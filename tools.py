@@ -22,7 +22,7 @@ ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
 # ── Approval system ─────────────────────────────────────────────────────────
 
 # Tools that require human approval before execution
-APPROVAL_REQUIRED = {"execute_code", "write_file"}
+APPROVAL_REQUIRED = {"execute_code"}
 
 # Pending approvals: tool_call_id → threading.Event
 _pending_approvals: dict[str, threading.Event] = {}

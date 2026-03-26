@@ -168,6 +168,24 @@ BUILTIN_REVIEWERS = [
         "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
         ["first-use clarity","plain language","workflow intuitiveness","value delivered"],
         ["ui","report","documentation","user_flow","dashboard","api","frontend"]),
+    ReviewerSpec("creative_director", "Creative Director",
+        "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? "
+        "Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? "
+        "FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
+        ["innovation","elegance","originality","lateral thinking","user delight","bold alternatives"],
+        ["code","api","ui","frontend","ux","report","dashboard","user_flow","backend","documentation"]),
+    ReviewerSpec("devils_advocate", "Devil's Advocate",
+        "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, "
+        "and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? "
+        "What looks right but is subtly wrong? Be ruthless but specific — vague skepticism is useless.",
+        ["hidden assumptions","logical flaws","edge cases","failure modes","unstated dependencies","silent failures"],
+        ["code","api","auth","data","config","infrastructure","backend","security","ui","frontend","user_flow"]),
+    ReviewerSpec("performance_engineer", "Performance Engineer",
+        "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, "
+        "memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, "
+        "and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
+        ["scalability","N+1 queries","memory management","caching","concurrency","latency","cost efficiency"],
+        ["code","api","data","backend","infrastructure","config"]),
 ]
 
 
@@ -261,12 +279,13 @@ class OrchestratorState(TypedDict):
     sub_agents:     list[dict]
     reviewers:      list[dict]
     tasks:          list[dict]
-    active_task_id: Optional[str]
-    results:        dict[str, str]
-    finished:       bool
-    phase:          str
-    tokens_used:    int
-    last_verdict:   Optional[dict]
+    active_task_id:  Optional[str]
+    active_task_ids: list[str]           # batch of tasks for parallel execution
+    results:         dict[str, str]
+    finished:        bool
+    phase:           str
+    tokens_used:     int
+    last_verdict:    Optional[dict]
     synthesis_report: str
 
 
@@ -329,37 +348,63 @@ def master_node(state):
     if _plan_id:
         save_checkpoint(_plan_id, state)
 
+    # ── Priority 1: route tasks waiting for review ──
     for task in tasks:
-        if task["status"] != "pending":
-            continue
-        if all(results.get(d) for d in task["depends_on"]):
-            msg = f"[MASTER] Dispatching → {task['id']}: {task['title']}"
+        if task["status"] == "in_manager_review":
+            msg = f"[MASTER] Routing {task['id']} → manager review"
             print(f"\n{msg}"); log_event(msg)
-            tasks = upd(tasks, task["id"], status="in_progress")
-            s = {**state, "tasks": tasks, "active_task_id": task["id"], "phase": "execute"}
+            s = {**state, "tasks": tasks, "active_task_id": task["id"],
+                 "active_task_ids": [], "phase": "manager_review"}
+            write_status(s); return s
+        if task["status"] == "in_specialist_review":
+            msg = f"[MASTER] Routing {task['id']} → specialist review"
+            print(f"\n{msg}"); log_event(msg)
+            s = {**state, "tasks": tasks, "active_task_id": task["id"],
+                 "active_task_ids": [], "phase": "specialist_review"}
             write_status(s); return s
 
+    # ── Priority 2: find ALL ready tasks and dispatch ──
+    ready = [t for t in tasks
+             if t["status"] == "pending"
+             and all(results.get(d) for d in t["depends_on"])]
+
+    if ready:
+        ready_ids = []
+        for t in ready:
+            msg = f"[MASTER] Dispatching → {t['id']}: {t['title']}"
+            print(f"\n{msg}"); log_event(msg)
+            tasks = upd(tasks, t["id"], status="in_progress")
+            ready_ids.append(t["id"])
+
+        if len(ready_ids) > 1:
+            log_event(f"[MASTER] ⚡ Parallel batch: {len(ready_ids)} tasks")
+
+        s = {**state, "tasks": tasks,
+             "active_task_id": ready_ids[0],
+             "active_task_ids": ready_ids,
+             "phase": "execute"}
+        write_status(s); return s
+
+    # ── All done or blocked ──
     if all(t["status"] in ("done", "failed") for t in tasks):
         msg = "[MASTER] All tasks complete — synthesising"
         print(f"\n{msg}"); log_event(msg)
-        s = {**state, "active_task_id": None, "phase": "done"}
+        s = {**state, "active_task_id": None, "active_task_ids": [], "phase": "done"}
         write_status(s); return s
 
     msg = "[MASTER] Remaining tasks blocked — forcing done"
     print(f"\n{msg}"); log_event(msg)
-    s = {**state, "active_task_id": None, "phase": "done"}
+    s = {**state, "active_task_id": None, "active_task_ids": [], "phase": "done"}
     write_status(s); return s
 
 
-def sub_agent_node(state):
-    tid    = state["active_task_id"]
-    tasks  = state["tasks"]
-    results = state["results"]
-    agents = {a["name"]: a for a in state["sub_agents"]}
+def _execute_single_task(tid, tasks, results, sub_agents_list):
+    """Run a single sub-agent task. Returns (tid, draft, toks, tool_calls_log, model).
+    Thread-safe — called from ThreadPoolExecutor for parallel execution."""
     task   = get_task(tid, tasks)
+    agents = {a["name"]: a for a in sub_agents_list}
     agent  = agents.get(task["agent"], {})
     rev    = task.get("revision_count", 0)
-    set_active_reviewer(None)
 
     system = (
         f"You are the '{task['agent']}' specialist. {agent.get('description','')}\n"
@@ -403,9 +448,8 @@ def sub_agent_node(state):
             if rag_context:
                 ctx.append(f"\n--- RELEVANT KNOWLEDGE ---\n{rag_context}")
     except Exception:
-        pass  # RAG unavailable — continue without
+        pass
 
-    # ── Set tool context for this task ──
     set_tool_context(plan_id=_plan_id, task_id=tid, agent=task["agent"])
     agent_tools = get_tools(agent.get("tools", []))
     messages = [
@@ -417,9 +461,8 @@ def sub_agent_node(state):
     tool_calls_log = []
 
     if agent_tools:
-        # ── Agentic tool loop ──
         llm_with_tools = llm(model).bind_tools(agent_tools)
-        max_iterations = 10
+        max_iterations = 5
         for _iter in range(max_iterations):
             resp = llm_with_tools.invoke(messages)
             total_toks += extract_tokens(resp)
@@ -431,27 +474,90 @@ def sub_agent_node(state):
                 tc_args = tc["args"]
                 log_event(f"  [TOOL] {tc_name}({str(tc_args)[:80]})")
                 result = execute_tool_call(tc, agent_tools)
-                messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
+                result_str = str(result)[:4000]
+                messages.append(ToolMessage(content=result_str, tool_call_id=tc["id"]))
                 tool_calls_log.append({"tool": tc_name, "args_preview": str(tc_args)[:100],
-                                       "result_preview": str(result)[:200]})
-        draft = resp.content
+                                       "result_preview": result_str[:200]})
+        draft = resp.content or ""
+        if not draft.strip():
+            log_event(f"  [TOOL] Loop exhausted — requesting final summary")
+            messages.append(HumanMessage(
+                content="You've completed your tool calls. Now produce your final written output for this task. "
+                        "Synthesize everything you learned from the tools into your deliverable."
+            ))
+            resp = llm(model).invoke(messages)
+            total_toks += extract_tokens(resp)
+            draft = resp.content or "(No output generated)"
     else:
-        # ── Plain text generation (no tools) ──
         resp = llm(model).invoke(messages)
         total_toks = extract_tokens(resp)
         draft = resp.content
 
-    total_tokens = state.get("tokens_used", 0) + total_toks
     tools_used = len(tool_calls_log)
-    done = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
-    print(f"  {done}"); log_event(done)
+    done_msg = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
+    print(f"  {done_msg}"); log_event(done_msg)
 
-    tasks = upd(tasks, tid, status="in_manager_review", result=draft,
-                manager_notes="", reviewer_notes="",
-                current_model=model, task_tokens=task.get("task_tokens", 0) + total_toks,
-                tool_calls=tool_calls_log)
-    s = {**state, "tasks": tasks, "phase": "manager_review", "tokens_used": total_tokens}
-    write_status(s); return s
+    return (tid, draft, total_toks, tool_calls_log, model)
+
+
+def sub_agent_node(state):
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    active_ids = state.get("active_task_ids", [])
+    tasks      = state["tasks"]
+    results    = state["results"]
+    sub_agents = state["sub_agents"]
+    set_active_reviewer(None)
+
+    # Fall back to single task if active_task_ids not populated
+    if not active_ids:
+        active_ids = [state["active_task_id"]]
+
+    if len(active_ids) == 1:
+        # ── Single task — run directly ──
+        tid = active_ids[0]
+        tid, draft, toks, tool_log, model = _execute_single_task(tid, tasks, results, sub_agents)
+        task = get_task(tid, tasks)
+        total_tokens = state.get("tokens_used", 0) + toks
+        tasks = upd(tasks, tid, status="in_manager_review", result=draft,
+                    manager_notes="", reviewer_notes="",
+                    current_model=model, task_tokens=task.get("task_tokens", 0) + toks,
+                    tool_calls=tool_log)
+        s = {**state, "tasks": tasks, "phase": "manager_review",
+             "tokens_used": total_tokens, "active_task_ids": []}
+        write_status(s); return s
+    else:
+        # ── Parallel execution — multiple agents working simultaneously ──
+        log_event(f"[PARALLEL] ⚡ Running {len(active_ids)} tasks concurrently")
+        total_new_toks = 0
+
+        with ThreadPoolExecutor(max_workers=len(active_ids)) as pool:
+            futures = {
+                pool.submit(_execute_single_task, tid, tasks, results, sub_agents): tid
+                for tid in active_ids
+            }
+            for future in as_completed(futures):
+                tid = futures[future]
+                try:
+                    tid, draft, toks, tool_log, model = future.result()
+                    task = get_task(tid, tasks)
+                    tasks = upd(tasks, tid, status="in_manager_review", result=draft,
+                                manager_notes="", reviewer_notes="",
+                                current_model=model,
+                                task_tokens=task.get("task_tokens", 0) + toks,
+                                tool_calls=tool_log)
+                    total_new_toks += toks
+                except Exception as e:
+                    log_event(f"[PARALLEL] {tid} failed: {e}")
+                    tasks = upd(tasks, tid, status="failed")
+
+        total_tokens = state.get("tokens_used", 0) + total_new_toks
+        log_event(f"[PARALLEL] ⚡ Batch complete — routing to reviews")
+        # Route back to master to dispatch reviews one at a time
+        s = {**state, "tasks": tasks, "phase": "dispatch",
+             "tokens_used": total_tokens, "active_task_id": None,
+             "active_task_ids": []}
+        write_status(s); return s
 
 
 def manager_review_node(state):
@@ -757,6 +863,7 @@ def run(plan_path="plan.md", plan_id: str = ""):
             "reviewers":         checkpoint["reviewers"],
             "tasks":             checkpoint["tasks"],
             "active_task_id":    None,
+            "active_task_ids":   [],
             "results":           checkpoint["results"],
             "finished":          checkpoint.get("finished", False),
             "phase":             "dispatch",
@@ -781,6 +888,7 @@ def run(plan_path="plan.md", plan_id: str = ""):
             "reviewers":         [r.__dict__ for r in reviewers],
             "tasks":             [t.__dict__ for t in tasks],
             "active_task_id":    None,
+            "active_task_ids":   [],
             "results":           {},
             "finished":          False,
             "phase":             "dispatch",

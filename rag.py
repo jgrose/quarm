@@ -10,6 +10,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+# Suppress noisy HTTP logs from HuggingFace/sentence-transformers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 

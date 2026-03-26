@@ -117,6 +117,46 @@
   #controlBar button:active {
     background: #ccaa00;
   }
+  /* ── Heartbeat indicator ──────────────────────────────────────────── */
+  #heartbeat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  #heartbeat .hb-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #444;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  #heartbeat .hb-dot.idle { background: #444; }
+  #heartbeat .hb-dot.running {
+    background: #00ff88;
+    animation: hbPulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 6px #00ff8866;
+  }
+  #heartbeat .hb-dot.stuck {
+    background: #ff4444;
+    animation: hbPulse 0.8s ease-in-out infinite;
+    box-shadow: 0 0 6px #ff444466;
+  }
+  @keyframes hbPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  #heartbeat .hb-label {
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    color: #556;
+    transition: color 0.3s;
+  }
+  #heartbeat .hb-label.running { color: #00ff88; }
+  #heartbeat .hb-label.stuck { color: #ff4444; }
+
   #controlBar button.active {
     background: #ffd70033;
   }
@@ -858,6 +898,7 @@
   <button id="btnQueue" onclick="toggleQueue()">QUEUE</button>
   <button id="btnLedger" onclick="toggleLedger()">LEDGER</button>
   <button id="btnModels" onclick="toggleModelConfig()">MODELS</button>
+  <div id="heartbeat"><div class="hb-dot idle"></div><span class="hb-label">IDLE</span></div>
 </div>
 <div id="queuePanel">
   <ul id="queueList">
@@ -901,7 +942,7 @@
 
 <script>
 const T = 17;
-const CW = 36, CH = 44;
+const CW = 36, CH = 54;
 
 const P = {
   void:'#06080f', wallD:'#12101e', wallM:'#1e1a30', wallH:'#2e2844',
@@ -976,6 +1017,21 @@ const ROOMS = [
     c:24,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.cyan, ch:'rev_usr',
     desc:'Quality gate #2 — Plane of Justice. Six hooded, faceless judges armed with perfectly balanced warhammers. Their dark piercing gaze weighs all deeds. Reviews as a mortal user: clarity, plain language, workflow intuitiveness.',
     resp:['First-use clarity','Plain language audit','Workflow intuitiveness','Value assessment']},
+  { id:'rev_creative', name:'CREATIVE DIRECTOR', role:'Innovation Provocateur',
+    floor:'BASEMENT · CREATIVE FORGE', tier:'reviewer',
+    c:2,r:44,w:10,h:8, fc:['#1a1808','#221e0a'], ac:'#ffaa00', ch:'rev_creative',
+    desc:'Quality gate #2 — The Creative Director. Challenges conventional thinking and safe solutions. Pushes for innovation, elegance, and delight. Asks: what would make someone say "that\'s brilliant"?',
+    resp:['Innovation','Elegance','Originality','Bold alternatives','User delight']},
+  { id:'rev_devil', name:"DEVIL'S ADVOCATE", role:'Contrarian Critic',
+    floor:'BASEMENT · SHADOW COURT', tier:'reviewer',
+    c:13,r:44,w:10,h:8, fc:['#0a0a18','#0e0e20'], ac:'#ff6644', ch:'rev_devil',
+    desc:'Quality gate #2 — The Devil\'s Advocate. Assumes everything is wrong. Finds hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ruthless but specific.',
+    resp:['Hidden assumptions','Logical flaws','Edge cases','Failure modes','Silent failures']},
+  { id:'rev_perf', name:'PERFORMANCE ENG', role:'Scalability Auditor',
+    floor:'BASEMENT · STRESS CHAMBER', tier:'reviewer',
+    c:24,r:44,w:10,h:8, fc:['#080e18','#0c1420'], ac:'#44ddff', ch:'rev_perf',
+    desc:'Quality gate #2 — The Performance Engineer. Reviews for scalability, efficiency, and production readiness. Finds N+1 queries, memory leaks, missing indexes, and anything that falls over at 10x traffic.',
+    resp:['Scalability','N+1 queries','Memory management','Caching','Latency','Cost efficiency']},
 ];
 
 const TIER_COLORS = { master:P.gold, manager:P.blue, subagent:P.green, reviewer:P.purple };
@@ -1310,11 +1366,64 @@ function drawRevUsr(ctx, x, y) {
   fp(ctx,x,y,5,8); fp(ctx,x,y,3,11); fp(ctx,x,y,4,11);
 }
 
+// ── Creative Director — wild hair, paint-splattered smock, golden eye ────────
+function drawRevCreative(ctx, x, y) {
+  ctx.fillStyle='#cc8800'; // wild golden hair
+  fp(ctx,x,y,0,0); fp(ctx,x,y,1,0); fp(ctx,x,y,2,0); fp(ctx,x,y,5,0); fp(ctx,x,y,6,0); fp(ctx,x,y,7,0);
+  ctx.fillStyle='#ffaa00'; fp(ctx,x,y,3,0); fp(ctx,x,y,4,0);
+  fp(ctx,x,y,0,1); fp(ctx,x,y,7,1);
+  ctx.fillStyle='#f5dcc0'; // face
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ffaa00'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3); // golden eyes
+  ctx.fillStyle='#cc6644'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5); // grin
+  ctx.fillStyle='#eeeedd'; // paint-splattered smock
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff4444'; fp(ctx,x,y,2,8); fp(ctx,x,y,5,11); // red paint
+  ctx.fillStyle='#4488ff'; fp(ctx,x,y,4,7); fp(ctx,x,y,1,10); // blue paint
+  ctx.fillStyle='#44cc44'; fp(ctx,x,y,6,9); fp(ctx,x,y,3,12); // green paint
+  ctx.fillStyle='#ffaa00'; fp(ctx,x,y,7,7); fp(ctx,x,y,7,8); fp(ctx,x,y,7,9); // paintbrush
+}
+
+// ── Devil's Advocate — red-tinted figure, horns, skeptical eyes ─────────────
+function drawRevDevil(ctx, x, y) {
+  ctx.fillStyle='#cc3300'; fp(ctx,x,y,1,0); fp(ctx,x,y,6,0); // horns
+  ctx.fillStyle='#aa2200'; fp(ctx,x,y,0,0); fp(ctx,x,y,7,0);
+  ctx.fillStyle='#8a4a3a'; // dark red-brown face
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff4400'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3); // glowing red eyes
+  ctx.fillStyle='#ff2200'; fp(ctx,x,y,3,3); fp(ctx,x,y,4,3); // intense stare
+  ctx.fillStyle='#555'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5); // skeptical frown
+  ctx.fillStyle='#1a1010'; // dark cloak
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#cc3300'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,7); // red clasp
+  ctx.fillStyle='#ff440033'; fp(ctx,x,y,3,9); fp(ctx,x,y,4,10); // ember glow
+  ctx.fillStyle='#0e0808'; fp(ctx,x,y,0,7); fp(ctx,x,y,7,7); // cloak edges
+}
+
+// ── Performance Engineer — visor, circuit-pattern suit, stopwatch ────────────
+function drawRevPerf(ctx, x, y) {
+  ctx.fillStyle='#44ddff'; // visor
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
+  ctx.fillStyle='#2288aa';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#d0d0d0'; // face behind visor
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#44ddff'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3); // visor eyes
+  ctx.fillStyle='#2a2a3a'; // dark tech suit
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#44ddff'; // circuit lines
+  fp(ctx,x,y,2,7); fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,5,7);
+  fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
+  ctx.fillStyle='#ffcc00'; fp(ctx,x,y,0,8); fp(ctx,x,y,0,9); // stopwatch
+  ctx.fillStyle='#aa8800'; fp(ctx,x,y,0,7); // chain
+}
+
 function drawSprite(ctx, x, y, type, bob) {
   const oy = bob ? 1 : 0;
   const fn = {master:drawMaster, manager_a:drawManagerA, manager_b:drawManagerB,
     eng:drawEng, sec:drawSec, fe:drawFE, writer:drawWriter,
-    rev_sec:drawRevSec, rev_ux:drawRevUX, rev_usr:drawRevUsr}[type];
+    rev_sec:drawRevSec, rev_ux:drawRevUX, rev_usr:drawRevUsr,
+    rev_creative:drawRevCreative, rev_devil:drawRevDevil, rev_perf:drawRevPerf}[type];
   if(fn) fn(ctx, x, y - oy);
 }
 
@@ -2016,7 +2125,7 @@ function drawRoom(ctx, room, selected, tick) {
 }
 
 function drawHalls(ctx, tick) {
-  const hallRows=[[11,12],[22,23],[32,33]];
+  const hallRows=[[11,12],[22,23],[32,33],[42,43]];
   for(const [r1,r2] of hallRows){
     for(let c=2;c<CW-2;c++) for(let r=r1;r<=r2;r++){
       ctx.fillStyle=(c+r)%2===0?P.wood:P.woodL;
@@ -2032,8 +2141,8 @@ function drawHalls(ctx, tick) {
         ctx.beginPath(); ctx.moveTo(sc*T,r1*T+i*4); ctx.lineTo(sc*T+T,r1*T+i*4); ctx.stroke();
       }
     });
-    const labels=['PLANES OF POWER','ELEMENTAL PLANES','PLANES OF FEAR'];
-    const labelColors=['#44aaff','#00ff88','#bf44ff'];
+    const labels=['PLANES OF POWER','ELEMENTAL PLANES','PLANES OF FEAR','PLANES OF CHALLENGE'];
+    const labelColors=['#44aaff','#00ff88','#bf44ff','#ff8844'];
     const idx=hallRows.findIndex(h=>h[0]===r1&&h[1]===r2);
     if(idx>=0){
       const lc=labelColors[idx];
@@ -2188,9 +2297,12 @@ const WS_URL = `ws://${location.host}/ws`;
 const SA_SLOTS  = ["sa1","sa2","sa3","sa4"];   // sub-agent workshops
 const MGR_SLOTS = ["mgr_a","mgr_b"];           // director offices
 const REV_SLOTS = {                            // reviewers are name-keyed (built-ins)
-  security_engineer: "rev_sec",
-  ux_designer:       "rev_ux",
-  user_tester:       "rev_usr",
+  security_engineer:    "rev_sec",
+  ux_designer:          "rev_ux",
+  user_tester:          "rev_usr",
+  creative_director:    "rev_creative",
+  devils_advocate:      "rev_devil",
+  performance_engineer: "rev_perf",
 };
 
 // Built at runtime from the roster payload
@@ -2877,6 +2989,15 @@ async function deletePlan(id) {
   }
 }
 
+async function stopPlan(id) {
+  try {
+    await fetch(`/api/plans/${id}/stop`, { method: 'POST' });
+    refreshQueue();
+  } catch (e) {
+    console.error('stopPlan:', e);
+  }
+}
+
 async function reorderQueue(orderedIds) {
   try {
     await fetch('/api/plans/reorder', {
@@ -2952,11 +3073,19 @@ function renderQueue(plans) {
       actions.appendChild(runBtn);
     }
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn-del';
-    delBtn.textContent = '\u2715';
-    delBtn.onclick = (e) => { e.stopPropagation(); deletePlan(plan.id); };
-    actions.appendChild(delBtn);
+    if (plan.status === 'running' || plan.status === 'generating') {
+      const stopBtn = document.createElement('button');
+      stopBtn.className = 'btn-del';
+      stopBtn.textContent = 'STOP';
+      stopBtn.onclick = (e) => { e.stopPropagation(); stopPlan(plan.id); };
+      actions.appendChild(stopBtn);
+    } else {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-del';
+      delBtn.textContent = '\u2715';
+      delBtn.onclick = (e) => { e.stopPropagation(); deletePlan(plan.id); };
+      actions.appendChild(delBtn);
+    }
 
     li.appendChild(actions);
 
@@ -3545,6 +3674,37 @@ async function checkPendingApprovals() {
   } catch (e) {}
 }
 checkPendingApprovals();
+
+// ── Heartbeat poller ─────────────────────────────────────────────────────────
+
+async function pollHeartbeat() {
+  const dot = document.querySelector('#heartbeat .hb-dot');
+  const label = document.querySelector('#heartbeat .hb-label');
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) return;
+    const data = await res.json();
+    const status = data.status || 'idle';
+    dot.className = 'hb-dot ' + status;
+    label.className = 'hb-label ' + status;
+    if (status === 'running') {
+      const since = data.seconds_since_update || 0;
+      if (since < 10) label.textContent = 'WORKING...';
+      else if (since < 60) label.textContent = 'WORKING (' + since + 's)';
+      else label.textContent = 'WORKING (' + Math.floor(since / 60) + 'm)';
+    } else if (status === 'stuck') {
+      label.textContent = 'STUCK';
+    } else {
+      label.textContent = 'IDLE';
+    }
+  } catch (e) {
+    dot.className = 'hb-dot idle';
+    label.className = 'hb-label';
+    label.textContent = 'OFFLINE';
+  }
+}
+pollHeartbeat();
+setInterval(pollHeartbeat, 3000);
 
 </script>
 <div id="modelConfigOverlay">

@@ -90,7 +90,7 @@ Manager expertise_blend MUST span ALL domains of sub-agents they oversee.]
 - agent: [agent_name — must match a sub-agent above]
 - description: [Specific, detailed instructions. What exactly should the agent produce?]
 - task_type: [comma-separated tags from: code, api, auth, data, config, ui, frontend, ux, report, documentation, backend, infrastructure, security, user_flow, dashboard, form]
-- reviewers: [comma-separated from: security_engineer, ux_designer, user_tester — or leave empty as []]
+- reviewers: [comma-separated from: security_engineer, ux_designer, user_tester, creative_director, devils_advocate, performance_engineer — or leave empty as []]
 - depends_on: []
 - model: [optional — override model for this specific task, omit to auto-select]
 
@@ -109,10 +109,23 @@ ux_designer → Any task involving: user interfaces, frontend components, dashbo
 user_tester → Any task involving: interfaces the end-user touches, reports
   delivered to non-technical users, documentation, workflows a user must navigate.
 
-Multiple reviewers can be assigned to one task.
-A backend data pipeline might get [security_engineer] only.
-A user dashboard might get [security_engineer, ux_designer, user_tester].
-A pure-analysis or internal task might get [].
+creative_director → Any task where the solution could be generic or conventional.
+  Challenges safe thinking, pushes for innovation and elegance. Good for: architecture
+  decisions, API design, user flows, any task where there might be a bolder approach.
+
+devils_advocate → Any task with complexity, assumptions, or risk. Finds hidden
+  flaws, unstated dependencies, edge cases, and failure modes. Good for: code,
+  auth, data pipelines, infrastructure, anything that could break silently.
+
+performance_engineer → Any task involving: code that runs at scale, APIs,
+  data pipelines, database queries, caching, infrastructure. Finds N+1 queries,
+  memory leaks, blocking calls, missing indexes, scalability bottlenecks.
+
+Multiple reviewers can be assigned to one task. Be generous with reviewers.
+A backend API might get [security_engineer, devils_advocate, performance_engineer].
+A user dashboard might get [security_engineer, ux_designer, user_tester, creative_director].
+A core architecture task might get [devils_advocate, creative_director, performance_engineer].
+A pure-analysis or internal task might get [devils_advocate].
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RULES
@@ -123,6 +136,30 @@ RULES
 - Do NOT create tasks for managers or reviewers — they run automatically
 - The master agent is implicit — do not include it
 - Be specific in task descriptions — vague tasks produce poor results
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PARALLELISM (critical for performance)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Tasks with no dependencies (depends_on: []) run IN PARALLEL automatically.
+Tasks that depend on other tasks wait for those to finish first.
+
+MAXIMIZE parallelism by minimizing unnecessary depends_on:
+- Only add a dependency when a task truly NEEDS the output of another task.
+- Do NOT chain tasks sequentially just because they are numbered in order.
+- If two tasks can be done independently, they MUST have depends_on: [].
+
+Good example (3 tasks run in parallel, 1 waits):
+  TASK-001: Build API endpoints          depends_on: []
+  TASK-002: Build frontend components    depends_on: []
+  TASK-003: Write security policies      depends_on: []
+  TASK-004: Integration testing          depends_on: [TASK-001, TASK-002]
+
+Bad example (all sequential, wastes time):
+  TASK-001: Build API endpoints          depends_on: []
+  TASK-002: Build frontend components    depends_on: [TASK-001]  ← unnecessary!
+  TASK-003: Write security policies      depends_on: [TASK-002]  ← unnecessary!
+
+Aim for a WIDE dependency graph (many parallel tasks) not a TALL one (long chain).
 """
 
 

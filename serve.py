@@ -202,6 +202,7 @@ _loop: asyncio.AbstractEventLoop | None = None
 # Track running orchestrator so we don't double-start
 _running_plan_id: str | None = None
 _running_lock = threading.Lock()
+_stop_flags: set[str] = set()  # plan IDs that should be stopped
 
 
 def _broadcast_queue():
@@ -347,12 +348,16 @@ def _resume_interrupted_runs():
 
 
 def _cleanup_running_plans():
-    """Mark any in-flight plan as failed on shutdown (graceful Ctrl+C)."""
+    """On graceful shutdown, leave running plans resumable if checkpointed."""
     with _running_lock:
         plan_id = _running_plan_id
     if plan_id:
-        log.info(f"Shutdown: marking running plan {plan_id} as failed")
-        _update_plan_status(plan_id, "failed")
+        if has_checkpoint(plan_id):
+            # Keep status as "running" so _resume_interrupted_runs picks it up
+            log.info(f"Shutdown: plan {plan_id} has checkpoint — will resume on restart")
+        else:
+            log.info(f"Shutdown: marking plan {plan_id} as failed (no checkpoint)")
+            _update_plan_status(plan_id, "failed")
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -396,8 +401,9 @@ async def receive_update(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
     _last_update_time = time.time()
-    # Tag as orchestrator status so UI can distinguish from queue updates
-    payload["type"] = "orchestrator"
+    # Tag as orchestrator status if no type set (preserves approval_request etc.)
+    if "type" not in payload:
+        payload["type"] = "orchestrator"
     await manager.broadcast(payload)
     return {"ok": True, "clients": len(manager.active)}
 
@@ -491,6 +497,21 @@ async def api_run_plan(plan_id: str):
     )
     t.start()
     return {"ok": True, "id": plan_id}
+
+
+@app.post("/api/plans/{plan_id}/stop")
+async def api_stop_plan(plan_id: str):
+    """Stop a running plan."""
+    global _running_plan_id
+    with _running_lock:
+        if _running_plan_id != plan_id:
+            raise HTTPException(status_code=409, detail="Plan is not running")
+    # Set a stop flag the orchestrator thread can check
+    _stop_flags.add(plan_id)
+    _update_plan_status(plan_id, "failed")
+    _broadcast_queue()
+    log.info(f"Stop requested: {plan_id}")
+    return {"ok": True}
 
 
 @app.delete("/api/plans/{plan_id}")
