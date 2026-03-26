@@ -22,7 +22,7 @@ from typing import Annotated, TypedDict, Sequence, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from status_bridge import (
@@ -31,6 +31,7 @@ from status_bridge import (
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
+from tools import get_tools, execute_tool_call, set_tool_context
 from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
 
 load_dotenv()
@@ -293,6 +294,23 @@ def upd(tasks, tid, **kw):
 def find_mgr(agent, mgrs):
     return next((m for m in mgrs if agent in m.get("oversees", [])), None)
 
+def _auto_ingest(task, results):
+    """Auto-ingest completed task output into RAG for cross-run knowledge."""
+    try:
+        from rag import ingest_text
+        result_text = results.get(task["id"], task.get("result", ""))
+        if result_text and len(result_text) > 50:
+            n = ingest_text(
+                result_text, source=f"task:{task['id']}",
+                content_type="output", plan_id=_plan_id,
+                task_id=task["id"], agent=task.get("agent", ""),
+                tags=task.get("task_type", []),
+            )
+            log_event(f"  [RAG] Auto-ingested {task['id']} → {n} chunks")
+    except Exception as e:
+        log_event(f"  [RAG] Ingest failed: {e}")
+
+
 def applicable_reviewers(task, reviewers):
     named  = set(task.get("reviewers", []))
     ttypes = set(task.get("task_type",  []))
@@ -373,20 +391,65 @@ def sub_agent_node(state):
     model = resolve_model(task.get("model", ""), agent.get("model", ""), role="execute")
     log_event(f"  [MODEL] {model}")
 
-    resp  = llm(model).invoke([
+    # ── Smart context injection: auto-search RAG for relevant past knowledge ──
+    try:
+        from rag import search as rag_search_fn
+        rag_hits = rag_search_fn(f"query: {task['title']} {task['description'][:200]}", top_k=3)
+        if rag_hits:
+            rag_context = "\n\n".join(
+                f"[Knowledge Base — {h['source']}]\n{h['text'][:400]}"
+                for h in rag_hits if h['score'] > 0.5
+            )
+            if rag_context:
+                ctx.append(f"\n--- RELEVANT KNOWLEDGE ---\n{rag_context}")
+    except Exception:
+        pass  # RAG unavailable — continue without
+
+    # ── Set tool context for this task ──
+    set_tool_context(plan_id=_plan_id, task_id=tid, agent=task["agent"])
+    agent_tools = get_tools(agent.get("tools", []))
+    messages = [
         SystemMessage(content=system),
         HumanMessage(content=f"Task: {task['title']}\nDescription: {task['description']}"
                               + ("\n\n" + "\n\n".join(ctx) if ctx else "")),
-    ])
-    draft = resp.content
-    toks  = extract_tokens(resp)
-    total_tokens = state.get("tokens_used", 0) + toks
-    done  = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {toks} tokens) → manager review"
+    ]
+    total_toks = 0
+    tool_calls_log = []
+
+    if agent_tools:
+        # ── Agentic tool loop ──
+        llm_with_tools = llm(model).bind_tools(agent_tools)
+        max_iterations = 10
+        for _iter in range(max_iterations):
+            resp = llm_with_tools.invoke(messages)
+            total_toks += extract_tokens(resp)
+            if not resp.tool_calls:
+                break
+            messages.append(resp)
+            for tc in resp.tool_calls:
+                tc_name = tc["name"]
+                tc_args = tc["args"]
+                log_event(f"  [TOOL] {tc_name}({str(tc_args)[:80]})")
+                result = execute_tool_call(tc, agent_tools)
+                messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
+                tool_calls_log.append({"tool": tc_name, "args_preview": str(tc_args)[:100],
+                                       "result_preview": str(result)[:200]})
+        draft = resp.content
+    else:
+        # ── Plain text generation (no tools) ──
+        resp = llm(model).invoke(messages)
+        total_toks = extract_tokens(resp)
+        draft = resp.content
+
+    total_tokens = state.get("tokens_used", 0) + total_toks
+    tools_used = len(tool_calls_log)
+    done = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
     print(f"  {done}"); log_event(done)
 
     tasks = upd(tasks, tid, status="in_manager_review", result=draft,
                 manager_notes="", reviewer_notes="",
-                current_model=model, task_tokens=task.get("task_tokens", 0) + toks)
+                current_model=model, task_tokens=task.get("task_tokens", 0) + total_toks,
+                tool_calls=tool_calls_log)
     s = {**state, "tasks": tasks, "phase": "manager_review", "tokens_used": total_tokens}
     write_status(s); return s
 
@@ -410,6 +473,7 @@ def manager_review_node(state):
         log_event(f"[{manager['name'].upper()}] Max revisions — force-approving {tid}")
         results = {**results, tid: task["result"]}
         tasks   = upd(tasks, tid, status="done")
+        _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s

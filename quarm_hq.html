@@ -37,40 +37,42 @@
   canvas {
     display: block;
     image-rendering: pixelated;
-    height: 100%;
-    width: auto;
+    width: 100%;
     max-width: 100%;
   }
   #panel {
     margin-top: 10px;
     width: 100%;
-    min-height: 120px;
+    max-height: 40vh;
+    overflow-y: auto;
     background: #0d0d20;
     border: 2px solid #333;
     padding: 14px;
     display: none;
     transition: border-color 0.2s;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2040 #0d0d20;
   }
   #panel.visible { display: block; }
-  #panel-floor { font-size: 15px; letter-spacing: 2px; margin-bottom: 5px; }
-  #panel-name  { font-size: 14px; color: #fff; margin-bottom: 4px; }
-  #panel-role  { font-size: 15px; color: #8899aa; margin-bottom: 10px; }
-  #panel-desc  { font-size: 15px; color: #9ab; line-height: 2.2; margin-bottom: 10px; }
-  #panel-resp-label { font-size: 14px; letter-spacing: 2px; margin-bottom: 7px; }
+  #panel-floor { font-size: 11px; letter-spacing: 2px; margin-bottom: 5px; }
+  #panel-name  { font-size: 14px; color: #fff; margin-bottom: 4px; word-wrap: break-word; }
+  #panel-role  { font-size: 11px; color: #8899aa; margin-bottom: 10px; word-wrap: break-word; }
+  #panel-desc  { font-size: 11px; color: #9ab; line-height: 2; margin-bottom: 10px; word-wrap: break-word; overflow-wrap: break-word; }
+  #panel-resp-label { font-size: 10px; letter-spacing: 2px; margin-bottom: 7px; }
   #panel-resp  { display: flex; flex-wrap: wrap; gap: 5px; }
-  .resp-tag    { font-size: 14px; padding: 3px 7px; border: 1px solid; }
+  .resp-tag    { font-size: 10px; padding: 3px 7px; border: 1px solid; white-space: nowrap; }
   #panel-close {
     float: right; background: none; border: 1px solid;
-    font-family: inherit; font-size: 15px; padding: 3px 8px; cursor: pointer;
+    font-family: inherit; font-size: 11px; padding: 3px 8px; cursor: pointer;
   }
   #hint {
-    margin-top: 8px; font-size: 14px; color: #334; letter-spacing: 2px; text-align: center;
+    margin-top: 8px; font-size: 10px; color: #334; letter-spacing: 2px; text-align: center;
   }
   #legend {
-    margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+    margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
   }
-  .leg { display: flex; align-items: center; gap: 5px; font-size: 14px; letter-spacing: 1px; }
-  .leg-dot { width: 9px; height: 9px; }
+  .leg { display: flex; align-items: center; gap: 4px; font-size: 9px; letter-spacing: 1px; }
+  .leg-dot { width: 8px; height: 8px; }
 
   /* ── Control bar ─────────────────────────────────────────────────────── */
   #controlBar {
@@ -85,8 +87,9 @@
   }
   #controlBar input[type="text"] {
     flex: 1;
+    min-width: 0;
     font-family: 'Silkscreen', monospace;
-    font-size: 15px;
+    font-size: 12px;
     background: #06080f;
     color: #ccc;
     border: 1px solid #2a2040;
@@ -102,7 +105,7 @@
   }
   #controlBar button {
     font-family: 'Silkscreen', monospace;
-    font-size: 15px;
+    font-size: 11px;
     padding: 5px 10px;
     cursor: pointer;
     border: 1px solid #ffd700;
@@ -151,7 +154,7 @@
     gap: 6px;
     padding: 5px 8px;
     border-bottom: 1px solid #1a1430;
-    font-size: 15px;
+    font-size: 11px;
     color: #ccc;
     transition: background 0.1s;
     cursor: default;
@@ -164,7 +167,7 @@
   .queue-item .drag-handle {
     cursor: grab;
     color: #444;
-    font-size: 22px;
+    font-size: 14px;
     user-select: none;
     padding: 0 2px;
   }
@@ -176,7 +179,7 @@
     white-space: nowrap;
   }
   .queue-item .status-badge {
-    font-size: 14px;
+    font-size: 10px;
     padding: 2px 5px;
     border: 1px solid;
     white-space: nowrap;
@@ -188,7 +191,7 @@
   }
   .queue-item .plan-actions button {
     font-family: 'Silkscreen', monospace;
-    font-size: 14px;
+    font-size: 10px;
     padding: 2px 5px;
     cursor: pointer;
     border: 1px solid;
@@ -212,7 +215,7 @@
   .queue-empty {
     padding: 10px;
     text-align: center;
-    font-size: 14px;
+    font-size: 10px;
     color: #334;
     letter-spacing: 1px;
   }
@@ -519,13 +522,14 @@
 
   /* ── Loot section in panel ─────────────────────────────────────────────── */
   #panel-loot-label {
-    font-size: 14px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
+    font-size: 10px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
   }
   #panel-loot {
-    font-size: 14px; color: #8a9a6a; line-height: 2;
+    font-size: 10px; color: #8a9a6a; line-height: 1.8;
     background: #0a0818; border: 1px solid #2a2040; padding: 8px;
-    max-height: 100px; overflow-y: auto; white-space: pre-wrap;
-    word-wrap: break-word; display: none;
+    max-height: 120px; overflow-y: auto; white-space: pre-wrap;
+    word-wrap: break-word; overflow-wrap: break-word; display: none;
+    scrollbar-width: thin; scrollbar-color: #2a2040 #0a0818;
   }
 /* ── Model config modal ──────────────────────────────────────────── */
 #modelConfigOverlay {
@@ -542,9 +546,13 @@
 #modelConfigInner {
   max-width: 500px;
   width: 100%;
+  min-width: 280px;
+  min-height: 200px;
   background: #0d0d20;
   border: 2px solid #ffd70066;
   padding: 16px;
+  resize: both;
+  overflow: auto;
 }
 #modelConfigHeader {
   display: flex;
@@ -591,7 +599,7 @@
 .model-ctrl-btn:hover { background: #ffd700; color: #0d0d20; }
 
 #modelList {
-  max-height: 300px;
+  flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #2a2040 #0d0d20;
@@ -600,6 +608,27 @@
 #modelList::-webkit-scrollbar-track { background: #0d0d20; }
 #modelList::-webkit-scrollbar-thumb { background: #2a2040; }
 
+.model-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid #ffd70033;
+  margin-bottom: 2px;
+  user-select: none;
+}
+.model-header span {
+  cursor: pointer;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace;
+  font-size: 14px;
+  color: #ffd70088;
+  letter-spacing: 1px;
+}
+.model-header span:hover { color: #ffd700; }
+.model-header span.sort-active { color: #ffd700; }
+.model-header .col-name { flex: 1; }
+.model-header .col-tier { width: 50px; text-align: center; margin: 0 6px; }
+.model-header .col-toggle { width: 24px; }
+
 .model-row {
   display: flex;
   align-items: center;
@@ -607,6 +636,29 @@
   border-bottom: 1px solid #1a1430;
 }
 .model-row:last-child { border-bottom: none; }
+.model-row.non-chat { opacity: 0.45; }
+.model-row.non-chat:hover { opacity: 0.7; }
+.model-badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 4px;
+  padding: 1px 4px;
+  margin-left: 4px;
+  border: 1px solid;
+  vertical-align: middle;
+}
+.badge-latest { color: #00ff88; border-color: #00ff8866; }
+.badge-recommended { color: #ffd700; border-color: #ffd70066; }
+.badge-nonchat { color: #666; border-color: #66666644; }
+.model-family-divider {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  color: #ffd70055;
+  padding: 6px 4px 2px;
+  letter-spacing: 1px;
+  border-top: 1px solid #ffd70022;
+  margin-top: 2px;
+}
+.model-ctrl-btn.active-preset { background: #ffd70033; border-color: #ffd700; }
 .model-name {
   font-family: 'Silkscreen', monospace;
   font-size: 14px;
@@ -3030,9 +3082,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closePlanViewer(); closeModelConfig(); }
 });
 
-// Close on click outside the inner panel
-document.getElementById('planViewer').addEventListener('click', e => {
-  if (e.target === document.getElementById('planViewer')) closePlanViewer();
+// Close on click outside the inner panel (deferred — element is after script tag)
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('planViewer').addEventListener('click', e => {
+    if (e.target === document.getElementById('planViewer')) closePlanViewer();
+  });
 });
 
 // Allow Enter key in the input to trigger generation
@@ -3043,6 +3097,97 @@ document.getElementById('planInput').addEventListener('keydown', e => {
 // ── Model config ─────────────────────────────────────────────────────────────
 
 let _modelConfigData = [];
+let _modelSort = { key: 'family', dir: 1 }; // default sort by family asc
+let _modelMeta = {}; // id → { family, isChat, isLatest, isRecommended }
+
+// Non-chat model keywords — these can't be used as agents
+const _NON_CHAT_KEYWORDS = ['embed', 'rerank', 'image-generator', 'canvas', 'titan-embed', 'titan-image'];
+
+function _modelFamily(id) {
+  const low = id.toLowerCase();
+  // Group by provider + model line: "bedrock-claude-opus-4-6" → "bedrock-claude"
+  // But keep sub-lines distinct: "bedrock-nova" vs "bedrock-claude"
+  const parts = low.split('-');
+  if (parts.length >= 3) {
+    // Check if third part is a model line (not a version/size)
+    const third = parts[2];
+    if (['claude', 'nova', 'titan', 'llama', 'gemma', 'embed'].includes(third)) {
+      return parts.slice(0, 3).join('-');
+    }
+  }
+  if (parts.length >= 2) return parts.slice(0, 2).join('-');
+  return parts[0];
+}
+
+function _isNonChat(id) {
+  const low = id.toLowerCase();
+  return _NON_CHAT_KEYWORDS.some(kw => low.includes(kw));
+}
+
+function _classifyModels() {
+  _modelMeta = {};
+  const families = {};
+
+  // Group by family
+  _modelConfigData.forEach(m => {
+    const fam = _modelFamily(m.id);
+    if (!families[fam]) families[fam] = [];
+    families[fam].push(m);
+    _modelMeta[m.id] = { family: fam, isChat: !_isNonChat(m.id), isLatest: false, isRecommended: false };
+  });
+
+  // Mark latest in each family (last alphabetically = highest version)
+  for (const fam of Object.keys(families)) {
+    const chatModels = families[fam].filter(m => _modelMeta[m.id].isChat);
+    if (chatModels.length > 0) {
+      // Sort descending, pick first as latest
+      const sorted = chatModels.map(m => m.id).sort().reverse();
+      _modelMeta[sorted[0]].isLatest = true;
+    }
+  }
+
+  // Mark recommended: latest chat model per tier (prefer non-guardrails)
+  const bestPerTier = {};
+  _modelConfigData.forEach(m => {
+    const meta = _modelMeta[m.id];
+    if (!meta.isChat || !meta.isLatest) return;
+    if (m.id.includes('guardrails')) return; // skip guardrails variants
+    const tier = m.tier;
+    if (!bestPerTier[tier] || m.id > bestPerTier[tier]) {
+      bestPerTier[tier] = m.id;
+    }
+  });
+  Object.values(bestPerTier).forEach(id => { _modelMeta[id].isRecommended = true; });
+}
+
+const _tierRank = { high: 0, mid: 1, low: 2 };
+
+function _sortModels() {
+  const k = _modelSort.key;
+  const d = _modelSort.dir;
+  _modelConfigData.sort((a, b) => {
+    let va, vb;
+    if (k === 'name') { va = a.id; vb = b.id; }
+    else if (k === 'tier') { va = _tierRank[a.tier] || 1; vb = _tierRank[b.tier] || 1; }
+    else { va = _modelFamily(a.id); vb = _modelFamily(b.id); } // family
+    if (va < vb) return -1 * d;
+    if (va > vb) return 1 * d;
+    // Secondary sort by name
+    if (k !== 'name') return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    return 0;
+  });
+}
+
+function sortModels(key) {
+  if (_modelSort.key === key) {
+    _modelSort.dir *= -1; // toggle direction
+  } else {
+    _modelSort.key = key;
+    _modelSort.dir = 1;
+  }
+  _sortModels();
+  renderModelList();
+}
 
 function toggleModelConfig() {
   const overlay = document.getElementById('modelConfigOverlay');
@@ -3067,6 +3212,7 @@ async function loadModelConfig() {
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     _modelConfigData = data.models;
+    _classifyModels();
     renderModelList();
   } catch (e) {
     listEl.innerHTML = '<div class="queue-empty">FAILED TO LOAD MODELS</div>';
@@ -3080,14 +3226,76 @@ function renderModelList() {
     listEl.innerHTML = '<div class="queue-empty">NO MODELS AVAILABLE</div>';
     return;
   }
+  _sortModels();
   listEl.innerHTML = '';
+
+  // Column header
+  const hdr = document.createElement('div');
+  hdr.className = 'model-header';
+  const arrow = (k) => _modelSort.key === k ? (_modelSort.dir === 1 ? ' \u25B2' : ' \u25BC') : '';
+  const mkCol = (label, key, cls) => {
+    const s = document.createElement('span');
+    s.className = cls + (_modelSort.key === key ? ' sort-active' : '');
+    s.textContent = label + arrow(key);
+    s.onclick = () => sortModels(key);
+    return s;
+  };
+  const nameLabel = _modelSort.key === 'family' ? 'FAMILY' : 'MODEL';
+  const nameKey = _modelSort.key === 'family' ? 'family' : 'name';
+  const nameCol = mkCol(nameLabel, nameKey, 'col-name');
+  // Clicking cycles: family → name → family
+  nameCol.onclick = () => {
+    if (_modelSort.key === 'family') sortModels('name');
+    else if (_modelSort.key === 'name') sortModels('family');
+    else sortModels('family');
+  };
+  hdr.appendChild(nameCol);
+  hdr.appendChild(mkCol('TIER', 'tier', 'col-tier'));
+  const spacer = document.createElement('span');
+  spacer.className = 'col-toggle';
+  hdr.appendChild(spacer);
+  listEl.appendChild(hdr);
+
+  let lastFamily = '';
   _modelConfigData.forEach(model => {
+    const meta = _modelMeta[model.id] || {};
+
+    // Family divider when sorted by family
+    if (_modelSort.key === 'family') {
+      const fam = meta.family || _modelFamily(model.id);
+      if (fam !== lastFamily) {
+        lastFamily = fam;
+        const div = document.createElement('div');
+        div.className = 'model-family-divider';
+        div.textContent = fam.toUpperCase();
+        listEl.appendChild(div);
+      }
+    }
+
     const row = document.createElement('div');
-    row.className = 'model-row';
+    row.className = 'model-row' + (meta.isChat === false ? ' non-chat' : '');
 
     const name = document.createElement('span');
     name.className = 'model-name';
     name.textContent = model.id;
+    // Badges
+    if (meta.isRecommended) {
+      const b = document.createElement('span');
+      b.className = 'model-badge badge-recommended';
+      b.textContent = 'REC';
+      name.appendChild(b);
+    } else if (meta.isLatest) {
+      const b = document.createElement('span');
+      b.className = 'model-badge badge-latest';
+      b.textContent = 'LATEST';
+      name.appendChild(b);
+    }
+    if (!meta.isChat) {
+      const b = document.createElement('span');
+      b.className = 'model-badge badge-nonchat';
+      b.textContent = 'NON-CHAT';
+      name.appendChild(b);
+    }
     row.appendChild(name);
 
     const tier = document.createElement('span');
@@ -3109,6 +3317,30 @@ function renderModelList() {
 
 function toggleAllModels(enabled) {
   _modelConfigData.forEach(m => m.enabled = enabled);
+  renderModelList();
+}
+
+function presetRecommended() {
+  _modelConfigData.forEach(m => {
+    const meta = _modelMeta[m.id] || {};
+    m.enabled = !!meta.isRecommended;
+  });
+  renderModelList();
+}
+
+function presetLatestOnly() {
+  _modelConfigData.forEach(m => {
+    const meta = _modelMeta[m.id] || {};
+    m.enabled = !!meta.isLatest;
+  });
+  renderModelList();
+}
+
+function presetChatOnly() {
+  _modelConfigData.forEach(m => {
+    const meta = _modelMeta[m.id] || {};
+    m.enabled = meta.isChat !== false;
+  });
   renderModelList();
 }
 
@@ -3137,8 +3369,10 @@ async function saveModelConfig() {
 }
 
 // Close model config on Escape and click-outside
-document.getElementById('modelConfigOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modelConfigOverlay')) closeModelConfig();
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('modelConfigOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modelConfigOverlay')) closeModelConfig();
+  });
 });
 
 </script>
@@ -3149,8 +3383,11 @@ document.getElementById('modelConfigOverlay').addEventListener('click', e => {
       <button id="modelConfigClose" onclick="closeModelConfig()">&#x2715; CLOSE</button>
     </div>
     <div id="modelConfigControls">
-      <button class="model-ctrl-btn" onclick="toggleAllModels(true)">ENABLE ALL</button>
-      <button class="model-ctrl-btn" onclick="toggleAllModels(false)">DISABLE ALL</button>
+      <button class="model-ctrl-btn" onclick="presetRecommended()">RECOMMENDED</button>
+      <button class="model-ctrl-btn" onclick="presetLatestOnly()">LATEST ONLY</button>
+      <button class="model-ctrl-btn" onclick="presetChatOnly()">CHAT ONLY</button>
+      <button class="model-ctrl-btn" onclick="toggleAllModels(true)">ALL</button>
+      <button class="model-ctrl-btn" onclick="toggleAllModels(false)">NONE</button>
       <button class="model-ctrl-btn" onclick="saveModelConfig()">SAVE</button>
     </div>
     <div id="modelList">
