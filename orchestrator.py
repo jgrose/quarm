@@ -554,6 +554,7 @@ def specialist_review_node(state):
         set_active_reviewer(None)
         results = {**results, tid: task["result"]}
         tasks   = upd(tasks, tid, status="done")
+        _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
@@ -621,6 +622,7 @@ def specialist_review_node(state):
     print(f"  {msg}"); log_event(msg)
     results = {**results, tid: task["result"]}
     tasks   = upd(tasks, tid, status="done", reviewer_notes="")
+    _auto_ingest(task, results)
     s = {**state, "tasks": tasks, "results": results,
          "phase": "dispatch", "active_task_id": None}
     write_status(s); return s

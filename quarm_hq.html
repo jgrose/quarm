@@ -27,18 +27,14 @@
     border: 2px solid #2a2040;
     cursor: pointer;
     overflow: hidden;
-    flex: 1 1 auto;
-    min-height: 0;
     width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    max-width: 800px;
+    margin: 0 auto;
   }
   canvas {
     display: block;
     image-rendering: pixelated;
     width: 100%;
-    max-width: 100%;
   }
   #panel {
     margin-top: 10px;
@@ -713,9 +709,93 @@
   margin-top: 8px;
   min-height: 12px;
 }
+
+/* ── Approval banner ─────────────────────────────────────────────── */
+#approvalBanner {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 2000;
+  background: #1a0a00;
+  border-bottom: 3px solid #ff8800;
+  padding: 12px 20px;
+  box-shadow: 0 4px 20px rgba(255, 136, 0, 0.3);
+  animation: approvalPulse 2s ease-in-out infinite;
+}
+#approvalBanner.visible { display: block; }
+@keyframes approvalPulse {
+  0%, 100% { border-bottom-color: #ff8800; }
+  50% { border-bottom-color: #ffd700; }
+}
+#approvalBanner .approval-header {
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
+  color: #ff8800;
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+#approvalBanner .approval-tool {
+  font-family: 'Silkscreen', monospace;
+  font-size: 13px;
+  color: #ffd700;
+  margin-bottom: 4px;
+}
+#approvalBanner .approval-agent {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  color: #aabbcc;
+  margin-bottom: 8px;
+}
+#approvalBanner .approval-args {
+  font-family: 'Silkscreen', monospace;
+  font-size: 10px;
+  color: #8899aa;
+  background: #0d0d20;
+  border: 1px solid #2a2040;
+  padding: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 10px;
+}
+#approvalBanner .approval-actions {
+  display: flex;
+  gap: 10px;
+}
+#approvalBanner .approval-actions button {
+  font-family: 'Silkscreen', monospace;
+  font-size: 13px;
+  padding: 6px 16px;
+  cursor: pointer;
+  border: 2px solid;
+}
+.btn-approve {
+  background: #0a2010;
+  color: #00ff88;
+  border-color: #00ff88 !important;
+}
+.btn-approve:hover { background: #00ff88; color: #0a2010; }
+.btn-reject {
+  background: #200a0a;
+  color: #ff4444;
+  border-color: #ff4444 !important;
+}
+.btn-reject:hover { background: #ff4444; color: #200a0a; }
 </style>
 </head>
 <body>
+
+<div id="approvalBanner">
+  <div class="approval-header">TOOL APPROVAL REQUIRED</div>
+  <div class="approval-tool" id="approvalTool"></div>
+  <div class="approval-agent" id="approvalAgent"></div>
+  <div class="approval-args" id="approvalArgs"></div>
+  <div class="approval-actions">
+    <button class="btn-approve" onclick="resolveApproval(true)">APPROVE</button>
+    <button class="btn-reject" onclick="resolveApproval(false)">REJECT</button>
+  </div>
+</div>
 
 <button id="configBtn" onclick="toggleConfig()">&#9881;</button>
 <div id="configOverlay">
@@ -1915,13 +1995,24 @@ function drawRoom(ctx, room, selected, tick) {
   drawPillar(ctx,x,y+rh-T);
   drawPillar(ctx,x+rw-T,y+rh-T);
 
-  ctx.font='bold 13px "Silkscreen",monospace';
+  // ── Room name label — clipped to room width ──
+  const maxLabelW = rw - T*2;  // leave pillar padding
+  let fontSize = 11;
+  ctx.font=`bold ${fontSize}px "Silkscreen",monospace`;
+  // Shrink font until name fits, minimum 7px
+  while(ctx.measureText(name).width > maxLabelW && fontSize > 7) {
+    fontSize--;
+    ctx.font=`bold ${fontSize}px "Silkscreen",monospace`;
+  }
   ctx.textAlign='center';
-  const tw=ctx.measureText(name).width+10;
+  const labelW = Math.min(ctx.measureText(name).width + 8, maxLabelW + 8);
   const nx=x+rw/2, ny=y+rh-7;
-  ctx.fillStyle='#050510cc'; ctx.fillRect(nx-tw/2,ny-9,tw,11);
-  ctx.strokeStyle=ac+'80'; ctx.lineWidth=1; ctx.strokeRect(nx-tw/2,ny-9,tw,11);
-  ctx.fillStyle=ac; ctx.fillText(name,nx,ny);
+  ctx.fillStyle='#050510cc'; ctx.fillRect(nx-labelW/2, ny-fontSize-1, labelW, fontSize+4);
+  ctx.strokeStyle=ac+'80'; ctx.lineWidth=1; ctx.strokeRect(nx-labelW/2, ny-fontSize-1, labelW, fontSize+4);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x+T, ny-fontSize-2, rw-T*2, fontSize+6); ctx.clip();
+  ctx.fillStyle=ac; ctx.fillText(name, nx, ny);
+  ctx.restore();
 }
 
 function drawHalls(ctx, tick) {
@@ -2138,7 +2229,7 @@ function buildMapsFromRoster(data) {
     roomMeta[slot] = { title: a.title || prettify(a.name), tier: "subagent" };
     // Relabel the room nameplate in ROOMS array
     const room = ROOMS.find(r => r.id === slot);
-    if (room) room.name = (a.title || prettify(a.name)).toUpperCase();
+    if (room) room.name = (a.title || prettify(a.name)).toUpperCase().slice(0, 16);
   });
 
   // Managers → mgr_a, mgr_b in declaration order
@@ -2688,6 +2779,10 @@ function connectWS() {
         renderQueue(data.plans);
       } else if (data.type === 'plan_event') {
         handlePlanEvent(data);
+      } else if (data.type === 'approval_request') {
+        showApproval(data);
+      } else if (data.type === 'approval_resolved') {
+        hideApproval();
       } else {
         // orchestrator status (existing behavior)
         applyStatus(data);
@@ -3101,22 +3196,42 @@ let _modelSort = { key: 'family', dir: 1 }; // default sort by family asc
 let _modelMeta = {}; // id → { family, isChat, isLatest, isRecommended }
 
 // Non-chat model keywords — these can't be used as agents
-const _NON_CHAT_KEYWORDS = ['embed', 'rerank', 'image-generator', 'canvas', 'titan-embed', 'titan-image'];
+const _NON_CHAT_KEYWORDS = ['embed', 'rerank', 'image-generator', 'canvas'];
+
+// Model line keywords — used to split families (e.g. claude-opus vs claude-sonnet)
+const _LINE_KEYWORDS = ['opus', 'sonnet', 'haiku', 'premier', 'pro', 'lite', 'maverick', 'scout'];
 
 function _modelFamily(id) {
-  const low = id.toLowerCase();
-  // Group by provider + model line: "bedrock-claude-opus-4-6" → "bedrock-claude"
-  // But keep sub-lines distinct: "bedrock-nova" vs "bedrock-claude"
-  const parts = low.split('-');
-  if (parts.length >= 3) {
-    // Check if third part is a model line (not a version/size)
-    const third = parts[2];
-    if (['claude', 'nova', 'titan', 'llama', 'gemma', 'embed'].includes(third)) {
-      return parts.slice(0, 3).join('-');
-    }
+  const parts = id.toLowerCase().split('-');
+
+  // Find model line (opus, sonnet, haiku, etc.)
+  let line = '';
+  for (const l of _LINE_KEYWORDS) {
+    if (parts.includes(l)) { line = l; break; }
   }
-  if (parts.length >= 2) return parts.slice(0, 2).join('-');
-  return parts[0];
+
+  // Find base family (claude, nova, llama, gemma, etc.)
+  const bases = ['claude', 'nova', 'titan', 'llama', 'gemma'];
+  let base = '';
+  for (const b of bases) {
+    if (parts.includes(b)) { base = b; break; }
+  }
+
+  // Build family: "claude-opus", "nova-premier", "llama-maverick"
+  if (base && line) return base + '-' + line;
+  if (base) return base;
+  // Fallback for non-standard names: first two parts
+  return parts.slice(0, Math.min(2, parts.length)).join('-');
+}
+
+function _versionScore(id) {
+  // Extract all numbers from the id and build a sortable score
+  // "bedrock-claude-opus-4-6" → [4, 6] → 40006
+  // "bedrock-claude-v3-5-sonnet" → [3, 5] → 30005
+  const nums = id.match(/\d+/g) || [];
+  let score = 0;
+  nums.forEach((n, i) => { score += parseInt(n) * Math.pow(1000, 4 - i); });
+  return score;
 }
 
 function _isNonChat(id) {
@@ -3136,28 +3251,29 @@ function _classifyModels() {
     _modelMeta[m.id] = { family: fam, isChat: !_isNonChat(m.id), isLatest: false, isRecommended: false };
   });
 
-  // Mark latest in each family (last alphabetically = highest version)
+  // Mark latest in each family — highest version score, excluding guardrails
   for (const fam of Object.keys(families)) {
-    const chatModels = families[fam].filter(m => _modelMeta[m.id].isChat);
-    if (chatModels.length > 0) {
-      // Sort descending, pick first as latest
-      const sorted = chatModels.map(m => m.id).sort().reverse();
-      _modelMeta[sorted[0]].isLatest = true;
+    const candidates = families[fam].filter(m =>
+      _modelMeta[m.id].isChat && !m.id.includes('guardrails')
+    );
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => _versionScore(b.id) - _versionScore(a.id));
+      _modelMeta[candidates[0].id].isLatest = true;
     }
   }
 
-  // Mark recommended: latest chat model per tier (prefer non-guardrails)
-  const bestPerTier = {};
+  // Mark recommended: the latest model per tier, preferring highest version score
+  const bestPerTier = {};  // tier → { id, score }
   _modelConfigData.forEach(m => {
     const meta = _modelMeta[m.id];
     if (!meta.isChat || !meta.isLatest) return;
-    if (m.id.includes('guardrails')) return; // skip guardrails variants
     const tier = m.tier;
-    if (!bestPerTier[tier] || m.id > bestPerTier[tier]) {
-      bestPerTier[tier] = m.id;
+    const score = _versionScore(m.id);
+    if (!bestPerTier[tier] || score > bestPerTier[tier].score) {
+      bestPerTier[tier] = { id: m.id, score };
     }
   });
-  Object.values(bestPerTier).forEach(id => { _modelMeta[id].isRecommended = true; });
+  Object.values(bestPerTier).forEach(entry => { _modelMeta[entry.id].isRecommended = true; });
 }
 
 const _tierRank = { high: 0, mid: 1, low: 2 };
@@ -3374,6 +3490,61 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('modelConfigOverlay')) closeModelConfig();
   });
 });
+
+// ── Tool approval UI ─────────────────────────────────────────────────────────
+
+let _pendingApprovalId = null;
+
+function showApproval(data) {
+  _pendingApprovalId = data.id;
+  document.getElementById('approvalTool').textContent = 'Tool: ' + data.tool;
+  document.getElementById('approvalAgent').textContent =
+    'Agent: ' + (data.agent || 'unknown') + (data.task_id ? '  |  Task: ' + data.task_id : '');
+
+  // Format args for display
+  let argsText = '';
+  if (data.args) {
+    for (const [key, val] of Object.entries(data.args)) {
+      const valStr = typeof val === 'string' ? val : JSON.stringify(val);
+      argsText += key + ': ' + valStr + '\n';
+    }
+  }
+  document.getElementById('approvalArgs').textContent = argsText || '(no arguments)';
+  document.getElementById('approvalBanner').classList.add('visible');
+}
+
+function hideApproval() {
+  document.getElementById('approvalBanner').classList.remove('visible');
+  _pendingApprovalId = null;
+}
+
+async function resolveApproval(approved) {
+  if (!_pendingApprovalId) return;
+  const id = _pendingApprovalId;
+  hideApproval();
+  try {
+    await fetch('/api/approvals/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved }),
+    });
+  } catch (e) {
+    console.error('resolveApproval:', e);
+  }
+}
+
+// Poll for pending approvals on page load (in case we refreshed while one was waiting)
+async function checkPendingApprovals() {
+  try {
+    const res = await fetch('/api/approvals');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.pending && data.pending.length > 0) {
+      showApproval(data.pending[0]);
+    }
+  } catch (e) {}
+}
+checkPendingApprovals();
 
 </script>
 <div id="modelConfigOverlay">

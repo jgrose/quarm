@@ -680,6 +680,56 @@ _watcher_thread = threading.Thread(target=_watch_incoming, daemon=True)
 _watcher_thread.start()
 
 
+# ── RAG endpoints ────────────────────────────────────────────────────────────
+
+@app.get("/api/rag/stats")
+async def rag_stats():
+    from rag import get_stats
+    return get_stats()
+
+@app.get("/api/rag/search")
+async def rag_search_endpoint(q: str = ""):
+    if not q:
+        return {"results": []}
+    from rag import search
+    return {"results": search(q, top_k=10)}
+
+
+# ── Tool approval endpoints ─────────────────────────────────────────────────
+
+@app.get("/api/approvals")
+async def get_approvals():
+    from tools import get_pending_approvals
+    return {"pending": get_pending_approvals()}
+
+@app.post("/api/approvals/{tool_call_id}")
+async def resolve_approval_endpoint(tool_call_id: str, request: Request):
+    data = await request.json()
+    from tools import resolve_approval
+    resolve_approval(tool_call_id, data.get("approved", False))
+    return {"ok": True}
+
+
+# ── Artifacts endpoint ───────────────────────────────────────────────────────
+
+ARTIFACTS_DIR = STATIC_DIR / "artifacts"
+
+@app.get("/api/artifacts/{plan_id}")
+async def list_artifacts(plan_id: str):
+    plan_dir = ARTIFACTS_DIR / plan_id
+    if not plan_dir.exists():
+        return {"files": []}
+    files = []
+    for f in sorted(plan_dir.rglob("*")):
+        if f.is_file():
+            files.append({
+                "path": str(f.relative_to(ARTIFACTS_DIR)),
+                "size": f.stat().st_size,
+                "name": f.name,
+            })
+    return {"files": files}
+
+
 # ── Static file fallback (must be last) ──────────────────────────────────────
 
 @app.get("/{filename}")

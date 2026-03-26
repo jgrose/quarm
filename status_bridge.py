@@ -139,6 +139,7 @@ def write_status(state: dict):
                 "task_tokens":    t.get("task_tokens", 0),
                 "depends_on":     t.get("depends_on", []),
                 "result_preview": (t.get("result", "") or "")[:500],
+                "tool_calls":     t.get("tool_calls", []),
             }
             for t in tasks
         ],

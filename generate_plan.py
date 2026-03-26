@@ -68,7 +68,7 @@ SCHEMA (follow exactly)
 ## Sub-Agents
 ### AGENT: [agent_name]
 - description: [Specialist role and exact output format this agent produces]
-- tools: [web_search, write_file, execute_code, read_file, analyze_data, design_ui, etc.]
+- tools: [choose from: web_search, browse_url, rag_search, rag_store, download_artifact, read_file, write_file, execute_code]
 - model: [optional — specific model ID to use for this agent, omit to auto-select]
 
 [Define 2-5 sub-agents. Each should be a distinct specialist.]
