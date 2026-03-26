@@ -17,9 +17,6 @@
   #out {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    max-width: 80vw;
-    max-height: 70vh;
-    object-fit: contain;
   }
   .sub {
     font-family: 'Cinzel Decorative', Georgia, serif;
@@ -133,8 +130,27 @@ function go() {
     }
   }
   oc.putImageData(img,0,0);
+
+  // Fit canvas display size to viewport
+  fitToViewport();
 }
 
+function fitToViewport() {
+  const out = document.getElementById('out');
+  const sub = document.querySelector('.sub');
+  const subH = sub ? sub.offsetHeight + 18 : 40;
+  const maxW = window.innerWidth * 0.8;
+  const maxH = window.innerHeight * 0.75 - subH;
+  const aspect = out.width / out.height;
+  let displayW = out.width;
+  let displayH = out.height;
+  if (displayH > maxH) { displayH = maxH; displayW = displayH * aspect; }
+  if (displayW > maxW) { displayW = maxW; displayH = displayW / aspect; }
+  out.style.width = Math.floor(displayW) + 'px';
+  out.style.height = Math.floor(displayH) + 'px';
+}
+
+window.addEventListener('resize', fitToViewport);
 if(document.fonts) document.fonts.ready.then(()=>setTimeout(go,200));
 else window.addEventListener('load',()=>setTimeout(go,400));
 </script>
