@@ -3688,10 +3688,12 @@ async function pollHeartbeat() {
     dot.className = 'hb-dot ' + status;
     label.className = 'hb-label ' + status;
     if (status === 'running') {
+      const count = data.running_count || 1;
       const since = data.seconds_since_update || 0;
-      if (since < 10) label.textContent = 'WORKING...';
-      else if (since < 60) label.textContent = 'WORKING (' + since + 's)';
-      else label.textContent = 'WORKING (' + Math.floor(since / 60) + 'm)';
+      const prefix = count > 1 ? count + ' PLANS' : 'WORKING';
+      if (since < 10) label.textContent = prefix + '...';
+      else if (since < 60) label.textContent = prefix + ' (' + since + 's)';
+      else label.textContent = prefix + ' (' + Math.floor(since / 60) + 'm)';
     } else if (status === 'stuck') {
       label.textContent = 'STUCK';
     } else {

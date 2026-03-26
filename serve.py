@@ -199,8 +199,8 @@ manager = ConnectionManager()
 # Reference to the running event loop (set during lifespan)
 _loop: asyncio.AbstractEventLoop | None = None
 
-# Track running orchestrator so we don't double-start
-_running_plan_id: str | None = None
+# Track running orchestrators — multiple plans can run simultaneously
+_running_plan_ids: set[str] = set()
 _running_lock = threading.Lock()
 _stop_flags: set[str] = set()  # plan IDs that should be stopped
 
@@ -269,7 +269,6 @@ def _generate_plan_worker(plan_id: str, description: str):
 
 def _run_orchestrator_worker(plan_id: str):
     """Run the orchestrator in a background thread."""
-    global _running_plan_id
     from orchestrator import run as orchestrator_run
     try:
         plan_file = str(PLANS_DIR / f"{plan_id}.md")
@@ -294,35 +293,30 @@ def _run_orchestrator_worker(plan_id: str):
         log.error(f"Orchestrator failed: {plan_id} — {e}")
     finally:
         with _running_lock:
-            _running_plan_id = None
-        # Auto-advance: start next queued plan if any
+            _running_plan_ids.discard(plan_id)
         _auto_advance()
 
 
 def _auto_advance():
-    """Start the next queued plan if nothing is running."""
-    global _running_plan_id
+    """Start any queued plans that aren't already running."""
     with _running_lock:
-        if _running_plan_id:
-            return
         queue = _load_queue()
+        to_start = []
         for entry in queue:
-            if entry["status"] == "queued":
-                _running_plan_id = entry["id"]
-                break
-        else:
-            return
-    t = threading.Thread(
-        target=_run_orchestrator_worker,
-        args=(_running_plan_id,),
-        daemon=True,
-    )
-    t.start()
+            if entry["status"] == "queued" and entry["id"] not in _running_plan_ids:
+                to_start.append(entry["id"])
+                _running_plan_ids.add(entry["id"])
+    for plan_id in to_start:
+        t = threading.Thread(
+            target=_run_orchestrator_worker,
+            args=(plan_id,),
+            daemon=True,
+        )
+        t.start()
 
 
 def _resume_interrupted_runs():
     """On startup, resume plans that were running when server died."""
-    global _running_plan_id
     queue = _load_queue()
     for entry in queue:
         if entry["status"] == "running":
@@ -330,17 +324,13 @@ def _resume_interrupted_runs():
             if has_checkpoint(plan_id):
                 log.info(f"Resuming interrupted run: {plan_id} ({entry.get('title', '')})")
                 with _running_lock:
-                    if _running_plan_id:
-                        log.warning(f"Cannot resume {plan_id} — another plan already running")
-                        continue
-                    _running_plan_id = plan_id
+                    _running_plan_ids.add(plan_id)
                 t = threading.Thread(
                     target=_run_orchestrator_worker,
                     args=(plan_id,),
                     daemon=True,
                 )
                 t.start()
-                break  # One at a time; _auto_advance handles the rest
             else:
                 log.warning(f"No checkpoint for interrupted run {plan_id} — marking failed")
                 _update_plan_status(plan_id, "failed")
@@ -350,10 +340,9 @@ def _resume_interrupted_runs():
 def _cleanup_running_plans():
     """On graceful shutdown, leave running plans resumable if checkpointed."""
     with _running_lock:
-        plan_id = _running_plan_id
-    if plan_id:
+        plan_ids = list(_running_plan_ids)
+    for plan_id in plan_ids:
         if has_checkpoint(plan_id):
-            # Keep status as "running" so _resume_interrupted_runs picks it up
             log.info(f"Shutdown: plan {plan_id} has checkpoint — will resume on restart")
         else:
             log.info(f"Shutdown: marking plan {plan_id} as failed (no checkpoint)")
@@ -486,9 +475,9 @@ async def api_run_plan(plan_id: str):
     clear_checkpoint(plan_id)
 
     with _running_lock:
-        if _running_plan_id:
-            raise HTTPException(status_code=409, detail="Another plan is already running")
-        _running_plan_id = plan_id
+        if plan_id in _running_plan_ids:
+            raise HTTPException(status_code=409, detail="Plan is already running")
+        _running_plan_ids.add(plan_id)
 
     t = threading.Thread(
         target=_run_orchestrator_worker,
@@ -502,9 +491,8 @@ async def api_run_plan(plan_id: str):
 @app.post("/api/plans/{plan_id}/stop")
 async def api_stop_plan(plan_id: str):
     """Stop a running plan."""
-    global _running_plan_id
     with _running_lock:
-        if _running_plan_id != plan_id:
+        if plan_id not in _running_plan_ids:
             raise HTTPException(status_code=409, detail="Plan is not running")
     # Set a stop flag the orchestrator thread can check
     _stop_flags.add(plan_id)
@@ -518,7 +506,7 @@ async def api_stop_plan(plan_id: str):
 async def api_delete_plan(plan_id: str):
     """Remove a plan from the queue."""
     with _running_lock:
-        if _running_plan_id == plan_id:
+        if plan_id in _running_plan_ids:
             raise HTTPException(status_code=409, detail="Cannot delete a running plan")
     _remove_plan(plan_id)
     _broadcast_queue()
@@ -588,14 +576,17 @@ _last_update_time = time.time()
 @app.get("/api/health")
 async def health():
     stuck_threshold = 1800  # 30 minutes
-    is_running = _running_plan_id is not None
+    with _running_lock:
+        running = list(_running_plan_ids)
+    is_running = len(running) > 0
     since_update = time.time() - _last_update_time
     status = "idle"
     if is_running:
         status = "stuck" if since_update > stuck_threshold else "running"
     return {
         "status": status,
-        "running_plan": _running_plan_id,
+        "running_plans": running,
+        "running_count": len(running),
         "uptime_seconds": int(time.time() - _server_start),
         "seconds_since_update": int(since_update),
     }
