@@ -474,6 +474,48 @@
   }
   #victoryClose:hover { background: #ffd700; color: #0d0d20; }
 
+  /* ── Ledger overlay ─────────────────────────────────────────────────────── */
+  #ledgerOverlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #06080fee; z-index: 180;
+    justify-content: center; align-items: flex-start; padding-top: 30px;
+    overflow-y: auto;
+  }
+  #ledgerOverlay.visible { display: flex; }
+  #ledgerPanel {
+    background: #0d0d20; border: 2px solid #0ff; padding: 20px;
+    width: 90%; max-width: 700px; font-family: 'Press Start 2P', monospace;
+    margin-bottom: 30px;
+  }
+  #ledgerPanel h2 {
+    font-size: 8px; color: #0ff; letter-spacing: 3px; margin-bottom: 14px;
+    text-align: center;
+  }
+  .ledger-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid #2a2040; }
+  .ledger-tab {
+    font-family: inherit; font-size: 6px; padding: 6px 14px; cursor: pointer;
+    border: 1px solid #2a2040; border-bottom: none; background: #0a0818; color: #556;
+  }
+  .ledger-tab.active { background: #0d0d20; color: #0ff; border-color: #0ff; }
+  .ledger-section { display: none; }
+  .ledger-section.active { display: block; }
+  .ledger-stat-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
+  .ledger-stat { text-align: center; padding: 8px 14px; border: 1px solid #2a2040; background: #0a0818; min-width: 80px; }
+  .ledger-stat-val { font-size: 10px; color: #0ff; }
+  .ledger-stat-lbl { font-size: 5px; color: #556; margin-top: 4px; letter-spacing: 1px; }
+  .ledger-bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .ledger-bar-label { font-size: 5px; color: #aab; width: 100px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ledger-bar-fill { height: 8px; min-width: 2px; transition: width 0.3s; }
+  .ledger-bar-val { font-size: 5px; color: #556; min-width: 40px; }
+  .ledger-table { font-size: 5px; color: #9ab; line-height: 2.2; width: 100%; border-collapse: collapse; }
+  .ledger-table th { color: #0ff; text-align: left; padding: 3px 6px; border-bottom: 1px solid #2a2040; font-size: 5px; letter-spacing: 1px; }
+  .ledger-table td { padding: 3px 6px; border-bottom: 1px solid #1a1430; }
+  #ledgerClose {
+    margin-top: 14px; width: 100%; font-family: inherit; font-size: 6px;
+    padding: 6px; cursor: pointer; border: 1px solid #0ff; background: #1a1430; color: #0ff;
+  }
+  #ledgerClose:hover { background: #0ff; color: #0d0d20; }
+
   /* ── Loot section in panel ─────────────────────────────────────────────── */
   #panel-loot-label {
     font-size: 5px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
@@ -634,6 +676,16 @@
     <div class="cfg-row"><span class="cfg-label">LOOT PREVIEW</span><div class="cfg-toggle on" data-key="lootPreview" onclick="toggleCfg(this)"></div></div>
     <div class="cfg-row"><span class="cfg-label">VICTORY SCREEN</span><div class="cfg-toggle on" data-key="victoryScreen" onclick="toggleCfg(this)"></div></div>
     <div class="cfg-row"><span class="cfg-label">DAY/NIGHT CYCLE</span><div class="cfg-toggle on" data-key="dayNight" onclick="toggleCfg(this)"></div></div>
+    <div style="border-top:1px solid #2a2040;margin:10px 0 6px;padding-top:8px">
+      <span class="cfg-label" style="color:#0ff;letter-spacing:2px">WEBHOOK</span>
+    </div>
+    <div class="cfg-row">
+      <input type="text" id="webhookUrl" placeholder="https://hooks.slack.com/..."
+        style="flex:1;font-family:inherit;font-size:5px;background:#06080f;color:#ccc;border:1px solid #2a2040;padding:4px 6px;outline:none">
+      <button onclick="saveWebhook()" style="font-family:inherit;font-size:5px;padding:4px 8px;cursor:pointer;border:1px solid #0ff;background:#1a1430;color:#0ff">SAVE</button>
+      <button onclick="testWebhook()" style="font-family:inherit;font-size:5px;padding:4px 8px;cursor:pointer;border:1px solid #ff8800;background:#1a1430;color:#ff8800">TEST</button>
+    </div>
+    <div id="webhookStatus" style="font-size:5px;color:#556;margin-top:4px;min-height:10px"></div>
     <button id="configClose" onclick="toggleConfig()">CLOSE</button>
   </div>
 </div>
@@ -645,11 +697,33 @@
   </div>
   <button id="victoryClose" onclick="closeVictory()">RETURN TO HQ</button>
 </div>
+<div id="ledgerOverlay">
+  <div id="ledgerPanel">
+    <h2>◈ QUARM LEDGER ◈</h2>
+    <div class="ledger-tabs">
+      <button class="ledger-tab active" onclick="switchLedgerTab('costs',this)">COSTS</button>
+      <button class="ledger-tab" onclick="switchLedgerTab('scores',this)">SCORES</button>
+    </div>
+    <div id="ledger-costs" class="ledger-section active">
+      <div id="cost-stats" class="ledger-stat-row"></div>
+      <div id="cost-by-agent"></div>
+      <div id="cost-by-model"></div>
+      <div id="cost-runs"></div>
+    </div>
+    <div id="ledger-scores" class="ledger-section">
+      <div id="score-stats" class="ledger-stat-row"></div>
+      <div id="score-by-agent"></div>
+      <div id="score-recent"></div>
+    </div>
+    <button id="ledgerClose" onclick="toggleLedger()">CLOSE</button>
+  </div>
+</div>
 <div id="header">◈ QUARM HQ ◈ PLANES OF OPERATIONS ◈</div>
 <div id="controlBar">
   <input type="text" id="planInput" placeholder="Describe your project...">
   <button id="btnGenerate" onclick="generatePlan()">GENERATE PLAN</button>
   <button id="btnQueue" onclick="toggleQueue()">QUEUE</button>
+  <button id="btnLedger" onclick="toggleLedger()">LEDGER</button>
   <button id="btnModels" onclick="toggleModelConfig()">MODELS</button>
 </div>
 <div id="queuePanel">
@@ -2327,6 +2401,136 @@ function drawVerdictPopups(ctx) {
     ctx.restore();
   }
 }
+
+// ── Ledger overlay ──────────────────────────────────────────────────────────
+
+function toggleLedger() {
+  const el = document.getElementById('ledgerOverlay');
+  const show = !el.classList.contains('visible');
+  el.classList.toggle('visible', show);
+  if (show) loadLedgerData();
+}
+
+function switchLedgerTab(tab, btn) {
+  document.querySelectorAll('.ledger-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ledger-section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('ledger-'+tab).classList.add('active');
+}
+
+function _barChart(items, maxVal, color) {
+  if (!maxVal) maxVal = 1;
+  return items.map(it =>
+    `<div class="ledger-bar-row">
+      <span class="ledger-bar-label">${it.label}</span>
+      <div class="ledger-bar-fill" style="width:${Math.max(2, (it.val/maxVal)*200)}px;background:${color}"></div>
+      <span class="ledger-bar-val">${it.val.toLocaleString()}</span>
+    </div>`
+  ).join('');
+}
+
+async function loadLedgerData() {
+  try {
+    const [costs, scores] = await Promise.all([
+      fetch('/api/analytics/costs').then(r => r.json()),
+      fetch('/api/analytics/scores').then(r => r.json()),
+    ]);
+
+    // Cost stats
+    document.getElementById('cost-stats').innerHTML = `
+      <div class="ledger-stat"><div class="ledger-stat-val">${(costs.total_tokens||0).toLocaleString()}</div><div class="ledger-stat-lbl">TOTAL TOKENS</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-val">${(costs.recent_runs||[]).length}</div><div class="ledger-stat-lbl">RUNS</div></div>
+    `;
+
+    // Cost by agent
+    const agentMax = Math.max(1, ...((costs.by_agent||[]).map(a=>a.total_tokens)));
+    document.getElementById('cost-by-agent').innerHTML =
+      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY AGENT</div>' +
+      _barChart((costs.by_agent||[]).map(a => ({label: a.agent, val: a.total_tokens})), agentMax, '#0088cc');
+
+    // Cost by model
+    const modelMax = Math.max(1, ...((costs.by_model||[]).map(m=>m.total_tokens)));
+    document.getElementById('cost-by-model').innerHTML =
+      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY MODEL</div>' +
+      _barChart((costs.by_model||[]).map(m => ({label: m.model, val: m.total_tokens})), modelMax, '#44aaff');
+
+    // Recent runs
+    document.getElementById('cost-runs').innerHTML =
+      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT RUNS</div>' +
+      '<table class="ledger-table"><tr><th>PLAN</th><th>TOKENS</th><th>TASKS</th><th>STATUS</th></tr>' +
+      (costs.recent_runs||[]).map(r =>
+        `<tr><td>${r.plan_name||'?'}</td><td>${(r.total_tokens||0).toLocaleString()}</td><td>${r.task_count||0}</td><td style="color:${r.status==='done'?'#00ff88':'#ff8800'}">${(r.status||'?').toUpperCase()}</td></tr>`
+      ).join('') + '</table>';
+
+    // Score stats
+    const dist = scores.distribution || {high:0,mid:0,low:0};
+    document.getElementById('score-stats').innerHTML = `
+      <div class="ledger-stat"><div class="ledger-stat-val" style="color:#00ff88">${dist.high||0}</div><div class="ledger-stat-lbl">SCORE 8+</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-val" style="color:#ffaa00">${dist.mid||0}</div><div class="ledger-stat-lbl">SCORE 5-7</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-val" style="color:#ff4444">${dist.low||0}</div><div class="ledger-stat-lbl">SCORE <5</div></div>
+    `;
+
+    // Score by agent
+    const scoreItems = (scores.by_agent||[]).map(a => ({
+      label: `${a.agent} (${a.reviews} reviews)`,
+      val: Math.round((a.avg_score||0)*10)/10,
+    }));
+    document.getElementById('score-by-agent').innerHTML =
+      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">AVG SCORE BY AGENT</div>' +
+      _barChart(scoreItems, 10, '#00ff88');
+
+    // Recent scores
+    document.getElementById('score-recent').innerHTML =
+      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT REVIEWS</div>' +
+      '<table class="ledger-table"><tr><th>TASK</th><th>AGENT</th><th>SCORE</th><th>VERDICT</th><th>REVIEWER</th></tr>' +
+      (scores.recent_scores||[]).map(s =>
+        `<tr><td>${s.task_id}</td><td>${s.agent}</td><td>${s.score}/10</td>
+        <td style="color:${s.verdict==='PASS'?'#00ff88':'#ff4444'}">${s.verdict}</td>
+        <td>${s.reviewer}</td></tr>`
+      ).join('') + '</table>';
+
+  } catch(e) {
+    document.getElementById('cost-stats').innerHTML =
+      '<div class="ledger-stat"><div class="ledger-stat-val">--</div><div class="ledger-stat-lbl">NO DATA YET</div></div>';
+  }
+}
+
+// ── Webhook config ──────────────────────────────────────────────────────────
+
+async function saveWebhook() {
+  const url = document.getElementById('webhookUrl').value.trim();
+  const el = document.getElementById('webhookStatus');
+  try {
+    await fetch('/api/config', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({webhook_url: url}),
+    });
+    el.textContent = 'SAVED'; el.style.color = '#00ff88';
+  } catch(e) {
+    el.textContent = 'FAILED'; el.style.color = '#ff4444';
+  }
+}
+
+async function testWebhook() {
+  const el = document.getElementById('webhookStatus');
+  el.textContent = 'SENDING...'; el.style.color = '#ffaa00';
+  try {
+    const r = await fetch('/api/webhook/test', {method:'POST'});
+    if (r.ok) { el.textContent = 'TEST SENT'; el.style.color = '#00ff88'; }
+    else { const d = await r.json(); el.textContent = d.detail || 'FAILED'; el.style.color = '#ff4444'; }
+  } catch(e) {
+    el.textContent = 'ERROR'; el.style.color = '#ff4444';
+  }
+}
+
+// Load webhook URL into config panel on open
+const _origToggleConfig = toggleConfig;
+toggleConfig = function() {
+  _origToggleConfig();
+  fetch('/api/config').then(r=>r.json()).then(c => {
+    document.getElementById('webhookUrl').value = c.webhook_url || '';
+  }).catch(()=>{});
+};
 
 // ── Live overlay drawing ──────────────────────────────────────────────────────
 
