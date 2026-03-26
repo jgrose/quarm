@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QUARM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(ellipse at 50% 55%, #0e0a18 0%, #060410 45%, #000 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  #logo {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .subtitle {
+    font-family: 'Cinzel Decorative', Georgia, serif;
+    color: #7a5c28;
+    letter-spacing: 0.5em;
+    font-size: 12px;
+    margin-top: 22px;
+    text-transform: uppercase;
+    opacity: 0.75;
+  }
+</style>
+</head>
+<body>
+<canvas id="logo"></canvas>
+<div class="subtitle">Multi-Agent Orchestrator</div>
+<script>
+const PX = 6;             // each art-pixel on screen
+const RENDER_SCALE = 3;   // hi-res render multiplier
+const FONT_SIZE_ART = 42; // font size in art-pixel units
+const SHADOW_PAD = 7;     // extra art-pixels for drop shadow
+const TEXT = 'QUARM';
+const FONT_FAM = '"Cinzel Decorative", Georgia, "Palatino Linotype", "Book Antiqua", serif';
+
+// ── Dynamically measure text and build pixel art ──
+function renderPixelArt() {
+  const fontSize = FONT_SIZE_ART * RENDER_SCALE;
+  const font = `900 ${fontSize}px ${FONT_FAM}`;
+
+  // Measure text at render resolution
+  const tmp = document.createElement('canvas');
+  tmp.width = 1; tmp.height = 1;
+  const tc = tmp.getContext('2d');
+  tc.font = font;
+  try { tc.letterSpacing = `${3 * RENDER_SCALE}px`; } catch (_) {}
+  const m = tc.measureText(TEXT);
+
+  // Compute sizes with generous padding for shadows + skew
+  const textW = m.width;
+  const pad = SHADOW_PAD * RENDER_SCALE;
+  const RW = Math.ceil(textW + pad * 4);
+  const RH = Math.ceil(fontSize * 1.5 + pad * 3);
+
+  // Art-pixel dimensions (what we downsample to)
+  const ART_W = Math.ceil(RW / RENDER_SCALE);
+  const ART_H = Math.ceil(RH / RENDER_SCALE);
+
+  // ── High-res offscreen render ──
+  const off = document.createElement('canvas');
+  off.width = RW;
+  off.height = RH;
+  const c = off.getContext('2d');
+
+  c.font = font;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  try { c.letterSpacing = `${3 * RENDER_SCALE}px`; } catch (_) {}
+
+  const cx = RW / 2;
+  const cy = RH / 2;
+
+  // Slight italic skew
+  c.save();
+  c.transform(1, 0, -0.06, 1, RW * 0.03, 0);
+
+  // ── Gold gradient (bright top → deep bronze bottom) ──
+  const g = c.createLinearGradient(0, cy - fontSize * 0.48, 0, cy + fontSize * 0.48);
+  g.addColorStop(0,    '#FFFCE8');
+  g.addColorStop(0.06, '#FFE898');
+  g.addColorStop(0.20, '#F0C840');
+  g.addColorStop(0.40, '#D09C28');
+  g.addColorStop(0.58, '#A87818');
+  g.addColorStop(0.76, '#785010');
+  g.addColorStop(0.92, '#50340C');
+  g.addColorStop(1,    '#382008');
+
+  // Layer 1 – deep drop shadow
+  for (let d = 6; d >= 3; d--) {
+    c.globalAlpha = 0.3;
+    c.fillStyle = '#000';
+    c.fillText(TEXT, cx + d * RENDER_SCALE, cy + d * RENDER_SCALE);
+  }
+
+  // Layer 2 – dark bronze mid-shadow
+  c.globalAlpha = 0.9;
+  c.fillStyle = '#1c0f00';
+  c.fillText(TEXT, cx + 2 * RENDER_SCALE, cy + 2 * RENDER_SCALE);
+  c.globalAlpha = 1;
+  c.fillStyle = '#2a1600';
+  c.fillText(TEXT, cx + 1 * RENDER_SCALE, cy + 1 * RENDER_SCALE);
+
+  // Layer 3 – main gold body
+  c.fillStyle = g;
+  c.fillText(TEXT, cx, cy);
+
+  // Layer 4 – specular highlight (source-atop = inside letters only)
+  c.globalCompositeOperation = 'source-atop';
+  const hi = c.createLinearGradient(0, cy - fontSize * 0.48, 0, cy - fontSize * 0.05);
+  hi.addColorStop(0, 'rgba(255,252,235,0.55)');
+  hi.addColorStop(1, 'rgba(255,230,160,0)');
+  c.fillStyle = hi;
+  c.fillRect(0, 0, RW, RH);
+  c.globalCompositeOperation = 'source-over';
+
+  // Layer 5 – bright edge kick upper-left
+  c.globalCompositeOperation = 'lighter';
+  c.globalAlpha = 0.18;
+  c.fillStyle = '#FFE8A0';
+  c.fillText(TEXT, cx - 0.6 * RENDER_SCALE, cy - 0.6 * RENDER_SCALE);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+
+  c.restore();
+
+  // ── Downsample to pixel art ──
+  const ds = document.createElement('canvas');
+  ds.width = ART_W;
+  ds.height = ART_H;
+  const dc = ds.getContext('2d');
+  dc.imageSmoothingEnabled = true;
+  dc.imageSmoothingQuality = 'high';
+  dc.drawImage(off, 0, 0, ART_W, ART_H);
+
+  const src = dc.getImageData(0, 0, ART_W, ART_H).data;
+
+  // ── Bevel / emboss ──
+  const out = new Uint8ClampedArray(src);
+  for (let y = 1; y < ART_H - 1; y++) {
+    for (let x = 1; x < ART_W - 1; x++) {
+      const i = (y * ART_W + x) * 4;
+      if (src[i + 3] < 18) continue;
+
+      const aT  = src[((y-1) * ART_W + x) * 4 + 3];
+      const aL  = src[(y * ART_W + (x-1)) * 4 + 3];
+      const aB  = src[((y+1) * ART_W + x) * 4 + 3];
+      const aR  = src[(y * ART_W + (x+1)) * 4 + 3];
+      const aTL = src[((y-1) * ART_W + (x-1)) * 4 + 3];
+      const aBR = src[((y+1) * ART_W + (x+1)) * 4 + 3];
+
+      let bv = 0;
+      if (aT  < 18) bv += 0.35;
+      if (aL  < 18) bv += 0.25;
+      if (aTL < 18) bv += 0.18;
+      if (aB  < 18) bv -= 0.25;
+      if (aR  < 18) bv -= 0.18;
+      if (aBR < 18) bv -= 0.12;
+      bv = Math.max(-0.45, Math.min(0.55, bv));
+
+      if (bv > 0) {
+        out[i]     = Math.min(255, src[i]     + bv * 200);
+        out[i + 1] = Math.min(255, src[i + 1] + bv * 170);
+        out[i + 2] = Math.min(255, src[i + 2] + bv * 90);
+      } else if (bv < 0) {
+        out[i]     = Math.max(0, src[i]     + bv * 130);
+        out[i + 1] = Math.max(0, src[i + 1] + bv * 110);
+        out[i + 2] = Math.max(0, src[i + 2] + bv * 70);
+      }
+    }
+  }
+  return { pixels: out, w: ART_W, h: ART_H };
+}
+
+// ── State ──
+const canvas = document.getElementById('logo');
+const ctx = canvas.getContext('2d');
+let art = null; // { pixels, w, h }
+let motes = [];
+
+// ── Animation ──
+function animate(t) {
+  const time = t * 0.001;
+  const { pixels, w, h } = art;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Glow layer
+  ctx.save();
+  ctx.filter = 'blur(28px)';
+  ctx.globalAlpha = 0.14 + 0.05 * Math.sin(time * 0.6);
+  drawPixels(pixels, w, h, time, false);
+  ctx.restore();
+
+  // Tighter glow
+  ctx.save();
+  ctx.filter = 'blur(10px)';
+  ctx.globalAlpha = 0.08;
+  drawPixels(pixels, w, h, time, false);
+  ctx.restore();
+
+  // Main pixel art
+  ctx.globalAlpha = 1;
+  ctx.filter = 'none';
+  drawPixels(pixels, w, h, time, true);
+
+  // Gold motes
+  for (const m of motes) {
+    m.x += m.vx;
+    m.y += m.vy;
+    m.life -= 0.002;
+    if (m.life <= 0 || m.y < -10 || m.x < -10 || m.x > canvas.width + 10) {
+      m.x = Math.random() * canvas.width;
+      m.y = canvas.height * 0.25 + Math.random() * canvas.height * 0.5;
+      m.life = 0.8 + Math.random() * 0.2;
+      m.vy = -Math.random() * 0.4 - 0.15;
+    }
+    ctx.globalAlpha = m.life * 0.4;
+    ctx.fillStyle = '#ffd050';
+    ctx.fillRect(Math.round(m.x), Math.round(m.y), m.sz | 0, m.sz | 0);
+  }
+  ctx.globalAlpha = 1;
+
+  requestAnimationFrame(animate);
+}
+
+function drawPixels(pixels, w, h, time, withShimmer) {
+  const shimmerX = ((time * 32) % (w + 60)) - 30;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      let r = pixels[i], g = pixels[i+1], b = pixels[i+2], a = pixels[i+3];
+      if (a < 10) continue;
+
+      if (withShimmer) {
+        const d = Math.abs(x - shimmerX);
+        if (d < 18) {
+          const k = Math.pow(1 - d / 18, 2) * 0.65;
+          r = Math.min(255, r + k * 200);
+          g = Math.min(255, g + k * 170);
+          b = Math.min(255, b + k * 90);
+        }
+        const pulse = 0.97 + 0.03 * Math.sin(time * 1.1 + x * 0.08);
+        r *= pulse; g *= pulse; b *= pulse;
+      }
+
+      ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${(a / 255).toFixed(3)})`;
+      ctx.fillRect(x * PX, y * PX, PX, PX);
+    }
+  }
+}
+
+// ── Start ──
+function start() {
+  art = renderPixelArt();
+  canvas.width  = art.w * PX;
+  canvas.height = art.h * PX;
+
+  motes = Array.from({ length: 30 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.25,
+    vy: -Math.random() * 0.4 - 0.15,
+    life: Math.random(),
+    sz: Math.random() * 2.5 + 0.5,
+  }));
+
+  requestAnimationFrame(animate);
+}
+
+if (document.fonts) {
+  document.fonts.ready.then(() => setTimeout(start, 200));
+} else {
+  window.addEventListener('load', () => setTimeout(start, 400));
+}
+</script>
+</body>
+</html>

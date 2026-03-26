@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #06080f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Press Start 2P', monospace;
+    padding: 12px 24px;
+    min-height: 100vh;
+    width: 100%;
+    color: #ccc;
+  }
+  #header {
+    font-size: 7px;
+    color: #ffd700;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  #canvasWrap {
+    position: relative;
+    border: 2px solid #2a2040;
+    cursor: pointer;
+    width: 100%;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    width: 100%;
+    height: auto;
+  }
+  #panel {
+    margin-top: 10px;
+    width: 100%;
+    min-height: 120px;
+    background: #0d0d20;
+    border: 2px solid #333;
+    padding: 14px;
+    display: none;
+    transition: border-color 0.2s;
+  }
+  #panel.visible { display: block; }
+  #panel-floor { font-size: 6px; letter-spacing: 2px; margin-bottom: 5px; }
+  #panel-name  { font-size: 9px; color: #fff; margin-bottom: 4px; }
+  #panel-role  { font-size: 6px; color: #8899aa; margin-bottom: 10px; }
+  #panel-desc  { font-size: 6px; color: #9ab; line-height: 2.2; margin-bottom: 10px; }
+  #panel-resp-label { font-size: 5px; letter-spacing: 2px; margin-bottom: 7px; }
+  #panel-resp  { display: flex; flex-wrap: wrap; gap: 5px; }
+  .resp-tag    { font-size: 5px; padding: 3px 7px; border: 1px solid; }
+  #panel-close {
+    float: right; background: none; border: 1px solid;
+    font-family: inherit; font-size: 6px; padding: 3px 8px; cursor: pointer;
+  }
+  #hint {
+    margin-top: 8px; font-size: 5px; color: #334; letter-spacing: 2px; text-align: center;
+  }
+  #legend {
+    margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+  }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 5px; letter-spacing: 1px; }
+  .leg-dot { width: 9px; height: 9px; }
+</style>
+</head>
+<body>
+
+<div id="header">◈ QUARM HQ ◈ PLANES OF OPERATIONS ◈</div>
+<div id="canvasWrap"><canvas id="c"></canvas></div>
+<div id="hint">CLICK A ROOM TO VIEW AGENT PROFILE</div>
+<div id="panel">
+  <button id="panel-close">✕ CLOSE</button>
+  <div id="panel-floor"></div>
+  <div id="panel-name"></div>
+  <div id="panel-role"></div>
+  <div id="panel-desc"></div>
+  <div id="panel-resp-label">RESPONSIBILITIES</div>
+  <div id="panel-resp"></div>
+</div>
+<div id="legend">
+  <div class="leg"><div class="leg-dot" style="background:#ffd700"></div><span style="color:#ffd700">PLANE OF TIME</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#44aaff"></div><span style="color:#44aaff">PLANES OF POWER</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#00ff88"></div><span style="color:#00ff88">ELEMENTAL PLANES</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#bf44ff"></div><span style="color:#bf44ff">PLANES OF FEAR/HATE/JUSTICE</span></div>
+</div>
+
+<script>
+const T = 17;
+const CW = 36, CH = 44;
+
+const P = {
+  void:'#06080f', wallD:'#12101e', wallM:'#1e1a30', wallH:'#2e2844',
+  wood:'#6a5020', woodL:'#7a6030',
+  floorG:'#122018', floorGL:'#1a2e20',
+  // Quarm elemental floors
+  floorFire:'#1e0800',  floorFireL:'#2e1200',   // Fennin Ro — Fire
+  floorWave:'#000e1e',  floorWaveL:'#00162c',   // Coirnav   — Water
+  floorEarth:'#120e00', floorEarthL:'#1e1600',  // Rathe     — Earth
+  floorAir:'#0e0e18',   floorAirL:'#161620',    // Xegony    — Air
+  // Elemental accents
+  acFire:'#ff6600', acWater:'#00aaff', acEarth:'#c8a000', acAir:'#aabbff',
+  floorB:'#0e1428', floorBL:'#141e38',
+  floorAu:'#2c1e04', floorAuL:'#3a2808',
+  floorP:'#16082a', floorPL:'#200e38',
+  desk:'#3c2610', deskT:'#5a3c1c',
+  mon:'#0c1018', monS:'#00ff44',
+  shelf:'#2e1c0c', shelfL:'#4a3018',
+  pillar:'#1e1a30', pillarH:'#3a3254',
+  gold:'#ffd700', cyan:'#00ffff', green:'#00ff88', purple:'#bf44ff', blue:'#44aaff', red:'#ff5555', white:'#ffffff',
+  doorF:'#4a2c10',
+};
+
+const ROOMS = [
+  { id:'master',  name:'PLANE OF TIME', role:'Program Manager / Lead Engineer',
+    floor:'FLOOR 3 · REALM OF QUARM', tier:'master',
+    c:2,r:2,w:32,h:9, fc:[P.floorAu,P.floorAuL], ac:P.gold, ch:'master',
+    desc:'The Plane of Time. Quarm waits here — the convergence of all four elemental heads. Dispatches tasks in dependency order, monitors all planes, and synthesises the final report when every plane has yielded its output.',
+    resp:['Task dispatch & sequencing','Dependency resolution','Cross-floor oversight','Final report synthesis']},
+  { id:'mgr_a', name:'PLANE OF WAR', role:'Engineering Architecture Lead',
+    floor:'FLOOR 2 · WEST SANCTUM', tier:'manager',
+    c:2,r:13,w:15,h:9, fc:[P.floorB,P.floorBL], ac:P.blue, ch:'manager_a',
+    desc:'Quality gate #1 for engineering and security outputs. Reviews sub-agent work with blended domain expertise. Issues scored PASS/FAIL verdicts with specific, actionable revision feedback.',
+    resp:['Domain quality review','Scored verdicts (1–10)','Revision directives','Engineering standards']},
+  { id:'mgr_b', name:'PLANE OF GROWTH', role:'Product & Delivery Lead',
+    floor:'FLOOR 2 · EAST SANCTUM', tier:'manager',
+    c:19,r:13,w:15,h:9, fc:[P.floorB,P.floorBL], ac:P.blue, ch:'manager_b',
+    desc:'Quality gate #1 for product and delivery outputs. Parallel director with complementary expertise. Maintains independence from Director A to prevent review bias.',
+    resp:['Product quality review','Scored verdicts (1–10)','Revision directives','Delivery standards']},
+  { id:'sa1', name:'FORGE OF FIRE', role:'Backend Engineer',
+    floor:'FLOOR 1 · FENNIN RO', tier:'subagent',
+    c:2,r:24,w:7,h:8, fc:[P.floorFire,P.floorFireL], ac:P.acFire, ch:'eng',
+    desc:'Builds secure REST APIs, data pipelines, and backend services. Produces production-ready code with type hints, error handling, logging, and OpenAPI docs.',
+    resp:['API development','Data modeling','Service architecture','Backend logic']},
+  { id:'sa2', name:'TIDE CHAMBER', role:'Security Architect',
+    floor:'FLOOR 1 · COIRNAV', tier:'subagent',
+    c:10,r:24,w:7,h:8, fc:[P.floorWave,P.floorWaveL], ac:P.acWater, ch:'sec',
+    desc:'Designs auth flows, IAM policies, and threat models using least-privilege and zero-trust. Produces ADRs, security configs, and mitigation documents.',
+    resp:['Auth architecture','Threat modeling','IAM policies','Security configs']},
+  { id:'sa3', name:'STONE HALL', role:'Frontend Engineer',
+    floor:'FLOOR 1 · RATHE', tier:'subagent',
+    c:18,r:24,w:8,h:8, fc:[P.floorEarth,P.floorEarthL], ac:P.acEarth, ch:'fe',
+    desc:'Builds accessible, responsive React components and data visualizations. WCAG 2.1 AA by default. Produces JSX, Tailwind CSS, and chart configurations.',
+    resp:['React components','Data visualizations','WCAG accessibility','Responsive layouts']},
+  { id:'sa4', name:'SKY SANCTUM', role:'Technical Writer',
+    floor:'FLOOR 1 · XEGONY', tier:'subagent',
+    c:27,r:24,w:7,h:8, fc:[P.floorAir,P.floorAirL], ac:P.acAir, ch:'writer',
+    desc:'Produces READMEs, API references, user guides, and onboarding content. Writes simultaneously for engineers needing detail and stakeholders needing plain English.',
+    resp:['Developer docs','API references','User guides','Onboarding content']},
+  { id:'rev_sec', name:'PLANE OF HATE', role:'Senior Security Engineer',
+    floor:'BASEMENT · INNORUUK', tier:'reviewer',
+    c:2,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.red, ch:'rev_sec',
+    desc:'Quality gate #2 — Plane of Hate. Innoruuk\'s domain: pure adversarial malice applied to every output. OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Hatred finds every flaw.',
+    resp:['OWASP Top 10','Auth & secrets audit','Input validation','Dependency risk']},
+  { id:'rev_ux', name:'PLANE OF TRANQUILITY', role:'Senior UX/UI Designer',
+    floor:'BASEMENT · QUELLIOUS', tier:'reviewer',
+    c:13,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.purple, ch:'rev_ux',
+    desc:'Quality gate #2 — Plane of Tranquility. Luclin\'s domain: form, clarity, and the elegance of what is seen. WCAG accessibility, visual hierarchy, information architecture, cognitive load. Nothing ugly passes.',
+    resp:['WCAG accessibility','Visual hierarchy','Info architecture','Interaction patterns']},
+  { id:'rev_usr', name:'PLANE OF JUSTICE', role:'End-User Representative',
+    floor:'BASEMENT · THE TRIBUNAL', tier:'reviewer',
+    c:24,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.cyan, ch:'rev_usr',
+    desc:'Quality gate #2 — Plane of Justice. The Tribunal weighs all deeds. Reviews as a mortal user of no special knowledge. Clarity, plain language, workflow intuitiveness. The six judges render final verdict.',
+    resp:['First-use clarity','Plain language audit','Workflow intuitiveness','Value assessment']},
+];
+
+const TIER_COLORS = { master:P.gold, manager:P.blue, subagent:P.green, reviewer:P.purple };
+
+const PX = 2;
+function fp(ctx, bx, by, c, r) { ctx.fillRect(bx+c*PX, by+r*PX, PX, PX); }
+
+function drawMaster(ctx, x, y) {
+  ctx.fillStyle='#ffd700';
+  [1,2,3,4,5,6].forEach(i=>fp(ctx,x,y,i,0));
+  [0,2,4,6].forEach(i=>fp(ctx,x,y,i,1));
+  ctx.fillStyle='#cc8800';
+  [0,1,2,3,4,5,6,7].forEach(i=>fp(ctx,x,y,i,2));
+  ctx.fillStyle='#f5c07a';
+  for(let c=1;c<=6;c++) for(let r=3;r<=6;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#2a1800'; fp(ctx,x,y,2,4); fp(ctx,x,y,5,4);
+  ctx.fillStyle='#7a3a10'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  ctx.fillStyle='#c87c00';
+  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ffd700'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
+  ctx.fillStyle='#f5c07a'; fp(ctx,x,y,0,9); fp(ctx,x,y,7,9);
+}
+
+function drawManagerA(ctx, x, y) {
+  ctx.fillStyle='#1a1a40';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#f5c07a';
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#001840'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#fff'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  ctx.fillStyle='#1a3a7a';
+  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#cc2200'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,9);
+  ctx.fillStyle='#44aaff'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
+}
+
+function drawManagerB(ctx, x, y) {
+  ctx.fillStyle='#3a2820';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#f5d0a0';
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#2a1408'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#fff'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  ctx.fillStyle='#2a4a6a';
+  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#aaddff'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,9);
+  ctx.fillStyle='#8899aa'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
+}
+
+function drawEng(ctx, x, y) {
+  ctx.fillStyle='#2a2a2a';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
+  ctx.fillStyle='#f5c07a';
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#000'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#1e3c1e';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#3a7a3a'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
+  ctx.fillStyle='#777';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,12);
+  ctx.fillStyle='#00ff44';
+  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
+}
+
+function drawSec(ctx, x, y) {
+  ctx.fillStyle='#0e0e20';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#d09060';
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff2200'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#0e0e20';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#cc0000'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
+  ctx.fillStyle='#00ff44';
+  for(let c=2;c<=5;c++) fp(ctx,x,y,c,10); for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
+  ctx.fillStyle='#ff2200'; fp(ctx,x,y,2,9); fp(ctx,x,y,5,9);
+}
+
+function drawFE(ctx, x, y) {
+  ctx.fillStyle='#cc44aa';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=1;c<=6;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#f5d5b0';
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#6622aa'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#8822cc';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff88cc'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
+  ctx.fillStyle='#444';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,12);
+  ctx.fillStyle='#ff44cc';
+  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
+}
+
+function drawWriter(ctx, x, y) {
+  ctx.fillStyle='#5a3010';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  ctx.fillStyle='#f5c07a';
+  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#2a1008'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#2a4a2a';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#5a8a5a'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
+  ctx.fillStyle='#fffff0';
+  for(let c=1;c<=5;c++) for(let r=10;r<=12;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#888'; fp(ctx,x,y,2,11); fp(ctx,x,y,3,11); fp(ctx,x,y,4,11);
+}
+
+function drawRevSec(ctx, x, y) {
+  ctx.fillStyle='#1a1a1a';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
+  ctx.fillStyle='#c0905a';
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#000'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#7a0000';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#cc0000'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
+  ctx.fillStyle='#c8a000';
+  for(let c=2;c<=5;c++) for(let r=9;r<=12;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff0000'; fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
+}
+
+function drawRevUX(ctx, x, y) {
+  ctx.fillStyle='#dd44aa';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0);
+  for(let c=0;c<=1;c++) for(let r=1;r<=4;r++) fp(ctx,x,y,c,r);
+  for(let c=6;c<=7;c++) for(let r=1;r<=4;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#f5d0b0';
+  for(let c=2;c<=5;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#882299'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#cc33cc';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ff88ff'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
+  ctx.fillStyle='#fff';
+  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
+  ctx.fillStyle='#ff44cc'; fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
+}
+
+function drawRevUsr(ctx, x, y) {
+  ctx.fillStyle='#6030a0';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
+  ctx.fillStyle='#f0b070';
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#3a2010'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  ctx.fillStyle='#7a4010'; fp(ctx,x,y,2,5); fp(ctx,x,y,5,5); fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  ctx.fillStyle='#3a6aaa';
+  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#88aaff'; fp(ctx,x,y,1,9); fp(ctx,x,y,6,9);
+  ctx.fillStyle='#7a3a10';
+  for(let c=3;c<=5;c++) for(let r=10;r<=12;r++) fp(ctx,x,y,c,r);
+  ctx.fillStyle='#ffe0a0'; for(let c=3;c<=5;c++) fp(ctx,x,y,c,10);
+}
+
+function drawSprite(ctx, x, y, type, bob) {
+  const oy = bob ? 1 : 0;
+  const fn = {master:drawMaster, manager_a:drawManagerA, manager_b:drawManagerB,
+    eng:drawEng, sec:drawSec, fe:drawFE, writer:drawWriter,
+    rev_sec:drawRevSec, rev_ux:drawRevUX, rev_usr:drawRevUsr}[type];
+  if(fn) fn(ctx, x, y - oy);
+}
+
+function drawDesk(ctx, x, y, w, tick) {
+  ctx.fillStyle=P.deskT; ctx.fillRect(x,y,w,T*0.9);
+  ctx.fillStyle=P.desk;  ctx.fillRect(x,y+T*0.9,w,T*0.4);
+  const mw=Math.min(w*0.7, T*1.6);
+  ctx.fillStyle=P.mon; ctx.fillRect(x+w*0.15,y-T*0.85,mw,T*0.85);
+  const blink = Math.sin(tick*0.05)>0.95;
+  ctx.fillStyle=blink?'#00ff88':'#00cc44';
+  ctx.fillRect(x+w*0.15+2,y-T*0.78,mw-4,T*0.7);
+  ctx.fillStyle='rgba(0,255,68,0.08)';
+  ctx.fillRect(x,y-T*0.85-4,w+8,T*2);
+}
+
+function drawShelf(ctx, x, y) {
+  ctx.fillStyle=P.shelf; ctx.fillRect(x,y,T,T*2.5);
+  const bc=['#c80000','#0000c8','#00a800','#c8c800','#c800c8','#008888'];
+  let bx=x+2;
+  for(let i=0;i<3;i++){ctx.fillStyle=bc[i]; ctx.fillRect(bx,y+3,5,T-6); bx+=5;}
+  bx=x+2;
+  for(let i=3;i<6;i++){ctx.fillStyle=bc[i]; ctx.fillRect(bx,y+T+3,5,T-6); bx+=5;}
+  ctx.fillStyle=P.shelfL; ctx.fillRect(x,y+T-1,T,2);
+}
+
+function drawPlant(ctx, x, y) {
+  ctx.fillStyle='#6a3010'; ctx.fillRect(x+3,y+T*0.7,T-6,T*0.3);
+  ctx.fillStyle='#0a4010'; ctx.beginPath(); ctx.arc(x+T/2,y+T*0.5,T*0.42,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a5a18'; ctx.beginPath(); ctx.arc(x+T/2-4,y+T*0.28,T*0.25,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+T/2+4,y+T*0.28,T*0.25,0,Math.PI*2); ctx.fill();
+}
+
+function drawTorch(ctx, x, y, tick) {
+  ctx.fillStyle='#2a1808'; ctx.fillRect(x+1,y+4,5,8);
+  const f=Math.sin(tick*0.18)*1.5;
+  ctx.fillStyle='#ff7700'; ctx.beginPath(); ctx.arc(x+3,y+f,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffcc00'; ctx.beginPath(); ctx.arc(x+3,y+1+f,2.5,0,Math.PI*2); ctx.fill();
+  const g=ctx.createRadialGradient(x+3,y,0,x+3,y,22);
+  g.addColorStop(0,'rgba(255,120,0,0.25)'); g.addColorStop(1,'rgba(255,120,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(x-16,y-16,38,38);
+}
+
+function drawPillar(ctx, x, y) {
+  ctx.fillStyle=P.pillar; ctx.fillRect(x,y,T,T);
+  ctx.fillStyle=P.pillarH; ctx.fillRect(x+2,y+2,T-4,6);
+  ctx.fillStyle='#101020'; ctx.fillRect(x+T-4,y+4,3,T-6); ctx.fillRect(x+2,y+T-4,T-4,3);
+}
+
+// ── Busy activity animations ─────────────────────────────────────────────────
+
+// Per-room activity state: which activity is playing, how long it's been active
+const _roomActivity = {};
+
+const ACTIVITIES = [
+  "book",       // reading a tome
+  "spell",      // casting a spell (sparkles)
+  "quill",      // writing with ink
+  "trinket",    // fiddling with a small object
+  "potion",     // mixing a potion (bubbles)
+  "scroll",     // unfurling a scroll
+  "fail",       // puff of smoke — something went wrong
+  "rune",       // tracing a glowing rune
+];
+
+function pickActivity(roomId, tick) {
+  if (!_roomActivity[roomId] || tick - _roomActivity[roomId].start > 180) {
+    // Deterministic-ish rotation seeded by room + tick cycle
+    const seed = roomId.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+    const cycle = Math.floor(tick / 180);
+    const idx = (seed + cycle) % ACTIVITIES.length;
+    _roomActivity[roomId] = { act: ACTIVITIES[idx], start: tick - (tick % 180) };
+  }
+  return _roomActivity[roomId].act;
+}
+
+function drawBusyActivity(ctx, rx, ry, rw, rh, ac, tick, roomId) {
+  const act = pickActivity(roomId, tick);
+  const t = tick % 180;  // local time within activity cycle
+  // Position activity near bottom-right of the sprite area
+  const ax = rx + rw/2 + 14;
+  const ay = ry + rh/2 - 4;
+
+  ctx.save();
+  switch(act) {
+
+    case "book": {
+      // Small open book, pages flip
+      const flip = Math.floor(tick/25) % 3;
+      ctx.fillStyle = '#8B4513'; ctx.fillRect(ax, ay, 12, 9);  // cover
+      ctx.fillStyle = '#fffff0'; ctx.fillRect(ax+1, ay+1, 10, 7); // pages
+      ctx.fillStyle = '#333';
+      // "text" lines that shift
+      for(let i = 0; i < 3; i++) {
+        const lw = 4 + ((flip + i) % 3);
+        ctx.fillRect(ax + 2, ay + 2 + i*2, lw, 1);
+      }
+      // page turn highlight
+      if(flip === 1) { ctx.fillStyle = '#ddd'; ctx.fillRect(ax+6, ay+1, 1, 7); }
+      break;
+    }
+
+    case "spell": {
+      // Sparkles orbiting — magical casting
+      const sparkCount = 5;
+      for(let i = 0; i < sparkCount; i++) {
+        const angle = (tick * 0.08) + (i * Math.PI * 2 / sparkCount);
+        const radius = 8 + Math.sin(tick * 0.05 + i) * 3;
+        const sx = ax + 4 + Math.cos(angle) * radius;
+        const sy = ay + 4 + Math.sin(angle) * radius;
+        const alpha = 0.4 + 0.6 * Math.abs(Math.sin(tick * 0.12 + i));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = i % 2 === 0 ? ac : '#fff';
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+      // Center glow
+      ctx.globalAlpha = 0.3 + 0.3 * Math.sin(tick * 0.1);
+      ctx.fillStyle = ac;
+      ctx.beginPath(); ctx.arc(ax+4, ay+4, 4, 0, Math.PI*2); ctx.fill();
+      break;
+    }
+
+    case "quill": {
+      // Quill pen scratching on parchment
+      ctx.fillStyle = '#d4c49a'; ctx.fillRect(ax, ay+2, 12, 8); // parchment
+      ctx.fillStyle = '#a08050'; ctx.fillRect(ax, ay+2, 12, 1); // top edge
+      // Ink lines appearing
+      ctx.fillStyle = '#1a0a00';
+      const lines = Math.min(3, Math.floor(t / 40));
+      for(let i = 0; i < lines; i++) {
+        ctx.fillRect(ax + 2, ay + 4 + i*2, 6 + (i%2)*2, 1);
+      }
+      // Quill
+      const qx = ax + 2 + Math.min(8, (t % 60) * 0.15);
+      const qy = ay - 1 + Math.sin(tick * 0.15) * 1.5;
+      ctx.fillStyle = '#fff'; ctx.fillRect(qx, qy, 1, 5);    // shaft
+      ctx.fillStyle = '#222'; ctx.fillRect(qx, qy+5, 1, 2);  // nib
+      // Ink drops occasionally
+      if(t % 60 > 50) {
+        ctx.fillStyle = '#1a0a00';
+        ctx.fillRect(qx + 1, qy + 7, 1, 1);
+      }
+      break;
+    }
+
+    case "trinket": {
+      // Small object being turned/examined — glints
+      const phase = Math.floor(tick / 20) % 4;
+      ctx.fillStyle = '#c8a000';
+      // Little cube that rotates (4 phases)
+      if(phase === 0)      ctx.fillRect(ax+2, ay+2, 6, 6);
+      else if(phase === 1) ctx.fillRect(ax+3, ay+1, 5, 7);
+      else if(phase === 2) ctx.fillRect(ax+2, ay+2, 6, 6);
+      else                 ctx.fillRect(ax+1, ay+3, 7, 5);
+      // Glint
+      ctx.fillStyle = '#fff';
+      ctx.globalAlpha = Math.abs(Math.sin(tick * 0.15));
+      ctx.fillRect(ax + 3 + phase, ay + 2, 2, 2);
+      break;
+    }
+
+    case "potion": {
+      // Beaker with bubbles rising
+      ctx.fillStyle = '#446';   ctx.fillRect(ax+3, ay, 5, 2);    // neck
+      ctx.fillStyle = '#556';   ctx.fillRect(ax+1, ay+2, 9, 7);  // body
+      ctx.fillStyle = '#0f6';   ctx.fillRect(ax+2, ay+4, 7, 4);  // liquid
+      ctx.globalAlpha = 0.7;
+      // Rising bubbles
+      for(let i = 0; i < 3; i++) {
+        const by = ay + 3 - ((tick * 0.5 + i * 12) % 14);
+        const bx = ax + 3 + (i * 2) + Math.sin(tick * 0.1 + i) * 1.5;
+        if(by > ay - 6 && by < ay + 4) {
+          ctx.fillStyle = '#0f8';
+          ctx.fillRect(bx, by, 2, 2);
+        }
+      }
+      // Steam wisps
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#8f8';
+      const wy = ay - 2 - Math.sin(tick*0.06)*2;
+      ctx.fillRect(ax+4, wy, 2, 1);
+      ctx.fillRect(ax+5, wy-1, 1, 1);
+      break;
+    }
+
+    case "scroll": {
+      // Unfurling scroll
+      const unfurl = Math.min(10, t * 0.08);
+      ctx.fillStyle = '#d4c49a'; ctx.fillRect(ax, ay+1, unfurl, 8);  // parchment
+      ctx.fillStyle = '#a08050'; // rollers
+      ctx.fillRect(ax-1, ay, 2, 10);
+      if(unfurl > 3) ctx.fillRect(ax + unfurl, ay, 2, 10);
+      // Text appearing
+      ctx.fillStyle = '#442200';
+      if(unfurl > 4) ctx.fillRect(ax+2, ay+3, Math.min(unfurl-3, 5), 1);
+      if(unfurl > 6) ctx.fillRect(ax+2, ay+5, Math.min(unfurl-4, 4), 1);
+      if(unfurl > 8) ctx.fillRect(ax+2, ay+7, Math.min(unfurl-5, 3), 1);
+      break;
+    }
+
+    case "fail": {
+      // Puff of smoke — something fizzled
+      const puffT = t % 90;
+      if(puffT < 60) {
+        const expand = puffT * 0.15;
+        const fade = Math.max(0, 1 - puffT / 60);
+        ctx.globalAlpha = fade * 0.6;
+        ctx.fillStyle = '#888';
+        ctx.beginPath(); ctx.arc(ax+5, ay+3 - expand, 3 + expand, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#aaa';
+        ctx.beginPath(); ctx.arc(ax+3, ay+5 - expand*0.7, 2 + expand*0.5, 0, Math.PI*2); ctx.fill();
+        // Red X flash
+        if(puffT < 15) {
+          ctx.globalAlpha = 1 - puffT/15;
+          ctx.fillStyle = '#f00';
+          ctx.fillRect(ax+2, ay+2, 2, 2);
+          ctx.fillRect(ax+6, ay+2, 2, 2);
+          ctx.fillRect(ax+4, ay+4, 2, 2);
+          ctx.fillRect(ax+2, ay+6, 2, 2);
+          ctx.fillRect(ax+6, ay+6, 2, 2);
+        }
+      }
+      break;
+    }
+
+    case "rune": {
+      // Tracing a glowing rune circle
+      const progress = (t % 120) / 120;
+      ctx.strokeStyle = ac;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(tick * 0.1);
+      ctx.beginPath();
+      ctx.arc(ax+5, ay+5, 7, 0, Math.PI * 2 * progress);
+      ctx.stroke();
+      // Inner symbol pulses
+      if(progress > 0.5) {
+        ctx.globalAlpha = (progress - 0.5) * 2 * (0.5 + 0.5 * Math.sin(tick*0.2));
+        ctx.fillStyle = ac;
+        ctx.fillRect(ax+3, ay+3, 2, 5);   // vertical bar
+        ctx.fillRect(ax+6, ay+3, 2, 5);
+        ctx.fillRect(ax+3, ay+5, 5, 1);   // crossbar
+      }
+      // Completed flash
+      if(progress > 0.95) {
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = ac;
+        ctx.beginPath(); ctx.arc(ax+5, ay+5, 9, 0, Math.PI*2); ctx.fill();
+      }
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function drawRoom(ctx, room, selected, tick) {
+  const {c,r,w,h,fc,ac,ch,name,tier} = room;
+  const x=c*T, y=r*T, rw=w*T, rh=h*T;
+
+  for(let tc=0;tc<w;tc++) for(let tr=0;tr<h;tr++){
+    ctx.fillStyle=(tc+tr)%2===0?fc[0]:fc[1];
+    ctx.fillRect(x+tc*T,y+tr*T,T,T);
+  }
+
+  if(selected){
+    ctx.fillStyle=ac+'22'; ctx.fillRect(x,y,rw,rh);
+  }
+
+  ctx.shadowColor=selected?ac:'transparent';
+  ctx.shadowBlur=selected?14:0;
+  ctx.strokeStyle=ac; ctx.lineWidth=selected?3:2;
+  ctx.strokeRect(x+1,y+1,rw-2,rh-2);
+  ctx.shadowBlur=0; ctx.shadowColor='transparent';
+
+  ctx.strokeStyle=P.wallD; ctx.lineWidth=1;
+  ctx.strokeRect(x+4,y+4,rw-8,rh-8);
+
+  if(rw>T*3 && rh>T*3){
+    ctx.fillStyle=ac+'12'; ctx.fillRect(x+T,y+T,rw-T*2,rh-T*2);
+    ctx.strokeStyle=ac+'40'; ctx.lineWidth=1;
+    ctx.strokeRect(x+T,y+T,rw-T*2,rh-T*2);
+    ctx.strokeRect(x+T+4,y+T+4,rw-T*2-8,rh-T*2-8);
+  }
+
+  if(w>=8){
+    drawTorch(ctx,x+T*2,y+5,tick);
+    drawTorch(ctx,x+rw-T*2-7,y+5,tick);
+  }
+
+  switch(tier){
+    case 'master':
+      drawDesk(ctx,x+T,y+T*2,T*2.2,tick);
+      drawDesk(ctx,x+rw-T*3.2,y+T*2,T*2.2,tick);
+      drawShelf(ctx,x+T,y+T*4.5);
+      drawShelf(ctx,x+rw-T*2,y+T*4.5);
+      drawPlant(ctx,x+rw-T*4,y+T*2);
+      drawPlant(ctx,x+T*2.8,y+T*5.5);
+      break;
+    case 'manager':
+      drawDesk(ctx,x+T*0.8,y+T*1.5,T*2,tick);
+      drawShelf(ctx,x+rw-T*2,y+T*1.5);
+      drawPlant(ctx,x+T,y+rh-T*3);
+      break;
+    case 'subagent':
+      drawDesk(ctx,x+2,y+T*1.5,T*2,tick);
+      break;
+    case 'reviewer':
+      drawDesk(ctx,x+T*0.8,y+T*1.5,T*2,tick);
+      drawPlant(ctx,x+rw-T*2,y+rh-T*3);
+      break;
+  }
+
+  const bob=Math.floor(tick/35)%2===0;
+  const cx=x+Math.floor(rw/2)-8;
+  const cy=y+Math.floor(rh/2)-10;
+  if(ch) drawSprite(ctx,cx,cy,ch,bob);
+
+  // Busy activities — only when room is active
+  const roomState = liveRoomStates[room.id];
+  if(roomState && roomState.statusKey !== "pending" && roomState.statusKey !== "done"){
+    drawBusyActivity(ctx, x, y, rw, rh, ac, tick, room.id);
+  }
+
+  drawPillar(ctx,x,y);
+  drawPillar(ctx,x+rw-T,y);
+  drawPillar(ctx,x,y+rh-T);
+  drawPillar(ctx,x+rw-T,y+rh-T);
+
+  ctx.font='bold 6px "Press Start 2P",monospace';
+  ctx.textAlign='center';
+  const tw=ctx.measureText(name).width+10;
+  const nx=x+rw/2, ny=y+rh-7;
+  ctx.fillStyle='#050510cc'; ctx.fillRect(nx-tw/2,ny-9,tw,11);
+  ctx.strokeStyle=ac+'80'; ctx.lineWidth=1; ctx.strokeRect(nx-tw/2,ny-9,tw,11);
+  ctx.fillStyle=ac; ctx.fillText(name,nx,ny);
+}
+
+function drawHalls(ctx, tick) {
+  const hallRows=[[11,12],[22,23],[32,33]];
+  for(const [r1,r2] of hallRows){
+    for(let c=2;c<CW-2;c++) for(let r=r1;r<=r2;r++){
+      ctx.fillStyle=(c+r)%2===0?P.wood:P.woodL;
+      ctx.fillRect(c*T,r*T,T,T);
+    }
+    [15,18].forEach(sc=>{
+      for(let i=0;i<4;i++){
+        ctx.fillStyle=i%2===0?P.woodL:P.wood;
+        ctx.fillRect(sc*T+i*4,r1*T+i*4,T-i*4,T-i*4);
+      }
+      for(let i=0;i<4;i++){
+        ctx.strokeStyle='#9a6a30'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(sc*T,r1*T+i*4); ctx.lineTo(sc*T+T,r1*T+i*4); ctx.stroke();
+      }
+    });
+    const labels=['PLANES OF POWER','ELEMENTAL PLANES','PLANES OF FEAR'];
+    const labelColors=['#44aaff','#00ff88','#bf44ff'];
+    const idx=hallRows.findIndex(h=>h[0]===r1&&h[1]===r2);
+    if(idx>=0){
+      const lc=labelColors[idx];
+      const ltxt='▼  '+labels[idx]+'  ▼';
+      ctx.font='bold 7px "Press Start 2P",monospace';
+      ctx.textAlign='center';
+      const lw=ctx.measureText(ltxt).width+20;
+      const lx=CW*T/2, ly=r1*T+T+5;
+      // Dark backdrop
+      ctx.fillStyle='#06080fdd';
+      ctx.fillRect(lx-lw/2,ly-10,lw,14);
+      // Border with glow
+      ctx.save();
+      ctx.shadowColor=lc; ctx.shadowBlur=6;
+      ctx.strokeStyle=lc+'88'; ctx.lineWidth=1;
+      ctx.strokeRect(lx-lw/2,ly-10,lw,14);
+      ctx.restore();
+      // Decorative dashes on sides
+      ctx.fillStyle=lc+'66';
+      ctx.fillRect(lx-lw/2+3, ly-4, 4, 1);
+      ctx.fillRect(lx+lw/2-7, ly-4, 4, 1);
+      // Text with glow
+      ctx.save();
+      ctx.shadowColor=lc; ctx.shadowBlur=8;
+      ctx.fillStyle=lc;
+      ctx.fillText(ltxt,lx,ly);
+      ctx.restore();
+    }
+  }
+
+  ctx.fillStyle=P.wallM;
+  ctx.fillRect(0,0,CW*T,T*2);
+  ctx.fillRect(0,0,T*2,CH*T);
+  ctx.fillRect((CW-2)*T,0,T*2,CH*T);
+  ctx.fillRect(0,(CH-2)*T,CW*T,T*2);
+
+  ctx.strokeStyle=P.wallH; ctx.lineWidth=3;
+  ctx.strokeRect(T,T,(CW-2)*T,(CH-2)*T);
+
+  for(let i=3;i<CW-3;i+=3){
+    [T, (CH-2)*T].forEach(wy=>{
+      ctx.fillStyle='#2a4a68'; ctx.fillRect(i*T+2,wy+2,T-4,T-4);
+      ctx.strokeStyle=P.wallH; ctx.lineWidth=1;
+      ctx.strokeRect(i*T+2,wy+2,T-4,T-4);
+      ctx.beginPath(); ctx.moveTo(i*T+T/2,wy+2); ctx.lineTo(i*T+T/2,wy+T-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i*T+2,wy+T/2); ctx.lineTo(i*T+T-2,wy+T/2); ctx.stroke();
+    });
+  }
+
+  ctx.fillStyle='#0a0818cc'; ctx.fillRect(CW*T/2-70,4,140,13);
+  ctx.strokeStyle='#ffd70060'; ctx.lineWidth=1; ctx.strokeRect(CW*T/2-70,4,140,13);
+  ctx.font='bold 7px "Press Start 2P",monospace'; ctx.fillStyle='#ffd700'; ctx.textAlign='center';
+  ctx.fillText('QUARM  HQ',CW*T/2,14);
+}
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width  = CW * T;
+canvas.height = CH * T;
+ctx.imageSmoothingEnabled = false;
+
+let tick=0, selectedId=null;
+
+function drawAll(){
+  ctx.fillStyle=P.void; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawHalls(ctx,tick);
+  for(const room of ROOMS) drawRoom(ctx,room,room.id===selectedId,tick);
+}
+
+function loop(){ tick++; drawAll(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+canvas.addEventListener('click', e=>{
+  const rect=canvas.getBoundingClientRect();
+  const sx=canvas.width/rect.width, sy=canvas.height/rect.height;
+  const mx=(e.clientX-rect.left)*sx, my=(e.clientY-rect.top)*sy;
+  let hit=null;
+  for(const room of ROOMS){
+    if(mx>=room.c*T && mx<=(room.c+room.w)*T && my>=room.r*T && my<=(room.r+room.h)*T){
+      hit=room; break;
+    }
+  }
+  if(hit){
+    selectedId = selectedId===hit.id ? null : hit.id;
+    updatePanel(hit, selectedId===hit.id);
+  } else {
+    selectedId=null; updatePanel(null,false);
+  }
+});
+
+function updatePanel(room, show){
+  const panel=document.getElementById('panel');
+  const hint=document.getElementById('hint');
+  if(!show||!room){ panel.classList.remove('visible'); hint.style.display='block'; return; }
+  const ac=TIER_COLORS[room.tier];
+  panel.classList.add('visible');
+  panel.style.borderColor=ac;
+  panel.style.boxShadow=`0 0 18px ${ac}33`;
+  hint.style.display='none';
+  document.getElementById('panel-floor').textContent=room.floor;
+  document.getElementById('panel-floor').style.color=ac;
+  document.getElementById('panel-name').textContent=room.name;
+  document.getElementById('panel-role').textContent=room.role;
+  document.getElementById('panel-desc').textContent=room.desc;
+  document.getElementById('panel-resp-label').style.color=ac;
+  const rc=document.getElementById('panel-resp');
+  rc.innerHTML='';
+  room.resp.forEach(r=>{
+    const span=document.createElement('span');
+    span.className='resp-tag';
+    span.textContent=r;
+    span.style.borderColor=ac+'55';
+    span.style.color=ac;
+    span.style.background=ac+'10';
+    rc.appendChild(span);
+  });
+  document.getElementById('panel-close').style.borderColor=ac;
+  document.getElementById('panel-close').style.color=ac;
+}
+
+document.getElementById('panel-close').addEventListener('click',()=>{
+  selectedId=null;
+  document.getElementById('panel').classList.remove('visible');
+  document.getElementById('hint').style.display='block';
+});
+
+// ── LIVE WEBSOCKET — zero-config dynamic room mapping ────────────────────────
+// Agent names, titles, and room assignments are built entirely from the
+// roster payloads sent by the orchestrator. No hardcoded maps.
+
+const WS_URL = `ws://${location.host}/ws`;
+
+// Fixed room slot arrays — order determines assignment
+const SA_SLOTS  = ["sa1","sa2","sa3","sa4"];   // sub-agent workshops
+const MGR_SLOTS = ["mgr_a","mgr_b"];           // director offices
+const REV_SLOTS = {                            // reviewers are name-keyed (built-ins)
+  security_engineer: "rev_sec",
+  ux_designer:       "rev_ux",
+  user_tester:       "rev_usr",
+};
+
+// Built at runtime from the roster payload
+let agentToRoom    = {};   // "backend_engineer" → "sa1"
+let reviewerToRoom = {};   // "security_engineer" → "rev_sec"
+let roomMeta       = {};   // roomId → { title, tier }
+
+const STATUS_META = {
+  pending:              { label:"IDLE",         color:"#444444" },
+  in_progress:          { label:"WORKING",      color:"#00ff88" },
+  in_manager_review:    { label:"REVIEWING",    color:"#44aaff" },
+  in_specialist_review: { label:"PANEL",        color:"#bf44ff" },
+  revision:             { label:"REVISING",     color:"#ff8800" },
+  done:                 { label:"DONE \u2713",  color:"#00ff88" },
+  failed:               { label:"FAILED",       color:"#ff4444" },
+};
+
+let liveRoomStates = {};
+
+// ── Roster ingestion ──────────────────────────────────────────────────────────
+
+function buildMapsFromRoster(data) {
+  const subAgents = data.sub_agents || [];
+  const managers  = data.managers   || [];
+  const reviewers = data.reviewers  || [];
+
+  agentToRoom    = {};
+  reviewerToRoom = {};
+  roomMeta       = {};
+
+  // Sub-agents → sa1..sa4 in declaration order
+  subAgents.forEach((a, i) => {
+    const slot = SA_SLOTS[i];
+    if (!slot) return;
+    agentToRoom[a.name] = slot;
+    roomMeta[slot] = { title: a.title || prettify(a.name), tier: "subagent" };
+    // Relabel the room nameplate in ROOMS array
+    const room = ROOMS.find(r => r.id === slot);
+    if (room) room.name = (a.title || prettify(a.name)).toUpperCase();
+  });
+
+  // Managers → mgr_a, mgr_b in declaration order
+  managers.forEach((m, i) => {
+    const slot = MGR_SLOTS[i];
+    if (!slot) return;
+    roomMeta[slot] = { title: m.title || prettify(m.name), tier: "manager" };
+    const room = ROOMS.find(r => r.id === slot);
+    if (room) room.name = (m.title || prettify(m.name)).toUpperCase().slice(0, 18);
+  });
+
+  // Reviewers — built-ins map by name; custom reviewers overflow into spare slots
+  reviewers.forEach(r => {
+    const slot = REV_SLOTS[r.name];
+    if (slot) {
+      reviewerToRoom[r.name] = slot;
+      roomMeta[slot] = { title: r.title || prettify(r.name), tier: "reviewer" };
+      const room = ROOMS.find(rm => rm.id === slot);
+      if (room) room.name = (r.title || prettify(r.name)).toUpperCase().slice(0, 14);
+    }
+  });
+}
+
+function prettify(name) {
+  return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Log overlay ───────────────────────────────────────────────────────────────
+
+function ensureLogEl() {
+  let el = document.getElementById("live-log");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "live-log";
+    el.style.cssText = "margin-top:10px;width:100%;" +
+      "background:#050514;border:1px solid #0ff2;padding:10px;" +
+      "font-size:5px;line-height:2;color:#556;max-height:130px;" +
+      "overflow-y:auto;font-family:'Press Start 2P',monospace;";
+    document.getElementById("hint").after(el);
+  }
+  return el;
+}
+
+function renderLog(lines, project, done, total) {
+  const el  = ensureLogEl();
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const bar = "\u2588".repeat(Math.floor(pct/5)) + "\u2591".repeat(20 - Math.floor(pct/5));
+  const rows = lines.slice(-16).map(l => {
+    let c = "#556";
+    if      (l.includes("[MASTER]"))                                          c = "#ffd700";
+    else if (l.includes("PASS") || l.includes("\u2713"))                      c = "#00ff88";
+    else if (l.includes("FLAG") || l.includes("FAIL") || l.includes("revis")) c = "#ff8800";
+    else if (l.toUpperCase().includes("SECURITY") ||
+             l.toUpperCase().includes("UX") ||
+             l.toUpperCase().includes("USER_TEST"))                           c = "#bf44ff";
+    else if (l.includes("Dispatch") || l.includes("Execut") ||
+             l.includes("Draft done"))                                        c = "#44aaff";
+    return `<span style="color:${c}">${l}</span>`;
+  }).join("<br>");
+
+  el.innerHTML =
+    `<span style="color:#ffd700">${project}</span>  ` +
+    `<span style="color:#0ff">${bar} ${pct}%  ${done}/${total} tasks</span><br>` +
+    rows;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Status application ────────────────────────────────────────────────────────
+
+function applyStatus(data) {
+  // Rebuild maps whenever roster data arrives (first message and any refresh)
+  if (data.sub_agents || data.managers || data.reviewers) {
+    buildMapsFromRoster(data);
+  }
+
+  // Reset all rooms
+  liveRoomStates = {};
+  for (const room of ROOMS)
+    liveRoomStates[room.id] = { statusKey:"pending", label:"IDLE", color:"#444444" };
+
+  // Apply task statuses to sub-agent rooms
+  for (const task of (data.tasks || [])) {
+    const roomId = agentToRoom[task.agent];
+    if (!roomId) continue;
+    const meta = STATUS_META[task.status] || STATUS_META.pending;
+    liveRoomStates[roomId] = {
+      statusKey:      task.status,
+      label:          meta.label + (task.revision_count > 0 ? " x" + task.revision_count : ""),
+      color:          meta.color,
+      taskId:         task.id,
+      taskTitle:      task.title,
+    };
+  }
+
+  // Highlight active reviewer — dim all others
+  const activeRev = data.active_reviewer;
+  for (const [rname, rroom] of Object.entries(reviewerToRoom)) {
+    liveRoomStates[rroom] = (rname === activeRev)
+      ? { statusKey:"in_specialist_review", label:"REVIEWING NOW", color:"#bf44ff" }
+      : { statusKey:"pending", label:"STANDBY", color:"#444444" };
+  }
+
+  renderLog(
+    data.log || [],
+    data.project || "QUARM HQ",
+    data.results_count || 0,
+    data.total_tasks   || 0,
+  );
+}
+
+// ── Live overlay drawing ──────────────────────────────────────────────────────
+
+function drawLiveOverlay(ctx, room, tick) {
+  const state = liveRoomStates[room.id];
+  if (!state || state.statusKey === "pending") return;
+
+  const x = room.c*T, y = room.r*T, rw = room.w*T, rh = room.h*T;
+  const pulse = 0.5 + 0.5 * Math.sin(tick * 0.09);
+
+  ctx.save();
+  ctx.globalAlpha = 0.25 + 0.2 * pulse;
+  ctx.fillStyle   = state.color;
+  ctx.fillRect(x+2, y+2, rw-4, rh-4);
+  ctx.restore();
+
+  // Status badge — top left
+  ctx.font      = 'bold 5px "Press Start 2P",monospace';
+  ctx.textAlign = "left";
+  const bw = ctx.measureText(state.label).width + 8;
+  ctx.fillStyle   = "#050510dd";
+  ctx.fillRect(x+6, y+6, bw, 11);
+  ctx.strokeStyle = state.color + "99"; ctx.lineWidth = 1;
+  ctx.strokeRect(x+6, y+6, bw, 11);
+  ctx.fillStyle = state.color;
+  ctx.fillText(state.label, x+10, y+15);
+
+  // Task ID badge — bottom right
+  if (state.taskId) {
+    ctx.textAlign = "right";
+    const tw = ctx.measureText(state.taskId).width + 6;
+    ctx.fillStyle   = "#050510dd";
+    ctx.fillRect(x+rw-tw-6, y+rh-16, tw, 10);
+    ctx.strokeStyle = "#ffffff22"; ctx.lineWidth = 1;
+    ctx.strokeRect(x+rw-tw-6, y+rh-16, tw, 10);
+    ctx.fillStyle = "#ffffff66";
+    ctx.fillText(state.taskId, x+rw-9, y+rh-9);
+  }
+  ctx.textAlign = "center";
+}
+
+// Patch drawRoom to call overlay after base render
+const _origDrawRoom = drawRoom;
+window.drawRoom = function(ctx, room, selected, tick) {
+  _origDrawRoom(ctx, room, selected, tick);
+  drawLiveOverlay(ctx, room, tick);
+};
+
+// ── WebSocket with auto-reconnect ─────────────────────────────────────────────
+
+let _ws = null, _delay = 1000;
+
+function connectWS() {
+  _ws = new WebSocket(WS_URL);
+
+  _ws.onopen = () => {
+    _delay = 1000;
+    const h = document.getElementById("hint");
+    h.textContent  = "CONNECTED \u2014 AWAITING ORCHESTRATOR";
+    h.style.color  = "#00ff8877";
+  };
+
+  _ws.onmessage = evt => {
+    try { applyStatus(JSON.parse(evt.data)); } catch(e) { /* ignore */ }
+  };
+
+  _ws.onclose = () => {
+    const h = document.getElementById("hint");
+    h.textContent = "DISCONNECTED \u2014 RECONNECTING...";
+    h.style.color = "#ff880077";
+    setTimeout(() => {
+      _delay = Math.min(_delay * 1.5, 10000);
+      connectWS();
+    }, _delay);
+  };
+
+  _ws.onerror = () => _ws.close();
+}
+
+connectWS();
+
+</script>
+</body>
+</html>
