@@ -223,10 +223,130 @@
   .badge-pulse {
     animation: pulseBadge 1.2s ease-in-out infinite;
   }
+
+  /* ── Config panel ─────────────────────────────────────────────────────── */
+  #configBtn {
+    position: fixed; top: 8px; right: 12px; z-index: 100;
+    background: none; border: 1px solid #ffd70044;
+    color: #ffd700; font-size: 14px; cursor: pointer;
+    width: 28px; height: 28px; display: flex; align-items: center;
+    justify-content: center; font-family: inherit;
+    transition: background 0.15s;
+  }
+  #configBtn:hover { background: #ffd70022; }
+  #configOverlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #06080fdd; z-index: 200;
+    justify-content: center; align-items: center;
+  }
+  #configOverlay.visible { display: flex; }
+  #configPanel {
+    background: #0d0d20; border: 2px solid #ffd700; padding: 20px;
+    min-width: 320px; max-width: 90vw; font-family: 'Press Start 2P', monospace;
+  }
+  #configPanel h2 {
+    font-size: 8px; color: #ffd700; letter-spacing: 3px; margin-bottom: 16px;
+    text-align: center;
+  }
+  .cfg-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid #1a1430;
+  }
+  .cfg-row:last-child { border-bottom: none; }
+  .cfg-label { font-size: 6px; color: #aab; }
+  .cfg-toggle {
+    width: 32px; height: 16px; background: #2a2040; border: 1px solid #444;
+    cursor: pointer; position: relative; border-radius: 0;
+  }
+  .cfg-toggle.on { background: #1a4a1a; border-color: #00ff88; }
+  .cfg-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 10px; height: 10px; background: #666; transition: left 0.15s;
+  }
+  .cfg-toggle.on::after { left: 18px; background: #00ff88; }
+  #configClose {
+    margin-top: 14px; width: 100%; font-family: inherit; font-size: 6px;
+    padding: 6px; cursor: pointer; border: 1px solid #ffd700;
+    background: #1a1430; color: #ffd700;
+  }
+  #configClose:hover { background: #ffd700; color: #0d0d20; }
+
+  /* ── Victory overlay ──────────────────────────────────────────────────── */
+  #victoryOverlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #06080fee; z-index: 150;
+    justify-content: center; align-items: center; flex-direction: column;
+  }
+  #victoryOverlay.visible { display: flex; }
+  #victoryScroll {
+    background: #0d0d20; border: 2px solid #ffd700; padding: 24px;
+    max-width: 600px; max-height: 70vh; overflow-y: auto; width: 90%;
+    font-family: 'Press Start 2P', monospace;
+  }
+  #victoryScroll h2 {
+    font-size: 9px; color: #ffd700; letter-spacing: 3px; margin-bottom: 12px;
+    text-align: center;
+  }
+  #victoryStats {
+    display: flex; gap: 16px; justify-content: center; margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .v-stat {
+    text-align: center; padding: 8px 12px; border: 1px solid #2a2040;
+    background: #0a0818;
+  }
+  .v-stat-val { font-size: 10px; color: #00ff88; }
+  .v-stat-lbl { font-size: 5px; color: #556; margin-top: 4px; letter-spacing: 1px; }
+  #victoryReport {
+    font-size: 5px; color: #9ab; line-height: 2.2;
+    white-space: pre-wrap; word-wrap: break-word;
+    max-height: 300px; overflow-y: auto;
+    border-top: 1px solid #2a2040; padding-top: 12px; margin-top: 8px;
+  }
+  #victoryClose {
+    margin-top: 14px; font-family: inherit; font-size: 7px;
+    padding: 8px 24px; cursor: pointer; border: 2px solid #ffd700;
+    background: #1a1430; color: #ffd700; letter-spacing: 2px;
+  }
+  #victoryClose:hover { background: #ffd700; color: #0d0d20; }
+
+  /* ── Loot section in panel ─────────────────────────────────────────────── */
+  #panel-loot-label {
+    font-size: 5px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
+  }
+  #panel-loot {
+    font-size: 5px; color: #8a9a6a; line-height: 2;
+    background: #0a0818; border: 1px solid #2a2040; padding: 8px;
+    max-height: 100px; overflow-y: auto; white-space: pre-wrap;
+    word-wrap: break-word; display: none;
+  }
 </style>
 </head>
 <body>
 
+<button id="configBtn" onclick="toggleConfig()">&#9881;</button>
+<div id="configOverlay">
+  <div id="configPanel">
+    <h2>◈ HQ SETTINGS ◈</h2>
+    <div class="cfg-row"><span class="cfg-label">HP BARS</span><div class="cfg-toggle on" data-key="hpBars" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">XP TOKEN BAR</span><div class="cfg-toggle on" data-key="xpBar" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">MODEL BADGES</span><div class="cfg-toggle on" data-key="modelBadges" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">VERDICT POPUPS</span><div class="cfg-toggle on" data-key="verdictPopups" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">DEPENDENCY LINES</span><div class="cfg-toggle on" data-key="depLines" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">LOOT PREVIEW</span><div class="cfg-toggle on" data-key="lootPreview" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">VICTORY SCREEN</span><div class="cfg-toggle on" data-key="victoryScreen" onclick="toggleCfg(this)"></div></div>
+    <div class="cfg-row"><span class="cfg-label">DAY/NIGHT CYCLE</span><div class="cfg-toggle on" data-key="dayNight" onclick="toggleCfg(this)"></div></div>
+    <button id="configClose" onclick="toggleConfig()">CLOSE</button>
+  </div>
+</div>
+<div id="victoryOverlay">
+  <div id="victoryScroll">
+    <h2>◈ QUEST COMPLETE ◈</h2>
+    <div id="victoryStats"></div>
+    <div id="victoryReport"></div>
+  </div>
+  <button id="victoryClose" onclick="closeVictory()">RETURN TO HQ</button>
+</div>
 <div id="header">◈ QUARM HQ ◈ PLANES OF OPERATIONS ◈</div>
 <div id="controlBar">
   <input type="text" id="planInput" placeholder="Describe your project...">
@@ -248,6 +368,8 @@
   <div id="panel-desc"></div>
   <div id="panel-resp-label">RESPONSIBILITIES</div>
   <div id="panel-resp"></div>
+  <div id="panel-loot-label">LOOT — OUTPUT PREVIEW</div>
+  <div id="panel-loot"></div>
 </div>
 <div id="legend">
   <div class="leg"><div class="leg-dot" style="background:#ffd700"></div><span style="color:#ffd700">PLANE OF TIME</span></div>
@@ -716,7 +838,7 @@ function updateWander(roomId, maxDx, maxDy, tick) {
     const dx = w.tx - w.x, dy = w.ty - w.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
     if (dist < 1 || w.timer <= 0) {
-      w.x = w.tx; w.y = w.ty;
+      if (dist < 1) { w.x = w.tx; w.y = w.ty; }
       w.state = 'pause';
       w.timer = 80 + Math.floor(Math.random()*120);
     } else {
