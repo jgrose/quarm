@@ -31,10 +31,12 @@ from status_bridge import (
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
+from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
 
 load_dotenv()
 MAX_REVISIONS = 3
 _run_id = ""  # set at run() start
+_plan_id = ""  # set at run() start, used for checkpointing
 
 # ── Model discovery & auto-selection ─────────────────────────────────────────
 
@@ -304,6 +306,10 @@ def applicable_reviewers(task, reviewers):
 def master_node(state):
     set_active_reviewer(None)
     tasks, results = state["tasks"], state["results"]
+
+    # Save checkpoint at each dispatch boundary (all completed tasks are persisted)
+    if _plan_id:
+        save_checkpoint(_plan_id, state)
 
     for task in tasks:
         if task["status"] != "pending":
@@ -642,34 +648,83 @@ def _send_webhook(data: dict):
     threading.Thread(target=_post, daemon=True).start()
 
 
-def run(plan_path="plan.md"):
-    global _run_id
+def run(plan_path="plan.md", plan_id: str = ""):
+    global _run_id, _plan_id
+    _plan_id = plan_id
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
     fetch_available_models()
-    _run_id = track_run_start(os.path.basename(plan_path))
-    objective, managers, sub_agents, tasks, reviewers = parse_plan(plan_path)
-    print(f"Managers  : {[m.name for m in managers]}")
-    print(f"Sub-agents: {[a.name for a in sub_agents]}")
-    print(f"Tasks     : {[t.id for t in tasks]}")
-    print("="*60)
 
-    final = build_graph().invoke({
-        "messages":       [],
-        "objective":      objective,
-        "managers":       [m.__dict__ for m in managers],
-        "sub_agents":     [a.__dict__ for a in sub_agents],
-        "reviewers":      [r.__dict__ for r in reviewers],
-        "tasks":          [t.__dict__ for t in tasks],
-        "active_task_id": None,
-        "results":        {},
-        "finished":       False,
-        "phase":          "dispatch",
-        "tokens_used":    0,
-        "last_verdict":   None,
-        "synthesis_report": "",
-    })
+    # ── Check for existing checkpoint ──
+    checkpoint = load_checkpoint(plan_id) if plan_id else None
+
+    if checkpoint:
+        # ── RESUME MODE ──
+        print(f"  ** Resuming from checkpoint (saved {checkpoint['saved_at']})")
+        _run_id = checkpoint.get("run_id", "") or track_run_start(os.path.basename(plan_path))
+
+        # Re-parse to re-register rosters with status bridge (in-memory, lost on restart)
+        parse_plan(plan_path)
+
+        # Reset any in-flight tasks back to pending
+        for task in checkpoint["tasks"]:
+            if task["status"] in ("in_progress", "in_manager_review",
+                                   "in_specialist_review", "revision"):
+                print(f"  ** Resetting interrupted task {task['id']} → pending")
+                task["status"] = "pending"
+                task["result"] = ""
+                task["manager_notes"] = ""
+                task["reviewer_notes"] = ""
+
+        completed = [t["id"] for t in checkpoint["tasks"] if t["status"] == "done"]
+        pending = [t["id"] for t in checkpoint["tasks"] if t["status"] == "pending"]
+        print(f"  Completed: {completed}")
+        print(f"  Pending:   {pending}")
+        print("=" * 60)
+
+        initial_state = {
+            "messages":          [],
+            "objective":         checkpoint["objective"],
+            "managers":          checkpoint["managers"],
+            "sub_agents":        checkpoint["sub_agents"],
+            "reviewers":         checkpoint["reviewers"],
+            "tasks":             checkpoint["tasks"],
+            "active_task_id":    None,
+            "results":           checkpoint["results"],
+            "finished":          checkpoint.get("finished", False),
+            "phase":             "dispatch",
+            "tokens_used":       checkpoint.get("tokens_used", 0),
+            "last_verdict":      None,
+            "synthesis_report":  checkpoint.get("synthesis_report", ""),
+        }
+    else:
+        # ── FRESH START ──
+        _run_id = track_run_start(os.path.basename(plan_path))
+        objective, managers, sub_agents, tasks, reviewers = parse_plan(plan_path)
+        print(f"Managers  : {[m.name for m in managers]}")
+        print(f"Sub-agents: {[a.name for a in sub_agents]}")
+        print(f"Tasks     : {[t.id for t in tasks]}")
+        print("=" * 60)
+
+        initial_state = {
+            "messages":          [],
+            "objective":         objective,
+            "managers":          [m.__dict__ for m in managers],
+            "sub_agents":        [a.__dict__ for a in sub_agents],
+            "reviewers":         [r.__dict__ for r in reviewers],
+            "tasks":             [t.__dict__ for t in tasks],
+            "active_task_id":    None,
+            "results":           {},
+            "finished":          False,
+            "phase":             "dispatch",
+            "tokens_used":       0,
+            "last_verdict":      None,
+            "synthesis_report":  "",
+        }
+
+    objective = initial_state["objective"]
+    final = build_graph().invoke(initial_state)
 
     print("\n" + "="*60 + "\nFINAL REPORT\n" + "="*60)
     for msg in final["messages"]:
@@ -709,6 +764,10 @@ def run(plan_path="plan.md"):
         "elapsed_seconds": elapsed,
         "summary": summary_preview,
     })
+
+    # Clean up checkpoint on successful completion
+    if plan_id:
+        clear_checkpoint(plan_id)
 
 
 if __name__ == "__main__":

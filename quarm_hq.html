@@ -2,7 +2,7 @@
 <html>
 <head>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100vh; overflow: hidden; }
   body {
@@ -10,16 +10,16 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-family: 'Press Start 2P', monospace;
-    padding: 12px 24px;
+    font-family: 'Silkscreen', monospace;
+    padding: 4px 12px;
     width: 100%;
     color: #ccc;
   }
   #header {
-    font-size: 7px;
+    font-size: 15px;
     color: #ffd700;
     letter-spacing: 3px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     text-align: center;
   }
   #canvasWrap {
@@ -29,6 +29,7 @@
     overflow: hidden;
     flex: 1 1 auto;
     min-height: 0;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -36,9 +37,9 @@
   canvas {
     display: block;
     image-rendering: pixelated;
+    height: 100%;
+    width: auto;
     max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
   }
   #panel {
     margin-top: 10px;
@@ -51,24 +52,24 @@
     transition: border-color 0.2s;
   }
   #panel.visible { display: block; }
-  #panel-floor { font-size: 6px; letter-spacing: 2px; margin-bottom: 5px; }
-  #panel-name  { font-size: 9px; color: #fff; margin-bottom: 4px; }
-  #panel-role  { font-size: 6px; color: #8899aa; margin-bottom: 10px; }
-  #panel-desc  { font-size: 6px; color: #9ab; line-height: 2.2; margin-bottom: 10px; }
-  #panel-resp-label { font-size: 5px; letter-spacing: 2px; margin-bottom: 7px; }
+  #panel-floor { font-size: 15px; letter-spacing: 2px; margin-bottom: 5px; }
+  #panel-name  { font-size: 14px; color: #fff; margin-bottom: 4px; }
+  #panel-role  { font-size: 15px; color: #8899aa; margin-bottom: 10px; }
+  #panel-desc  { font-size: 15px; color: #9ab; line-height: 2.2; margin-bottom: 10px; }
+  #panel-resp-label { font-size: 14px; letter-spacing: 2px; margin-bottom: 7px; }
   #panel-resp  { display: flex; flex-wrap: wrap; gap: 5px; }
-  .resp-tag    { font-size: 5px; padding: 3px 7px; border: 1px solid; }
+  .resp-tag    { font-size: 14px; padding: 3px 7px; border: 1px solid; }
   #panel-close {
     float: right; background: none; border: 1px solid;
-    font-family: inherit; font-size: 6px; padding: 3px 8px; cursor: pointer;
+    font-family: inherit; font-size: 15px; padding: 3px 8px; cursor: pointer;
   }
   #hint {
-    margin-top: 8px; font-size: 5px; color: #334; letter-spacing: 2px; text-align: center;
+    margin-top: 8px; font-size: 14px; color: #334; letter-spacing: 2px; text-align: center;
   }
   #legend {
     margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
   }
-  .leg { display: flex; align-items: center; gap: 5px; font-size: 5px; letter-spacing: 1px; }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 14px; letter-spacing: 1px; }
   .leg-dot { width: 9px; height: 9px; }
 
   /* ── Control bar ─────────────────────────────────────────────────────── */
@@ -84,8 +85,8 @@
   }
   #controlBar input[type="text"] {
     flex: 1;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 6px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 15px;
     background: #06080f;
     color: #ccc;
     border: 1px solid #2a2040;
@@ -100,8 +101,8 @@
     color: #334;
   }
   #controlBar button {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 6px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 15px;
     padding: 5px 10px;
     cursor: pointer;
     border: 1px solid #ffd700;
@@ -150,7 +151,7 @@
     gap: 6px;
     padding: 5px 8px;
     border-bottom: 1px solid #1a1430;
-    font-size: 6px;
+    font-size: 15px;
     color: #ccc;
     transition: background 0.1s;
     cursor: default;
@@ -163,7 +164,7 @@
   .queue-item .drag-handle {
     cursor: grab;
     color: #444;
-    font-size: 8px;
+    font-size: 22px;
     user-select: none;
     padding: 0 2px;
   }
@@ -175,7 +176,7 @@
     white-space: nowrap;
   }
   .queue-item .status-badge {
-    font-size: 5px;
+    font-size: 14px;
     padding: 2px 5px;
     border: 1px solid;
     white-space: nowrap;
@@ -186,8 +187,8 @@
     gap: 4px;
   }
   .queue-item .plan-actions button {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 5px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 14px;
     padding: 2px 5px;
     cursor: pointer;
     border: 1px solid;
@@ -211,7 +212,7 @@
   .queue-empty {
     padding: 10px;
     text-align: center;
-    font-size: 5px;
+    font-size: 14px;
     color: #334;
     letter-spacing: 1px;
   }
@@ -253,19 +254,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 22px;
   flex-shrink: 0;
 }
 
 .thinking-label {
   flex: 1;
-  font-size: 6px;
+  font-size: 15px;
   color: #ffd700;
   letter-spacing: 2px;
 }
 
 .thinking-toggle {
-  font-size: 6px;
+  font-size: 15px;
   color: #ffd70088;
   transition: transform 0.2s;
 }
@@ -288,7 +289,7 @@
   position: absolute;
   right: 4px;
   top: -1px;
-  font-size: 4px;
+  font-size: 22px;
   color: #ffffff66;
   letter-spacing: 1px;
 }
@@ -307,8 +308,8 @@
 
 #thinkingText {
   padding: 8px 10px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
   line-height: 2.4;
   color: #aabbcc;
   white-space: pre-wrap;
@@ -364,14 +365,14 @@
   border-bottom: 1px solid #2a2040;
 }
 #planViewerTitle {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 15px;
   color: #ffd700;
   letter-spacing: 2px;
 }
 #planViewerClose {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 15px;
   background: none;
   border: 1px solid #ffd700;
   color: #ffd700;
@@ -380,8 +381,8 @@
 }
 #planViewerClose:hover { background: #ffd700; color: #0d0d20; }
 #planViewerContent {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
   line-height: 2.2;
   color: #aabbcc;
   white-space: pre-wrap;
@@ -392,7 +393,7 @@
   #configBtn {
     position: fixed; top: 8px; right: 12px; z-index: 100;
     background: none; border: 1px solid #ffd70044;
-    color: #ffd700; font-size: 14px; cursor: pointer;
+    color: #ffd700; font-size: 22px; cursor: pointer;
     width: 28px; height: 28px; display: flex; align-items: center;
     justify-content: center; font-family: inherit;
     transition: background 0.15s;
@@ -406,10 +407,10 @@
   #configOverlay.visible { display: flex; }
   #configPanel {
     background: #0d0d20; border: 2px solid #ffd700; padding: 20px;
-    min-width: 320px; max-width: 90vw; font-family: 'Press Start 2P', monospace;
+    min-width: 320px; max-width: 90vw; font-family: 'Silkscreen', monospace;
   }
   #configPanel h2 {
-    font-size: 8px; color: #ffd700; letter-spacing: 3px; margin-bottom: 16px;
+    font-size: 22px; color: #ffd700; letter-spacing: 3px; margin-bottom: 16px;
     text-align: center;
   }
   .cfg-row {
@@ -417,7 +418,7 @@
     padding: 6px 0; border-bottom: 1px solid #1a1430;
   }
   .cfg-row:last-child { border-bottom: none; }
-  .cfg-label { font-size: 6px; color: #aab; }
+  .cfg-label { font-size: 15px; color: #aab; }
   .cfg-toggle {
     width: 32px; height: 16px; background: #2a2040; border: 1px solid #444;
     cursor: pointer; position: relative; border-radius: 0;
@@ -429,7 +430,7 @@
   }
   .cfg-toggle.on::after { left: 18px; background: #00ff88; }
   #configClose {
-    margin-top: 14px; width: 100%; font-family: inherit; font-size: 6px;
+    margin-top: 14px; width: 100%; font-family: inherit; font-size: 15px;
     padding: 6px; cursor: pointer; border: 1px solid #ffd700;
     background: #1a1430; color: #ffd700;
   }
@@ -445,10 +446,10 @@
   #victoryScroll {
     background: #0d0d20; border: 2px solid #ffd700; padding: 24px;
     max-width: 600px; max-height: 70vh; overflow-y: auto; width: 90%;
-    font-family: 'Press Start 2P', monospace;
+    font-family: 'Silkscreen', monospace;
   }
   #victoryScroll h2 {
-    font-size: 9px; color: #ffd700; letter-spacing: 3px; margin-bottom: 12px;
+    font-size: 14px; color: #ffd700; letter-spacing: 3px; margin-bottom: 12px;
     text-align: center;
   }
   #victoryStats {
@@ -459,16 +460,16 @@
     text-align: center; padding: 8px 12px; border: 1px solid #2a2040;
     background: #0a0818;
   }
-  .v-stat-val { font-size: 10px; color: #00ff88; }
-  .v-stat-lbl { font-size: 5px; color: #556; margin-top: 4px; letter-spacing: 1px; }
+  .v-stat-val { font-size: 14px; color: #00ff88; }
+  .v-stat-lbl { font-size: 14px; color: #556; margin-top: 4px; letter-spacing: 1px; }
   #victoryReport {
-    font-size: 5px; color: #9ab; line-height: 2.2;
+    font-size: 14px; color: #9ab; line-height: 2.2;
     white-space: pre-wrap; word-wrap: break-word;
     max-height: 300px; overflow-y: auto;
     border-top: 1px solid #2a2040; padding-top: 12px; margin-top: 8px;
   }
   #victoryClose {
-    margin-top: 14px; font-family: inherit; font-size: 7px;
+    margin-top: 14px; font-family: inherit; font-size: 15px;
     padding: 8px 24px; cursor: pointer; border: 2px solid #ffd700;
     background: #1a1430; color: #ffd700; letter-spacing: 2px;
   }
@@ -484,16 +485,16 @@
   #ledgerOverlay.visible { display: flex; }
   #ledgerPanel {
     background: #0d0d20; border: 2px solid #0ff; padding: 20px;
-    width: 90%; max-width: 700px; font-family: 'Press Start 2P', monospace;
+    width: 90%; max-width: 700px; font-family: 'Silkscreen', monospace;
     margin-bottom: 30px;
   }
   #ledgerPanel h2 {
-    font-size: 8px; color: #0ff; letter-spacing: 3px; margin-bottom: 14px;
+    font-size: 22px; color: #0ff; letter-spacing: 3px; margin-bottom: 14px;
     text-align: center;
   }
   .ledger-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid #2a2040; }
   .ledger-tab {
-    font-family: inherit; font-size: 6px; padding: 6px 14px; cursor: pointer;
+    font-family: inherit; font-size: 15px; padding: 6px 14px; cursor: pointer;
     border: 1px solid #2a2040; border-bottom: none; background: #0a0818; color: #556;
   }
   .ledger-tab.active { background: #0d0d20; color: #0ff; border-color: #0ff; }
@@ -501,27 +502,27 @@
   .ledger-section.active { display: block; }
   .ledger-stat-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
   .ledger-stat { text-align: center; padding: 8px 14px; border: 1px solid #2a2040; background: #0a0818; min-width: 80px; }
-  .ledger-stat-val { font-size: 10px; color: #0ff; }
-  .ledger-stat-lbl { font-size: 5px; color: #556; margin-top: 4px; letter-spacing: 1px; }
+  .ledger-stat-val { font-size: 14px; color: #0ff; }
+  .ledger-stat-lbl { font-size: 14px; color: #556; margin-top: 4px; letter-spacing: 1px; }
   .ledger-bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-  .ledger-bar-label { font-size: 5px; color: #aab; width: 100px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ledger-bar-label { font-size: 14px; color: #aab; width: 100px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ledger-bar-fill { height: 8px; min-width: 2px; transition: width 0.3s; }
-  .ledger-bar-val { font-size: 5px; color: #556; min-width: 40px; }
-  .ledger-table { font-size: 5px; color: #9ab; line-height: 2.2; width: 100%; border-collapse: collapse; }
-  .ledger-table th { color: #0ff; text-align: left; padding: 3px 6px; border-bottom: 1px solid #2a2040; font-size: 5px; letter-spacing: 1px; }
+  .ledger-bar-val { font-size: 14px; color: #556; min-width: 40px; }
+  .ledger-table { font-size: 14px; color: #9ab; line-height: 2.2; width: 100%; border-collapse: collapse; }
+  .ledger-table th { color: #0ff; text-align: left; padding: 3px 6px; border-bottom: 1px solid #2a2040; font-size: 14px; letter-spacing: 1px; }
   .ledger-table td { padding: 3px 6px; border-bottom: 1px solid #1a1430; }
   #ledgerClose {
-    margin-top: 14px; width: 100%; font-family: inherit; font-size: 6px;
+    margin-top: 14px; width: 100%; font-family: inherit; font-size: 15px;
     padding: 6px; cursor: pointer; border: 1px solid #0ff; background: #1a1430; color: #0ff;
   }
   #ledgerClose:hover { background: #0ff; color: #0d0d20; }
 
   /* ── Loot section in panel ─────────────────────────────────────────────── */
   #panel-loot-label {
-    font-size: 5px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
+    font-size: 14px; letter-spacing: 2px; margin-top: 10px; margin-bottom: 5px;
   }
   #panel-loot {
-    font-size: 5px; color: #8a9a6a; line-height: 2;
+    font-size: 14px; color: #8a9a6a; line-height: 2;
     background: #0a0818; border: 1px solid #2a2040; padding: 8px;
     max-height: 100px; overflow-y: auto; white-space: pre-wrap;
     word-wrap: break-word; display: none;
@@ -554,14 +555,14 @@
   border-bottom: 1px solid #2a2040;
 }
 #modelConfigTitle {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 15px;
   color: #ffd700;
   letter-spacing: 2px;
 }
 #modelConfigClose {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 15px;
   background: none;
   border: 1px solid #ffd700;
   color: #ffd700;
@@ -579,8 +580,8 @@
   border-bottom: 1px solid #1a1430;
 }
 .model-ctrl-btn {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
   padding: 3px 8px;
   cursor: pointer;
   border: 1px solid #ffd70066;
@@ -607,8 +608,8 @@
 }
 .model-row:last-child { border-bottom: none; }
 .model-name {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
   color: #aabbcc;
   flex: 1;
   overflow: hidden;
@@ -616,8 +617,8 @@
   white-space: nowrap;
 }
 .model-tier {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 4px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 22px;
   padding: 2px 5px;
   border: 1px solid;
   margin: 0 6px;
@@ -653,8 +654,8 @@
 }
 
 #modelSaveStatus {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 14px;
   color: #00ff88;
   text-align: center;
   margin-top: 8px;
@@ -681,11 +682,11 @@
     </div>
     <div class="cfg-row">
       <input type="text" id="webhookUrl" placeholder="https://hooks.slack.com/..."
-        style="flex:1;font-family:inherit;font-size:5px;background:#06080f;color:#ccc;border:1px solid #2a2040;padding:4px 6px;outline:none">
-      <button onclick="saveWebhook()" style="font-family:inherit;font-size:5px;padding:4px 8px;cursor:pointer;border:1px solid #0ff;background:#1a1430;color:#0ff">SAVE</button>
-      <button onclick="testWebhook()" style="font-family:inherit;font-size:5px;padding:4px 8px;cursor:pointer;border:1px solid #ff8800;background:#1a1430;color:#ff8800">TEST</button>
+        style="flex:1;font-family:inherit;font-size:12px;background:#06080f;color:#ccc;border:1px solid #2a2040;padding:4px 6px;outline:none">
+      <button onclick="saveWebhook()" style="font-family:inherit;font-size:12px;padding:4px 8px;cursor:pointer;border:1px solid #0ff;background:#1a1430;color:#0ff">SAVE</button>
+      <button onclick="testWebhook()" style="font-family:inherit;font-size:12px;padding:4px 8px;cursor:pointer;border:1px solid #ff8800;background:#1a1430;color:#ff8800">TEST</button>
     </div>
-    <div id="webhookStatus" style="font-size:5px;color:#556;margin-top:4px;min-height:10px"></div>
+    <div id="webhookStatus" style="font-size:12px;color:#556;margin-top:4px;min-height:10px"></div>
     <button id="configClose" onclick="toggleConfig()">CLOSE</button>
   </div>
 </div>
@@ -1862,7 +1863,7 @@ function drawRoom(ctx, room, selected, tick) {
   drawPillar(ctx,x,y+rh-T);
   drawPillar(ctx,x+rw-T,y+rh-T);
 
-  ctx.font='bold 6px "Press Start 2P",monospace';
+  ctx.font='bold 13px "Silkscreen",monospace';
   ctx.textAlign='center';
   const tw=ctx.measureText(name).width+10;
   const nx=x+rw/2, ny=y+rh-7;
@@ -1894,7 +1895,7 @@ function drawHalls(ctx, tick) {
     if(idx>=0){
       const lc=labelColors[idx];
       const ltxt='▼  '+labels[idx]+'  ▼';
-      ctx.font='bold 7px "Press Start 2P",monospace';
+      ctx.font='bold 14px "Silkscreen",monospace';
       ctx.textAlign='center';
       const lw=ctx.measureText(ltxt).width+20;
       const lx=CW*T/2, ly=r1*T+T+5;
@@ -1941,7 +1942,7 @@ function drawHalls(ctx, tick) {
 
   ctx.fillStyle='#0a0818cc'; ctx.fillRect(CW*T/2-70,4,140,13);
   ctx.strokeStyle='#ffd70060'; ctx.lineWidth=1; ctx.strokeRect(CW*T/2-70,4,140,13);
-  ctx.font='bold 7px "Press Start 2P",monospace'; ctx.fillStyle='#ffd700'; ctx.textAlign='center';
+  ctx.font='bold 14px "Silkscreen",monospace'; ctx.fillStyle='#ffd700'; ctx.textAlign='center';
   ctx.fillText('QUARM  HQ',CW*T/2,14);
 }
 
@@ -2122,8 +2123,8 @@ function ensureLogEl() {
     el.id = "live-log";
     el.style.cssText = "margin-top:10px;width:100%;" +
       "background:#050514;border:1px solid #0ff2;padding:10px;" +
-      "font-size:5px;line-height:2;color:#556;max-height:130px;" +
-      "overflow-y:auto;font-family:'Press Start 2P',monospace;";
+      "font-size:12px;line-height:2;color:#556;max-height:130px;" +
+      "overflow-y:auto;font-family:'Silkscreen',monospace;";
     document.getElementById("hint").after(el);
   }
   return el;
@@ -2312,7 +2313,7 @@ function drawXPBar(ctx, tick) {
   ctx.fillStyle = '#fff'; ctx.fillRect(shimX, by, 12, bh);
   ctx.restore();
   // Label
-  ctx.font = 'bold 5px "Press Start 2P",monospace';
+  ctx.font = 'bold 13px "Silkscreen",monospace';
   ctx.fillStyle = '#0ff'; ctx.textAlign = 'left';
   ctx.fillText(`${liveTokensUsed.toLocaleString()} XP`, bx + 4, by + 7);
   ctx.textAlign = 'center';
@@ -2392,7 +2393,7 @@ function drawVerdictPopups(ctx) {
     const yOff = v.age * 0.5;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = 'bold 7px "Press Start 2P",monospace';
+    ctx.font = 'bold 14px "Silkscreen",monospace';
     ctx.textAlign = 'center';
     // Shadow
     ctx.fillStyle = '#000'; ctx.fillText(v.text, v.x+1, v.y - yOff + 1);
@@ -2445,18 +2446,18 @@ async function loadLedgerData() {
     // Cost by agent
     const agentMax = Math.max(1, ...((costs.by_agent||[]).map(a=>a.total_tokens)));
     document.getElementById('cost-by-agent').innerHTML =
-      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY AGENT</div>' +
+      '<div style="font-size:12px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY AGENT</div>' +
       _barChart((costs.by_agent||[]).map(a => ({label: a.agent, val: a.total_tokens})), agentMax, '#0088cc');
 
     // Cost by model
     const modelMax = Math.max(1, ...((costs.by_model||[]).map(m=>m.total_tokens)));
     document.getElementById('cost-by-model').innerHTML =
-      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY MODEL</div>' +
+      '<div style="font-size:12px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">TOKENS BY MODEL</div>' +
       _barChart((costs.by_model||[]).map(m => ({label: m.model, val: m.total_tokens})), modelMax, '#44aaff');
 
     // Recent runs
     document.getElementById('cost-runs').innerHTML =
-      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT RUNS</div>' +
+      '<div style="font-size:12px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT RUNS</div>' +
       '<table class="ledger-table"><tr><th>PLAN</th><th>TOKENS</th><th>TASKS</th><th>STATUS</th></tr>' +
       (costs.recent_runs||[]).map(r =>
         `<tr><td>${r.plan_name||'?'}</td><td>${(r.total_tokens||0).toLocaleString()}</td><td>${r.task_count||0}</td><td style="color:${r.status==='done'?'#00ff88':'#ff8800'}">${(r.status||'?').toUpperCase()}</td></tr>`
@@ -2476,12 +2477,12 @@ async function loadLedgerData() {
       val: Math.round((a.avg_score||0)*10)/10,
     }));
     document.getElementById('score-by-agent').innerHTML =
-      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">AVG SCORE BY AGENT</div>' +
+      '<div style="font-size:12px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">AVG SCORE BY AGENT</div>' +
       _barChart(scoreItems, 10, '#00ff88');
 
     // Recent scores
     document.getElementById('score-recent').innerHTML =
-      '<div style="font-size:5px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT REVIEWS</div>' +
+      '<div style="font-size:12px;color:#0ff;letter-spacing:1px;margin:8px 0 4px">RECENT REVIEWS</div>' +
       '<table class="ledger-table"><tr><th>TASK</th><th>AGENT</th><th>SCORE</th><th>VERDICT</th><th>REVIEWER</th></tr>' +
       (scores.recent_scores||[]).map(s =>
         `<tr><td>${s.task_id}</td><td>${s.agent}</td><td>${s.score}/10</td>
@@ -2548,7 +2549,7 @@ function drawLiveOverlay(ctx, room, tick) {
   ctx.restore();
 
   // Status badge — top left
-  ctx.font      = 'bold 5px "Press Start 2P",monospace';
+  ctx.font      = 'bold 13px "Silkscreen",monospace';
   ctx.textAlign = "left";
   const bw = ctx.measureText(state.label).width + 8;
   ctx.fillStyle   = "#050510dd";
@@ -2584,7 +2585,7 @@ function drawLiveOverlay(ctx, room, tick) {
     ctx.strokeRect(hpX-1, hpY-1, hpW+2, 8);
     ctx.fillStyle = hpColor; ctx.fillRect(hpX, hpY, hpW * pct, 6);
     // Score text
-    ctx.font = 'bold 4px "Press Start 2P",monospace';
+    ctx.font = 'bold 10px "Silkscreen",monospace';
     ctx.textAlign = 'right'; ctx.fillStyle = '#fff';
     ctx.fillText(td.score + '/10', hpX + hpW - 1, hpY + 5);
   }
@@ -2599,7 +2600,7 @@ function drawLiveOverlay(ctx, room, tick) {
     ctx.fillStyle = '#0a0818cc'; ctx.fillRect(mx, my, 10, 10);
     ctx.fillStyle = tier.c;
     ctx.beginPath(); ctx.arc(mx+5, my+5, 3, 0, Math.PI*2); ctx.fill();
-    ctx.font = 'bold 4px "Press Start 2P",monospace';
+    ctx.font = 'bold 10px "Silkscreen",monospace';
     ctx.textAlign = 'center'; ctx.fillStyle = '#000';
     ctx.fillText(tier.l, mx+5, my+7);
   }

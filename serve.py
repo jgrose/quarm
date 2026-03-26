@@ -31,6 +31,7 @@ import logging
 import uuid
 import time
 import threading
+from checkpoint import has_checkpoint, clear_checkpoint
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -276,7 +277,7 @@ def _run_orchestrator_worker(plan_id: str):
         _broadcast_plan_event(plan_id, "started")
         log.info(f"Orchestrator started: {plan_id}")
 
-        orchestrator_run(plan_file)
+        orchestrator_run(plan_file, plan_id=plan_id)
 
         _update_plan_status(plan_id, "done")
         _broadcast_queue()
@@ -315,6 +316,32 @@ def _auto_advance():
     t.start()
 
 
+def _resume_interrupted_runs():
+    """On startup, resume plans that were running when server died."""
+    global _running_plan_id
+    queue = _load_queue()
+    for entry in queue:
+        if entry["status"] == "running":
+            plan_id = entry["id"]
+            if has_checkpoint(plan_id):
+                log.info(f"Resuming interrupted run: {plan_id} ({entry.get('title', '')})")
+                with _running_lock:
+                    if _running_plan_id:
+                        log.warning(f"Cannot resume {plan_id} — another plan already running")
+                        continue
+                    _running_plan_id = plan_id
+                t = threading.Thread(
+                    target=_run_orchestrator_worker,
+                    args=(plan_id,),
+                    daemon=True,
+                )
+                t.start()
+                break  # One at a time; _auto_advance handles the rest
+            else:
+                log.warning(f"No checkpoint for interrupted run {plan_id} — marking failed")
+                _update_plan_status(plan_id, "failed")
+
+
 # ── App setup ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -326,6 +353,7 @@ async def lifespan(app: FastAPI):
     log.info(f"  Dashboard : http://localhost:{PORT}/")
     log.info(f"  API       : http://localhost:{PORT}/api/plans")
     log.info(f"  WebSocket : ws://localhost:{PORT}/ws")
+    _resume_interrupted_runs()
     yield
     _loop = None
     log.info("Server shutting down")
@@ -431,6 +459,9 @@ async def api_run_plan(plan_id: str):
         raise HTTPException(status_code=404, detail="Plan not found")
     if entry["status"] not in ("queued", "failed", "done"):
         raise HTTPException(status_code=409, detail=f"Plan is {entry['status']}, cannot run")
+
+    # Clear any stale checkpoint from a previous run
+    clear_checkpoint(plan_id)
 
     with _running_lock:
         if _running_plan_id:
