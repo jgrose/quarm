@@ -29,9 +29,12 @@ from status_bridge import (
     write_status, log_event, set_project,
     set_active_reviewer, register_rosters,
 )
+from model_config import load_allowed_models
+from tracking import track_run_start, track_score, track_run_end
 
 load_dotenv()
 MAX_REVISIONS = 3
+_run_id = ""  # set at run() start
 
 # ── Model discovery & auto-selection ─────────────────────────────────────────
 
@@ -47,12 +50,22 @@ _TIER_KEYWORDS = {
 
 
 def fetch_available_models() -> list[str]:
-    """Query the /models endpoint and cache results."""
+    """Query the /models endpoint, filter by config, and cache results."""
     global AVAILABLE_MODELS
     try:
         client = OpenAI()
-        AVAILABLE_MODELS = sorted(m.id for m in client.models.list().data)
-        print(f"Available models ({len(AVAILABLE_MODELS)}): {AVAILABLE_MODELS}")
+        all_models = sorted(m.id for m in client.models.list().data)
+        allowed = load_allowed_models()
+        if allowed is not None:
+            AVAILABLE_MODELS = [m for m in all_models if m in allowed]
+            if not AVAILABLE_MODELS:
+                print(f"[WARN] No allowed models found, using all {len(all_models)}")
+                AVAILABLE_MODELS = all_models
+            else:
+                print(f"Allowed models ({len(AVAILABLE_MODELS)}/{len(all_models)}): {AVAILABLE_MODELS}")
+        else:
+            AVAILABLE_MODELS = all_models
+            print(f"Available models ({len(AVAILABLE_MODELS)}): {AVAILABLE_MODELS}")
     except Exception as e:
         print(f"[WARN] Could not fetch models: {e} — using default: {DEFAULT_MODEL}")
         AVAILABLE_MODELS = [DEFAULT_MODEL]
@@ -428,6 +441,8 @@ def manager_review_node(state):
     for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
 
     last_v = {"reviewer": manager["name"], "verdict": verdict, "score": score, "task_id": tid}
+    if _run_id:
+        track_score(_run_id, tid, task["agent"], score, verdict, manager["name"], model, toks)
 
     if verdict == "PASS":
         log_event(f"[{manager['name'].upper()}] Approved → panel")
@@ -512,6 +527,8 @@ def specialist_review_node(state):
         for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
         verdicts.append(verdict)
         last_v = {"reviewer": reviewer["name"], "verdict": verdict, "score": score, "task_id": tid}
+        if _run_id:
+            track_score(_run_id, tid, task["agent"], score, verdict, reviewer["name"], model, toks)
         if verdict == "FLAG" and v.get("feedback"):
             flags.append(f"[{reviewer['title']}]\n{v['feedback']}")
         # Update score to latest reviewer score
@@ -601,9 +618,37 @@ def build_graph():
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def _send_webhook(data: dict):
+    """Fire-and-forget webhook notification."""
+    import threading
+    url = os.environ.get("QUARM_WEBHOOK_URL", "")
+    if not url:
+        # Try config.json
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
+                url = json.load(f).get("webhook_url", "")
+        except Exception:
+            pass
+    if not url:
+        return
+    def _post():
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(data).encode(),
+                                         headers={"Content-Type": "application/json"}, method="POST")
+            urllib.request.urlopen(req, timeout=10)
+        except Exception as e:
+            print(f"[WEBHOOK] Failed: {e}")
+    threading.Thread(target=_post, daemon=True).start()
+
+
 def run(plan_path="plan.md"):
+    global _run_id
+    import time as _time
+    _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
     fetch_available_models()
+    _run_id = track_run_start(os.path.basename(plan_path))
     objective, managers, sub_agents, tasks, reviewers = parse_plan(plan_path)
     print(f"Managers  : {[m.name for m in managers]}")
     print(f"Sub-agents: {[a.name for a in sub_agents]}")
@@ -646,6 +691,24 @@ def run(plan_path="plan.md"):
             ),
         }, f, indent=2)
     print(f"\nSaved → {results_path}")
+
+    # ── Tracking & webhook ──
+    total_tokens = final.get("tokens_used", 0)
+    total_revisions = sum(t.get("revision_count", 0) for t in final["tasks"])
+    track_run_end(_run_id, total_tokens, total_revisions, len(final["tasks"]))
+    elapsed = int(_time.time() - _start_time)
+    summary_preview = next(
+        (m.content[:300] for m in final["messages"] if isinstance(m, AIMessage)), ""
+    )
+    _send_webhook({
+        "project": objective[:100],
+        "plan": os.path.basename(plan_path),
+        "tasks_completed": len(final["results"]),
+        "total_revisions": total_revisions,
+        "tokens_used": total_tokens,
+        "elapsed_seconds": elapsed,
+        "summary": summary_preview,
+    })
 
 
 if __name__ == "__main__":

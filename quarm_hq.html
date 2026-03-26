@@ -484,6 +484,140 @@
     max-height: 100px; overflow-y: auto; white-space: pre-wrap;
     word-wrap: break-word; display: none;
   }
+/* ── Model config modal ──────────────────────────────────────────── */
+#modelConfigOverlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #06080fee;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+#modelConfigOverlay.visible { display: flex; flex-direction: column; align-items: center; }
+
+#modelConfigInner {
+  max-width: 500px;
+  width: 100%;
+  background: #0d0d20;
+  border: 2px solid #ffd70066;
+  padding: 16px;
+}
+#modelConfigHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2040;
+}
+#modelConfigTitle {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #ffd700;
+  letter-spacing: 2px;
+}
+#modelConfigClose {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  background: none;
+  border: 1px solid #ffd700;
+  color: #ffd700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+#modelConfigClose:hover { background: #ffd700; color: #0d0d20; }
+
+#modelConfigControls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a1430;
+}
+.model-ctrl-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  border: 1px solid #ffd70066;
+  background: #1a1430;
+  color: #ffd700;
+}
+.model-ctrl-btn:hover { background: #ffd700; color: #0d0d20; }
+
+#modelList {
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2040 #0d0d20;
+}
+#modelList::-webkit-scrollbar { width: 6px; }
+#modelList::-webkit-scrollbar-track { background: #0d0d20; }
+#modelList::-webkit-scrollbar-thumb { background: #2a2040; }
+
+.model-row {
+  display: flex;
+  align-items: center;
+  padding: 5px 4px;
+  border-bottom: 1px solid #1a1430;
+}
+.model-row:last-child { border-bottom: none; }
+.model-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  color: #aabbcc;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-tier {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 4px;
+  padding: 2px 5px;
+  border: 1px solid;
+  margin: 0 6px;
+  white-space: nowrap;
+}
+.tier-high  { color: #ff8800; border-color: #ff880066; }
+.tier-mid   { color: #44aaff; border-color: #44aaff66; }
+.tier-low   { color: #888;    border-color: #88888866; }
+
+.model-toggle {
+  width: 24px;
+  height: 12px;
+  background: #1a0a18;
+  border: 1px solid #ff444466;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+.model-toggle::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  top: 1px;
+  left: 1px;
+  background: #ff4444;
+  transition: left 0.15s, background 0.15s;
+}
+.model-toggle.on { border-color: #00ff8866; }
+.model-toggle.on::after {
+  left: 13px;
+  background: #00ff88;
+}
+
+#modelSaveStatus {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  color: #00ff88;
+  text-align: center;
+  margin-top: 8px;
+  min-height: 12px;
+}
 </style>
 </head>
 <body>
@@ -516,6 +650,7 @@
   <input type="text" id="planInput" placeholder="Describe your project...">
   <button id="btnGenerate" onclick="generatePlan()">GENERATE PLAN</button>
   <button id="btnQueue" onclick="toggleQueue()">QUEUE</button>
+  <button id="btnModels" onclick="toggleModelConfig()">MODELS</button>
 </div>
 <div id="queuePanel">
   <ul id="queueList">
@@ -2687,7 +2822,7 @@ function closePlanViewer() {
 
 // Close on Escape key
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closePlanViewer();
+  if (e.key === 'Escape') { closePlanViewer(); closeModelConfig(); }
 });
 
 // Close on click outside the inner panel
@@ -2700,7 +2835,125 @@ document.getElementById('planInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') generatePlan();
 });
 
+// ── Model config ─────────────────────────────────────────────────────────────
+
+let _modelConfigData = [];
+
+function toggleModelConfig() {
+  const overlay = document.getElementById('modelConfigOverlay');
+  const btn = document.getElementById('btnModels');
+  const show = !overlay.classList.contains('visible');
+  overlay.classList.toggle('visible', show);
+  btn.classList.toggle('active', show);
+  if (show) loadModelConfig();
+}
+
+function closeModelConfig() {
+  document.getElementById('modelConfigOverlay').classList.remove('visible');
+  document.getElementById('btnModels').classList.remove('active');
+}
+
+async function loadModelConfig() {
+  const listEl = document.getElementById('modelList');
+  listEl.innerHTML = '<div class="queue-empty">LOADING MODELS...</div>';
+  document.getElementById('modelSaveStatus').textContent = '';
+  try {
+    const res = await fetch('/api/models');
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    _modelConfigData = data.models;
+    renderModelList();
+  } catch (e) {
+    listEl.innerHTML = '<div class="queue-empty">FAILED TO LOAD MODELS</div>';
+    console.error('loadModelConfig:', e);
+  }
+}
+
+function renderModelList() {
+  const listEl = document.getElementById('modelList');
+  if (!_modelConfigData.length) {
+    listEl.innerHTML = '<div class="queue-empty">NO MODELS AVAILABLE</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  _modelConfigData.forEach(model => {
+    const row = document.createElement('div');
+    row.className = 'model-row';
+
+    const name = document.createElement('span');
+    name.className = 'model-name';
+    name.textContent = model.id;
+    row.appendChild(name);
+
+    const tier = document.createElement('span');
+    tier.className = 'model-tier tier-' + model.tier;
+    tier.textContent = model.tier.toUpperCase();
+    row.appendChild(tier);
+
+    const toggle = document.createElement('div');
+    toggle.className = 'model-toggle' + (model.enabled ? ' on' : '');
+    toggle.onclick = () => {
+      model.enabled = !model.enabled;
+      toggle.classList.toggle('on', model.enabled);
+    };
+    row.appendChild(toggle);
+
+    listEl.appendChild(row);
+  });
+}
+
+function toggleAllModels(enabled) {
+  _modelConfigData.forEach(m => m.enabled = enabled);
+  renderModelList();
+}
+
+async function saveModelConfig() {
+  const statusEl = document.getElementById('modelSaveStatus');
+  const allEnabled = _modelConfigData.every(m => m.enabled);
+  const payload = {
+    allowed_models: allEnabled ? null : _modelConfigData.filter(m => m.enabled).map(m => m.id),
+  };
+  statusEl.textContent = 'SAVING...';
+  try {
+    const res = await fetch('/api/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.textContent = 'SAVED';
+    statusEl.style.color = '#00ff88';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    statusEl.textContent = 'SAVE FAILED';
+    statusEl.style.color = '#ff4444';
+    console.error('saveModelConfig:', e);
+  }
+}
+
+// Close model config on Escape and click-outside
+document.getElementById('modelConfigOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modelConfigOverlay')) closeModelConfig();
+});
+
 </script>
+<div id="modelConfigOverlay">
+  <div id="modelConfigInner">
+    <div id="modelConfigHeader">
+      <span id="modelConfigTitle">MODEL ROSTER</span>
+      <button id="modelConfigClose" onclick="closeModelConfig()">&#x2715; CLOSE</button>
+    </div>
+    <div id="modelConfigControls">
+      <button class="model-ctrl-btn" onclick="toggleAllModels(true)">ENABLE ALL</button>
+      <button class="model-ctrl-btn" onclick="toggleAllModels(false)">DISABLE ALL</button>
+      <button class="model-ctrl-btn" onclick="saveModelConfig()">SAVE</button>
+    </div>
+    <div id="modelList">
+      <div class="queue-empty">LOADING MODELS...</div>
+    </div>
+    <div id="modelSaveStatus"></div>
+  </div>
+</div>
 <div id="planViewer">
   <div id="planViewerInner">
     <div id="planViewerHeader">

@@ -69,6 +69,34 @@ def _save_queue(queue: list[dict]):
     QUEUE_FILE.write_text(json.dumps(queue, indent=2))
 
 
+CONFIG_FILE = STATIC_DIR / "config.json"
+
+def _load_config() -> dict:
+    if CONFIG_FILE.exists():
+        try:
+            return json.loads(CONFIG_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+def _save_config(cfg: dict):
+    cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+
+_TIER_KEYWORDS_SERVE = {
+    "high": ["opus", "gpt-4o", "nova-premier"],
+    "mid":  ["sonnet", "gpt-4o-mini", "nova-pro", "llama-4-maverick"],
+    "low":  ["haiku", "nova-lite", "llama3.2-3b", "llama3.2-1b"],
+}
+
+def _tier_for_model(model_id: str) -> str:
+    low = model_id.lower()
+    for tier, keywords in _TIER_KEYWORDS_SERVE.items():
+        if any(kw in low for kw in keywords):
+            return tier
+    return "mid"
+
+
 def _extract_title(plan_text: str) -> str:
     m = re.search(r"^# PROJECT PLAN:\s*(.+)", plan_text, re.MULTILINE)
     return m.group(1).strip() if m else "Untitled Plan"
@@ -429,6 +457,46 @@ async def api_delete_plan(plan_id: str):
     return {"ok": True}
 
 
+# ── Model config API routes ──────────────────────────────────────────────────
+
+@app.get("/api/models")
+async def api_list_models():
+    """Return all available models with their enabled/disabled status."""
+    from openai import OpenAI
+    try:
+        client = OpenAI()
+        all_models = sorted(m.id for m in client.models.list().data)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Cannot reach model API: {e}")
+
+    config = _load_config()
+    allowed = config.get("allowed_models")
+
+    result = []
+    for model_id in all_models:
+        result.append({
+            "id": model_id,
+            "enabled": allowed is None or model_id in allowed,
+            "tier": _tier_for_model(model_id),
+        })
+    return {"models": result, "all_allowed": allowed is None}
+
+
+@app.post("/api/models")
+async def api_save_models(request: Request):
+    """Save the list of enabled model IDs."""
+    body = await request.json()
+    allowed = body.get("allowed_models")
+
+    if allowed is not None and not isinstance(allowed, list):
+        raise HTTPException(status_code=400, detail="allowed_models must be a list or null")
+
+    config = _load_config()
+    config["allowed_models"] = allowed
+    _save_config(config)
+    return {"ok": True, "allowed_count": len(allowed) if allowed else "all"}
+
+
 # ── WebSocket ────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
@@ -441,6 +509,137 @@ async def websocket_endpoint(websocket: WebSocket):
         await manager.disconnect(websocket)
     except Exception:
         await manager.disconnect(websocket)
+
+
+# ── Health endpoint ──────────────────────────────────────────────────────────
+
+_server_start = time.time()
+_last_update_time = time.time()
+
+@app.post("/update")
+async def _track_update_time(request: Request):
+    """Wrapper — update the last-seen timestamp for health checks."""
+    global _last_update_time
+    _last_update_time = time.time()
+
+# Patch: the original /update handler is above; we just track time here
+# The actual broadcast happens in the original receive_update handler
+
+
+@app.get("/api/health")
+async def health():
+    stuck_threshold = 1800  # 30 minutes
+    is_running = _running_plan_id is not None
+    since_update = time.time() - _last_update_time
+    status = "idle"
+    if is_running:
+        status = "stuck" if since_update > stuck_threshold else "running"
+    return {
+        "status": status,
+        "running_plan": _running_plan_id,
+        "uptime_seconds": int(time.time() - _server_start),
+        "seconds_since_update": int(since_update),
+    }
+
+
+# ── Analytics endpoints ─────────────────────────────────────────────────────
+
+@app.get("/api/analytics/costs")
+async def analytics_costs():
+    from tracking import get_cost_analytics
+    return get_cost_analytics()
+
+
+@app.get("/api/analytics/scores")
+async def analytics_scores():
+    from tracking import get_score_analytics
+    return get_score_analytics()
+
+
+# ── Webhook config endpoint ─────────────────────────────────────────────────
+
+CONFIG_FILE = STATIC_DIR / "config.json"
+
+def _load_config():
+    try:
+        return json.loads(CONFIG_FILE.read_text())
+    except Exception:
+        return {}
+
+def _save_config(cfg):
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+
+@app.get("/api/config")
+async def get_config():
+    return _load_config()
+
+@app.post("/api/config")
+async def save_config(request: Request):
+    data = await request.json()
+    cfg = _load_config()
+    cfg.update(data)
+    _save_config(cfg)
+    return {"ok": True}
+
+@app.post("/api/webhook/test")
+async def test_webhook(request: Request):
+    """Send a test payload to the configured webhook URL."""
+    cfg = _load_config()
+    url = cfg.get("webhook_url", "")
+    if not url:
+        raise HTTPException(status_code=400, detail="No webhook URL configured")
+    import urllib.request
+    payload = json.dumps({
+        "project": "QUARM Test",
+        "tasks_completed": 0,
+        "total_revisions": 0,
+        "tokens_used": 0,
+        "elapsed_seconds": 0,
+        "summary": "This is a test webhook from QUARM HQ.",
+    }).encode()
+    try:
+        req = urllib.request.Request(url, data=payload,
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        urllib.request.urlopen(req, timeout=10)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+# ── Plan directory watcher ──────────────────────────────────────────────────
+
+INCOMING_DIR = PLANS_DIR / "incoming"
+
+def _watch_incoming():
+    """Poll plans/incoming/ for new .md files and auto-queue them."""
+    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+    while True:
+        try:
+            for f in sorted(INCOMING_DIR.glob("*.md")):
+                plan_id = uuid.uuid4().hex[:12]
+                dest = PLANS_DIR / f"{plan_id}.md"
+                content = f.read_text()
+                dest.write_text(content)
+                # Extract title from first heading
+                title_match = re.search(r"^#\s+(?:PROJECT PLAN:\s*)?(.+)", content, re.MULTILINE)
+                title = title_match.group(1).strip() if title_match else f.stem
+                # Add to queue
+                plans = json.loads(QUEUE_FILE.read_text()) if QUEUE_FILE.exists() else []
+                plans.append({
+                    "id": plan_id,
+                    "title": title,
+                    "status": "queued",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+                QUEUE_FILE.write_text(json.dumps(plans, indent=2))
+                f.unlink()  # remove from incoming
+                log.info(f"Auto-queued: {title} ({plan_id})")
+        except Exception as e:
+            log.debug(f"Watcher error: {e}")
+        time.sleep(5)
+
+_watcher_thread = threading.Thread(target=_watch_incoming, daemon=True)
+_watcher_thread.start()
 
 
 # ── Static file fallback (must be last) ──────────────────────────────────────

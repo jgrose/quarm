@@ -11,8 +11,10 @@ import sys
 import os
 import threading
 import time
+import json
 import openai
 from dotenv import load_dotenv
+from model_config import load_allowed_models
 
 load_dotenv()
 
@@ -24,11 +26,15 @@ def _pick_best_opus() -> str:
     try:
         client = openai.OpenAI()
         available = sorted(m.id for m in client.models.list().data)
+        allowed = load_allowed_models()
+        if allowed is not None:
+            available = [m for m in available if m in allowed]
+            if not available:
+                print("[WARN] No allowed models, falling back to all available")
+                available = sorted(m.id for m in client.models.list().data)
         opus_models = [m for m in available if "opus" in m.lower()]
         if opus_models:
-            # Prefer the highest-versioned opus model (sorted descending)
             return sorted(opus_models, reverse=True)[0]
-        # No opus found — fall back to first available
         print(f"[WARN] No opus model found, falling back to: {available[0]}")
         return available[0]
     except Exception as e:
