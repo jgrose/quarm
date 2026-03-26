@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/quarm_logo.png" alt="QUARM" width="500">
+</p>
+
 # 4-Layer Multi-Agent Orchestrator
 
 A LangGraph system with two independent quality gates: domain manager review and a specialist reviewer panel (security engineer, UX designer, user tester).
