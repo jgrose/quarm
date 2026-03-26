@@ -224,6 +224,170 @@
     animation: pulseBadge 1.2s ease-in-out infinite;
   }
 
+/* ── Thinking panel (RPG dialogue box) ───────────────────────────── */
+#thinkingPanel {
+  display: none;
+  width: 100%;
+  margin-bottom: 6px;
+  border: 2px solid #ffd70066;
+  background: #0d0d20;
+}
+#thinkingPanel.visible { display: block; }
+
+#thinkingHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #2a2040;
+}
+#thinkingHeader:hover { background: #1a1430; }
+
+.thinking-portrait {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #ffd700;
+  background: #1a1430;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.thinking-label {
+  flex: 1;
+  font-size: 6px;
+  color: #ffd700;
+  letter-spacing: 2px;
+}
+
+.thinking-toggle {
+  font-size: 6px;
+  color: #ffd70088;
+  transition: transform 0.2s;
+}
+#thinkingPanel.expanded .thinking-toggle { transform: rotate(180deg); }
+
+#contextBar {
+  height: 6px;
+  background: #06080f;
+  border-top: 1px solid #2a204066;
+  position: relative;
+  overflow: hidden;
+}
+#contextBarFill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #00ff88, #44aaff, #ffd700);
+}
+#contextBarLabel {
+  position: absolute;
+  right: 4px;
+  top: -1px;
+  font-size: 4px;
+  color: #ffffff66;
+  letter-spacing: 1px;
+}
+
+#thinkingBody {
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2040 #0d0d20;
+}
+#thinkingPanel.expanded #thinkingBody { display: block; }
+#thinkingBody::-webkit-scrollbar { width: 6px; }
+#thinkingBody::-webkit-scrollbar-track { background: #0d0d20; }
+#thinkingBody::-webkit-scrollbar-thumb { background: #2a2040; }
+
+#thinkingText {
+  padding: 8px 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  line-height: 2.4;
+  color: #aabbcc;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 3px solid #ffd70033;
+  margin: 0 6px 6px 6px;
+}
+#thinkingText.streaming::after {
+  content: '\25CB';
+  animation: cursorBlink 0.6s steps(2) infinite;
+  color: #ffd700;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+#thinkingBody::before {
+  content: '';
+  display: block;
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #ffd70033;
+  margin: 0 0 0 16px;
+}
+
+/* ── Plan viewer modal ───────────────────────────────────────────── */
+#planViewer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #06080fee;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+#planViewer.visible { display: flex; flex-direction: column; align-items: center; }
+
+#planViewerInner {
+  max-width: 700px;
+  width: 100%;
+  background: #0d0d20;
+  border: 2px solid #ffd70066;
+  padding: 16px;
+}
+#planViewerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2040;
+}
+#planViewerTitle {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #ffd700;
+  letter-spacing: 2px;
+}
+#planViewerClose {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  background: none;
+  border: 1px solid #ffd700;
+  color: #ffd700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+#planViewerClose:hover { background: #ffd700; color: #0d0d20; }
+#planViewerContent {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  line-height: 2.2;
+  color: #aabbcc;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
   /* ── Config panel ─────────────────────────────────────────────────────── */
   #configBtn {
     position: fixed; top: 8px; right: 12px; z-index: 100;
@@ -357,6 +521,20 @@
   <ul id="queueList">
     <li class="queue-empty">NO PLANS IN QUEUE</li>
   </ul>
+</div>
+<div id="thinkingPanel">
+  <div id="thinkingHeader" onclick="toggleThinking()">
+    <div class="thinking-portrait">&#x1F9D9;</div>
+    <span class="thinking-label">PLAN ARCHITECT IS THINKING...</span>
+    <span class="thinking-toggle">&#x25BC;</span>
+  </div>
+  <div id="contextBar">
+    <div id="contextBarFill"></div>
+    <span id="contextBarLabel"></span>
+  </div>
+  <div id="thinkingBody">
+    <div id="thinkingText"></div>
+  </div>
 </div>
 <div id="canvasWrap"><canvas id="c"></canvas></div>
 <div id="hint">CLICK A ROOM TO VIEW AGENT PROFILE</div>
@@ -1568,8 +1746,12 @@ let tick=0, selectedId=null;
 
 function drawAll(){
   ctx.fillStyle=P.void; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawDayNightOverlay(ctx, tick);
   drawHalls(ctx,tick);
+  drawDepLines(ctx, tick);
   for(const room of ROOMS) drawRoom(ctx,room,room.id===selectedId,tick);
+  drawVerdictPopups(ctx);
+  drawXPBar(ctx, tick);
 }
 
 function loop(){ tick++; drawAll(); requestAnimationFrame(loop); }
@@ -1621,6 +1803,20 @@ function updatePanel(room, show){
   });
   document.getElementById('panel-close').style.borderColor=ac;
   document.getElementById('panel-close').style.color=ac;
+
+  // Loot preview
+  const lootEl = document.getElementById('panel-loot');
+  const lootLabel = document.getElementById('panel-loot-label');
+  const td = liveTaskData[room.id];
+  if (cfg.lootPreview && td && td.result_preview) {
+    lootEl.textContent = td.result_preview;
+    lootEl.style.display = 'block';
+    lootLabel.style.color = ac;
+    lootLabel.style.display = 'block';
+  } else {
+    lootEl.style.display = 'none';
+    lootLabel.style.display = 'none';
+  }
 }
 
 document.getElementById('panel-close').addEventListener('click',()=>{
@@ -1748,6 +1944,43 @@ function renderLog(lines, project, done, total) {
   el.scrollTop = el.scrollHeight;
 }
 
+// ── Config system ────────────────────────────────────────────────────────────
+
+const DEFAULT_CONFIG = {
+  hpBars: true, xpBar: true, modelBadges: true, verdictPopups: true,
+  depLines: true, lootPreview: true, victoryScreen: true, dayNight: true,
+};
+let cfg = {...DEFAULT_CONFIG};
+try {
+  const saved = JSON.parse(localStorage.getItem('quarm_config') || '{}');
+  cfg = {...DEFAULT_CONFIG, ...saved};
+} catch(e) {}
+
+function saveCfg() { localStorage.setItem('quarm_config', JSON.stringify(cfg)); }
+
+function toggleConfig() {
+  document.getElementById('configOverlay').classList.toggle('visible');
+  // Sync toggles with cfg state
+  document.querySelectorAll('.cfg-toggle').forEach(el => {
+    el.classList.toggle('on', cfg[el.dataset.key]);
+  });
+}
+
+function toggleCfg(el) {
+  const key = el.dataset.key;
+  cfg[key] = !cfg[key];
+  el.classList.toggle('on', cfg[key]);
+  saveCfg();
+}
+
+// ── Live data state ─────────────────────────────────────────────────────────
+let liveTokensUsed = 0;
+let liveStartedAt = null;
+let liveSynthesisReport = '';
+let liveTaskData = {};     // roomId → full task data (score, model, tokens, depends_on, result_preview)
+const verdictQueue = [];   // [{text, color, x, y, age}]
+let victoryShown = false;
+
 // ── Status application ────────────────────────────────────────────────────────
 
 function applyStatus(data) {
@@ -1755,6 +1988,10 @@ function applyStatus(data) {
   if (data.sub_agents || data.managers || data.reviewers) {
     buildMapsFromRoster(data);
   }
+
+  // Track global state
+  liveTokensUsed = data.tokens_used || 0;
+  if (!liveStartedAt && data.updated_at) liveStartedAt = data.updated_at;
 
   // Reset all rooms
   liveRoomStates = {};
@@ -1773,6 +2010,33 @@ function applyStatus(data) {
       taskId:         task.id,
       taskTitle:      task.title,
     };
+    // Store enriched task data for new features
+    liveTaskData[roomId] = {
+      score:          task.last_score || 0,
+      model:          task.current_model || "",
+      tokens:         task.task_tokens || 0,
+      depends_on:     task.depends_on || [],
+      result_preview: task.result_preview || "",
+      agent:          task.agent,
+      status:         task.status,
+    };
+  }
+
+  // Process verdict popup
+  if (cfg.verdictPopups && data.last_verdict) {
+    const v = data.last_verdict;
+    const roomId = agentToRoom[v.task_id ? (data.tasks||[]).find(t=>t.id===v.task_id)?.agent : ''];
+    const room = ROOMS.find(r => r.id === roomId);
+    if (room) {
+      const isPASS = v.verdict === 'PASS';
+      verdictQueue.push({
+        text: `${v.verdict} ${isPASS?'+':''}${v.score}`,
+        color: isPASS ? '#00ff88' : '#ff4444',
+        x: room.c*T + room.w*T/2,
+        y: room.r*T + T*2,
+        age: 0,
+      });
+    }
   }
 
   // Highlight active reviewer — dim all others
@@ -1783,12 +2047,150 @@ function applyStatus(data) {
       : { statusKey:"pending", label:"STANDBY", color:"#444444" };
   }
 
+  // Victory screen
+  if (data.synthesis_report && data.phase === 'done' && cfg.victoryScreen && !victoryShown) {
+    liveSynthesisReport = data.synthesis_report;
+    showVictory(data);
+  }
+
   renderLog(
     data.log || [],
     data.project || "QUARM HQ",
     data.results_count || 0,
     data.total_tasks   || 0,
   );
+}
+
+// ── Victory screen ──────────────────────────────────────────────────────────
+
+function showVictory(data) {
+  victoryShown = true;
+  const stats = document.getElementById('victoryStats');
+  const totalRevisions = (data.tasks||[]).reduce((s,t) => s + (t.revision_count||0), 0);
+  const elapsed = liveStartedAt ? Math.round((Date.now() - new Date(liveStartedAt).getTime())/1000) : 0;
+  const mins = Math.floor(elapsed/60), secs = elapsed%60;
+  stats.innerHTML = `
+    <div class="v-stat"><div class="v-stat-val">${data.total_tasks||0}</div><div class="v-stat-lbl">TASKS</div></div>
+    <div class="v-stat"><div class="v-stat-val">${totalRevisions}</div><div class="v-stat-lbl">REVISIONS</div></div>
+    <div class="v-stat"><div class="v-stat-val">${liveTokensUsed.toLocaleString()}</div><div class="v-stat-lbl">TOKENS</div></div>
+    <div class="v-stat"><div class="v-stat-val">${mins}m${secs}s</div><div class="v-stat-lbl">ELAPSED</div></div>
+  `;
+  document.getElementById('victoryReport').textContent = liveSynthesisReport;
+  document.getElementById('victoryOverlay').classList.add('visible');
+}
+
+function closeVictory() {
+  document.getElementById('victoryOverlay').classList.remove('visible');
+}
+
+// ── Canvas drawing: new features ────────────────────────────────────────────
+
+function drawXPBar(ctx, tick) {
+  if (!cfg.xpBar || liveTokensUsed === 0) return;
+  const bx = T*2 + 4, by = CH*T - T + 3;
+  const bw = (CW-4)*T - 8, bh = 8;
+  // Background
+  ctx.fillStyle = '#0a0818cc'; ctx.fillRect(bx-1, by-1, bw+2, bh+2);
+  ctx.strokeStyle = '#0ff4'; ctx.lineWidth = 1; ctx.strokeRect(bx-1, by-1, bw+2, bh+2);
+  // Fill — cycles through color as tokens grow
+  const fill = Math.min(1, (liveTokensUsed % 50000) / 50000);
+  const grd = ctx.createLinearGradient(bx, by, bx + bw * fill, by);
+  grd.addColorStop(0, '#004488'); grd.addColorStop(1, '#00aaff');
+  ctx.fillStyle = grd; ctx.fillRect(bx, by, bw * fill, bh);
+  // Shimmer
+  const shimX = bx + ((tick * 2) % (bw + 40)) - 20;
+  ctx.save(); ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#fff'; ctx.fillRect(shimX, by, 12, bh);
+  ctx.restore();
+  // Label
+  ctx.font = 'bold 5px "Press Start 2P",monospace';
+  ctx.fillStyle = '#0ff'; ctx.textAlign = 'left';
+  ctx.fillText(`${liveTokensUsed.toLocaleString()} XP`, bx + 4, by + 7);
+  ctx.textAlign = 'center';
+}
+
+function drawDayNightOverlay(ctx, tick) {
+  if (!cfg.dayNight || !liveStartedAt) return;
+  const elapsed = (Date.now() - new Date(liveStartedAt).getTime()) / 1000;
+  // 10-minute full cycle
+  const cycle = (elapsed % 600) / 600;
+  let r=0, g=0, b=0, a=0;
+  if (cycle < 0.25) { // dawn: dark blue → warm
+    a = 0.08 * (1 - cycle*4);
+    r=10; g=10; b=40;
+  } else if (cycle < 0.5) { // day: bright, minimal overlay
+    a = 0;
+  } else if (cycle < 0.75) { // dusk: warm orange tint
+    const t = (cycle-0.5)*4;
+    a = 0.06 * t; r=40; g=20; b=0;
+  } else { // night: dark blue
+    const t = (cycle-0.75)*4;
+    a = 0.04 + 0.06*t; r=0; g=0; b=30;
+  }
+  if (a > 0) {
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+}
+
+function drawDepLines(ctx, tick) {
+  if (!cfg.depLines) return;
+  for (const [roomId, td] of Object.entries(liveTaskData)) {
+    if (!td.depends_on || td.depends_on.length === 0) continue;
+    const dstRoom = ROOMS.find(r => r.id === roomId);
+    if (!dstRoom) continue;
+    for (const depTaskId of td.depends_on) {
+      // Find which room has the dependency task
+      for (const [srcRoomId, srcTd] of Object.entries(liveTaskData)) {
+        const srcRoom = ROOMS.find(r => r.id === srcRoomId);
+        if (!srcRoom) continue;
+        // Check if this room's task matches the dependency (by looking at task data)
+        const srcState = liveRoomStates[srcRoomId];
+        if (srcState && srcState.taskId === depTaskId) {
+          const sx = srcRoom.c*T + srcRoom.w*T/2;
+          const sy = srcRoom.r*T + srcRoom.h*T;
+          const dx = dstRoom.c*T + dstRoom.w*T/2;
+          const dy = dstRoom.r*T;
+          const done = srcTd.status === 'done';
+          const pulse = 0.4 + 0.3 * Math.sin(tick * 0.06);
+          ctx.save();
+          ctx.globalAlpha = done ? 0.5 : pulse;
+          ctx.strokeStyle = done ? '#00ff8866' : '#ffd70066';
+          ctx.lineWidth = done ? 2 : 1.5;
+          ctx.setLineDash(done ? [] : [4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          const my = (sy + dy) / 2;
+          ctx.bezierCurveTo(sx, my, dx, my, dx, dy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+      }
+    }
+  }
+}
+
+function drawVerdictPopups(ctx) {
+  if (!cfg.verdictPopups) return;
+  for (let i = verdictQueue.length - 1; i >= 0; i--) {
+    const v = verdictQueue[i];
+    v.age++;
+    if (v.age > 90) { verdictQueue.splice(i, 1); continue; }
+    const alpha = Math.max(0, 1 - v.age / 90);
+    const yOff = v.age * 0.5;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 7px "Press Start 2P",monospace';
+    ctx.textAlign = 'center';
+    // Shadow
+    ctx.fillStyle = '#000'; ctx.fillText(v.text, v.x+1, v.y - yOff + 1);
+    // Text
+    ctx.fillStyle = v.color; ctx.fillText(v.text, v.x, v.y - yOff);
+    ctx.restore();
+  }
 }
 
 // ── Live overlay drawing ──────────────────────────────────────────────────────
@@ -1828,6 +2230,41 @@ function drawLiveOverlay(ctx, room, tick) {
     ctx.fillStyle = "#ffffff66";
     ctx.fillText(state.taskId, x+rw-9, y+rh-9);
   }
+
+  const td = liveTaskData[room.id];
+
+  // HP bar — review score as health
+  if (cfg.hpBars && td && td.score > 0) {
+    const hpW = Math.min(rw - T*3, 50);
+    const hpX = x + rw - hpW - T - 2;
+    const hpY = y + 6;
+    const pct = td.score / 10;
+    const hpColor = pct > 0.7 ? '#00ff88' : pct > 0.4 ? '#ffaa00' : '#ff4444';
+    ctx.fillStyle = '#0a0818cc'; ctx.fillRect(hpX-1, hpY-1, hpW+2, 8);
+    ctx.strokeStyle = hpColor + '66'; ctx.lineWidth = 1;
+    ctx.strokeRect(hpX-1, hpY-1, hpW+2, 8);
+    ctx.fillStyle = hpColor; ctx.fillRect(hpX, hpY, hpW * pct, 6);
+    // Score text
+    ctx.font = 'bold 4px "Press Start 2P",monospace';
+    ctx.textAlign = 'right'; ctx.fillStyle = '#fff';
+    ctx.fillText(td.score + '/10', hpX + hpW - 1, hpY + 5);
+  }
+
+  // Model badge — equipped weapon gem
+  if (cfg.modelBadges && td && td.model) {
+    const ml = td.model.toLowerCase();
+    const tier = ml.includes('opus') ? {c:'#ffd700',l:'L'} :
+                 ml.includes('sonnet') ? {c:'#44aaff',l:'R'} :
+                 ml.includes('haiku') ? {c:'#00ff88',l:'C'} : {c:'#888',l:'?'};
+    const mx = x + T + 2, my = y + rh - T - 10;
+    ctx.fillStyle = '#0a0818cc'; ctx.fillRect(mx, my, 10, 10);
+    ctx.fillStyle = tier.c;
+    ctx.beginPath(); ctx.arc(mx+5, my+5, 3, 0, Math.PI*2); ctx.fill();
+    ctx.font = 'bold 4px "Press Start 2P",monospace';
+    ctx.textAlign = 'center'; ctx.fillStyle = '#000';
+    ctx.fillText(tier.l, mx+5, my+7);
+  }
+
   ctx.textAlign = "center";
 }
 
@@ -1880,6 +2317,9 @@ function connectWS() {
 }
 
 connectWS();
+
+// Load queue from server on page load (persists across refreshes)
+refreshQueue();
 
 // ── Queue panel & plan generation ─────────────────────────────────────────────
 
@@ -1994,6 +2434,10 @@ function renderQueue(plans) {
     const title = document.createElement('span');
     title.className = 'plan-title';
     title.textContent = plan.title || plan.id || 'Untitled';
+    title.style.cursor = 'pointer';
+    if (plan.status !== 'generating') {
+      title.onclick = (e) => { e.stopPropagation(); viewPlan(plan.id); };
+    }
     li.appendChild(title);
 
     // Status badge
@@ -2092,10 +2536,164 @@ function onDragEnd(e) {
   document.querySelectorAll('.queue-item.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
+// ── Thinking panel state ──────────────────────────────────────────────────────
+
+const _thinking = {
+  planId: null,
+  contextWindow: 200000,
+  estimatedInput: 0,
+  outputTokens: 0,
+  textBuffer: '',
+  displayedLen: 0,
+  typewriterTimer: null,
+  expanded: false,
+};
+
+function showThinkingPanel(planId) {
+  _thinking.planId = planId;
+  _thinking.textBuffer = '';
+  _thinking.displayedLen = 0;
+  _thinking.outputTokens = 0;
+  const panel = document.getElementById('thinkingPanel');
+  const textEl = document.getElementById('thinkingText');
+  textEl.textContent = '';
+  textEl.classList.remove('done');
+  textEl.classList.add('streaming');
+  panel.classList.add('visible');
+  document.querySelector('.thinking-label').style.color = '#ffd700';
+  updateContextBar(0);
+}
+
+function hideThinkingPanel() {
+  document.getElementById('thinkingPanel').classList.remove('visible');
+  _thinking.planId = null;
+  if (_thinking.typewriterTimer) {
+    clearInterval(_thinking.typewriterTimer);
+    _thinking.typewriterTimer = null;
+  }
+}
+
+function toggleThinking() {
+  const panel = document.getElementById('thinkingPanel');
+  _thinking.expanded = !_thinking.expanded;
+  panel.classList.toggle('expanded', _thinking.expanded);
+  if (_thinking.expanded) {
+    const textEl = document.getElementById('thinkingText');
+    textEl.textContent = _thinking.textBuffer;
+    _thinking.displayedLen = _thinking.textBuffer.length;
+    scrollThinkingToBottom();
+    startTypewriter();
+  }
+}
+
+function startTypewriter() {
+  if (_thinking.typewriterTimer) return;
+  _thinking.typewriterTimer = setInterval(() => {
+    if (_thinking.displayedLen >= _thinking.textBuffer.length) return;
+    const batch = Math.min(3, _thinking.textBuffer.length - _thinking.displayedLen);
+    _thinking.displayedLen += batch;
+    if (_thinking.expanded) {
+      const textEl = document.getElementById('thinkingText');
+      textEl.textContent = _thinking.textBuffer.substring(0, _thinking.displayedLen);
+      scrollThinkingToBottom();
+    }
+  }, 16);
+}
+
+function scrollThinkingToBottom() {
+  const body = document.getElementById('thinkingBody');
+  body.scrollTop = body.scrollHeight;
+}
+
+function updateContextBar(outputTokens) {
+  const total = _thinking.estimatedInput + outputTokens;
+  const pct = Math.min(100, (total / _thinking.contextWindow) * 100);
+  document.getElementById('contextBarFill').style.width = pct.toFixed(1) + '%';
+  document.getElementById('contextBarLabel').textContent =
+    total.toLocaleString() + ' / ' + _thinking.contextWindow.toLocaleString() + ' TOKENS';
+  const fill = document.getElementById('contextBarFill');
+  if (pct > 80) fill.style.background = 'linear-gradient(90deg, #ff4444, #ff8800)';
+  else if (pct > 50) fill.style.background = 'linear-gradient(90deg, #ffd700, #ff8800)';
+  else fill.style.background = 'linear-gradient(90deg, #00ff88, #44aaff, #ffd700)';
+}
+
 function handlePlanEvent(data) {
-  // Refresh the queue whenever a plan event comes in
+  const evt = data.event;
+
+  if (evt === 'generating_model') {
+    showThinkingPanel(data.plan_id);
+    _thinking.contextWindow = data.context_window || 200000;
+    _thinking.estimatedInput = data.estimated_input_tokens || 0;
+    updateContextBar(0);
+    document.querySelector('.thinking-label').textContent =
+      'PLAN ARCHITECT (' + data.model + ') IS THINKING...';
+  }
+  else if (evt === 'generating_chunk' && data.plan_id === _thinking.planId) {
+    _thinking.textBuffer += data.text;
+    _thinking.outputTokens = Math.round(_thinking.textBuffer.length / 4);
+    updateContextBar(_thinking.outputTokens);
+    startTypewriter();
+  }
+  else if (evt === 'ready') {
+    if (data.plan_id === _thinking.planId) {
+      if (data.usage) updateContextBar(data.usage.output_tokens);
+      _thinking.displayedLen = _thinking.textBuffer.length;
+      const textEl = document.getElementById('thinkingText');
+      if (_thinking.expanded) textEl.textContent = _thinking.textBuffer;
+      textEl.classList.remove('streaming');
+      textEl.classList.add('done');
+      if (_thinking.typewriterTimer) {
+        clearInterval(_thinking.typewriterTimer);
+        _thinking.typewriterTimer = null;
+      }
+      document.querySelector('.thinking-label').textContent =
+        'PLAN COMPLETE: ' + (data.title || 'UNTITLED');
+      setTimeout(() => {
+        if (_thinking.planId === data.plan_id) hideThinkingPanel();
+      }, 8000);
+    }
+  }
+  else if (evt === 'error' && data.plan_id === _thinking.planId) {
+    const textEl = document.getElementById('thinkingText');
+    textEl.textContent += '\n\n[ERROR] ' + (data.message || 'Generation failed');
+    textEl.classList.remove('streaming');
+    textEl.classList.add('done');
+    document.querySelector('.thinking-label').textContent = 'PLAN GENERATION FAILED';
+    document.querySelector('.thinking-label').style.color = '#ff4444';
+    setTimeout(() => hideThinkingPanel(), 10000);
+  }
+
   refreshQueue();
 }
+
+// ── Plan viewer ───────────────────────────────────────────────────────────────
+
+async function viewPlan(id) {
+  try {
+    const res = await fetch('/api/plans/' + id);
+    if (!res.ok) return;
+    const plan = await res.json();
+    document.getElementById('planViewerTitle').textContent = plan.title || 'PLAN';
+    document.getElementById('planViewerContent').textContent = plan.content || '(empty)';
+    document.getElementById('planViewer').classList.add('visible');
+  } catch (e) {
+    console.error('viewPlan:', e);
+  }
+}
+
+function closePlanViewer() {
+  document.getElementById('planViewer').classList.remove('visible');
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePlanViewer();
+});
+
+// Close on click outside the inner panel
+document.getElementById('planViewer').addEventListener('click', e => {
+  if (e.target === document.getElementById('planViewer')) closePlanViewer();
+});
 
 // Allow Enter key in the input to trigger generation
 document.getElementById('planInput').addEventListener('keydown', e => {
@@ -2103,5 +2701,14 @@ document.getElementById('planInput').addEventListener('keydown', e => {
 });
 
 </script>
+<div id="planViewer">
+  <div id="planViewerInner">
+    <div id="planViewerHeader">
+      <span id="planViewerTitle">PLAN</span>
+      <button id="planViewerClose" onclick="closePlanViewer()">&#x2715; CLOSE</button>
+    </div>
+    <div id="planViewerContent"></div>
+  </div>
+</div>
 </body>
 </html>

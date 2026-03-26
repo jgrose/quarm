@@ -29,6 +29,7 @@ import json
 import asyncio
 import logging
 import uuid
+import time
 import threading
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -119,12 +120,20 @@ class ConnectionManager:
         async with self._lock:
             self.active.append(ws)
         log.info(f"WS connected  ({len(self.active)} total)")
-        # Replay last known states
+        # Send queue state (from memory or disk)
+        queue_payload = None
         if self._last_queue:
+            queue_payload = {"type": "queue", "plans": self._last_queue}
+        else:
+            disk_queue = _load_queue()
+            if disk_queue:
+                queue_payload = {"type": "queue", "plans": disk_queue}
+        if queue_payload:
             try:
-                await ws.send_json({"type": "queue", "plans": self._last_queue})
+                await ws.send_json(queue_payload)
             except Exception:
                 pass
+        # Send last orchestrator state
         if self._last_status:
             try:
                 await ws.send_json(self._last_status)
@@ -181,16 +190,43 @@ def _broadcast_plan_event(plan_id: str, event: str, **extra):
 # ── Background workers ────────────────────────────────────────────────────────
 
 def _generate_plan_worker(plan_id: str, description: str):
-    """Run plan generation in a background thread."""
-    from generate_plan import generate_plan
+    """Run plan generation in a background thread, streaming updates."""
+    from generate_plan import generate_plan_streaming
     try:
         plan_file = str(PLANS_DIR / f"{plan_id}.md")
-        plan_text = generate_plan(description, plan_file)
-        title = _extract_title(plan_text)
-        _update_plan_status(plan_id, "queued", title=title)
-        _broadcast_queue()
-        _broadcast_plan_event(plan_id, "ready", title=title)
-        log.info(f"Plan generated: {plan_id} — {title}")
+        chunk_buffer = ""
+        last_flush = time.time()
+
+        for event in generate_plan_streaming(description, plan_file):
+            evt_type = event.get("event")
+
+            if evt_type == "model":
+                _broadcast_plan_event(plan_id, "generating_model",
+                    model=event["model"],
+                    context_window=event["context_window"],
+                    estimated_input_tokens=event["estimated_input_tokens"])
+
+            elif evt_type == "chunk":
+                chunk_buffer += event["text"]
+                now = time.time()
+                if now - last_flush > 0.05 or len(chunk_buffer) > 20:
+                    _broadcast_plan_event(plan_id, "generating_chunk", text=chunk_buffer)
+                    chunk_buffer = ""
+                    last_flush = now
+
+            elif evt_type == "done":
+                if chunk_buffer:
+                    _broadcast_plan_event(plan_id, "generating_chunk", text=chunk_buffer)
+                    chunk_buffer = ""
+                title = _extract_title(event["plan_text"])
+                _update_plan_status(plan_id, "queued", title=title)
+                _broadcast_queue()
+                _broadcast_plan_event(plan_id, "ready", title=title, usage=event.get("usage"))
+                log.info(f"Plan generated: {plan_id} — {title}")
+
+            elif evt_type == "error":
+                raise RuntimeError(event["message"])
+
     except Exception as e:
         _update_plan_status(plan_id, "failed")
         _broadcast_queue()

@@ -36,6 +36,15 @@ def _pick_best_opus() -> str:
         return DEFAULT_MODEL
 
 
+CONTEXT_WINDOWS = {
+    "opus": 200000,
+    "sonnet": 200000,
+    "haiku": 200000,
+    "gpt-4o": 128000,
+    "gpt-4": 128000,
+}
+
+
 SYSTEM_PROMPT = """You are a technical project planner designing a 4-layer AI agent system.
 
 Given a project description, produce a structured plan.md.
@@ -109,6 +118,61 @@ RULES
 - The master agent is implicit — do not include it
 - Be specific in task descriptions — vague tasks produce poor results
 """
+
+
+def generate_plan_streaming(description: str, output_path: str = "plan.md"):
+    """Generator that yields streaming events as dicts for the web UI."""
+    client = openai.OpenAI()
+    model = _pick_best_opus()
+
+    ctx_window = 200000
+    for key, size in CONTEXT_WINDOWS.items():
+        if key in model.lower():
+            ctx_window = size
+            break
+
+    est_input = (len(SYSTEM_PROMPT) + len(description)) // 4
+    yield {"event": "model", "model": model, "context_window": ctx_window,
+           "estimated_input_tokens": est_input}
+
+    try:
+        stream = client.chat.completions.create(
+            model=model,
+            max_tokens=4096,
+            stream=True,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": description},
+            ],
+        )
+    except Exception as e:
+        yield {"event": "error", "message": str(e)}
+        return
+
+    chunks = []
+    usage_info = None
+    for chunk in stream:
+        if hasattr(chunk, 'usage') and chunk.usage:
+            usage_info = {
+                "input_tokens": getattr(chunk.usage, 'prompt_tokens', 0),
+                "output_tokens": getattr(chunk.usage, 'completion_tokens', 0),
+            }
+        if chunk.choices and chunk.choices[0].delta.content:
+            text = chunk.choices[0].delta.content
+            chunks.append(text)
+            yield {"event": "chunk", "text": text}
+
+    plan = "".join(chunks).strip()
+    if plan.startswith("```"):
+        plan = "\n".join(plan.split("\n")[1:])
+    if plan.endswith("```"):
+        plan = "\n".join(plan.split("\n")[:-1])
+
+    with open(output_path, "w") as f:
+        f.write(plan)
+
+    yield {"event": "done", "plan_text": plan,
+           "usage": usage_info or {"input_tokens": est_input, "output_tokens": len(plan) // 4}}
 
 
 def generate_plan(description: str, output_path: str = "plan.md") -> str:

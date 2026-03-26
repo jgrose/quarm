@@ -249,6 +249,9 @@ class OrchestratorState(TypedDict):
     results:        dict[str, str]
     finished:       bool
     phase:          str
+    tokens_used:    int
+    last_verdict:   Optional[dict]
+    synthesis_report: str
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -256,6 +259,15 @@ class OrchestratorState(TypedDict):
 def llm(model: str = ""):
     m = model or DEFAULT_MODEL
     return ChatOpenAI(model=m, temperature=0.2)
+
+def extract_tokens(resp) -> int:
+    """Extract total token count from a LangChain response."""
+    try:
+        meta = resp.response_metadata or {}
+        usage = meta.get("usage", meta.get("token_usage", {}))
+        return usage.get("total_tokens", 0)
+    except Exception:
+        return 0
 
 def get_task(tid, tasks):
     return next((t for t in tasks if t["id"] == tid), None)
@@ -348,12 +360,15 @@ def sub_agent_node(state):
                               + ("\n\n" + "\n\n".join(ctx) if ctx else "")),
     ])
     draft = resp.content
-    done  = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars) → manager review"
+    toks  = extract_tokens(resp)
+    total_tokens = state.get("tokens_used", 0) + toks
+    done  = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {toks} tokens) → manager review"
     print(f"  {done}"); log_event(done)
 
     tasks = upd(tasks, tid, status="in_manager_review", result=draft,
-                manager_notes="", reviewer_notes="")
-    s = {**state, "tasks": tasks, "phase": "manager_review"}
+                manager_notes="", reviewer_notes="",
+                current_model=model, task_tokens=task.get("task_tokens", 0) + toks)
+    s = {**state, "tasks": tasks, "phase": "manager_review", "tokens_used": total_tokens}
     write_status(s); return s
 
 
@@ -399,6 +414,8 @@ def manager_review_node(state):
                               + (f"\nContext:{prior}" if prior else "")
                               + f"\n\n---\n{task['result']}"),
     ])
+    toks = extract_tokens(resp)
+    total_tokens = state.get("tokens_used", 0) + toks
     try:
         v = json.loads(resp.content.strip().replace("```json","").replace("```",""))
     except Exception:
@@ -410,16 +427,22 @@ def manager_review_node(state):
     print(f"  {msg}"); log_event(msg)
     for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
 
+    last_v = {"reviewer": manager["name"], "verdict": verdict, "score": score, "task_id": tid}
+
     if verdict == "PASS":
         log_event(f"[{manager['name'].upper()}] Approved → panel")
-        tasks = upd(tasks, tid, status="in_specialist_review", manager_notes="")
-        s = {**state, "tasks": tasks, "phase": "specialist_review"}
+        tasks = upd(tasks, tid, status="in_specialist_review", manager_notes="",
+                    last_score=score)
+        s = {**state, "tasks": tasks, "phase": "specialist_review",
+             "tokens_used": total_tokens, "last_verdict": last_v}
         write_status(s); return s
     else:
         log_event(f"[{manager['name'].upper()}] Returning {tid} for revision")
         tasks = upd(tasks, tid, status="revision",
-                    manager_notes=v.get("feedback",""), revision_count=rev+1)
-        s = {**state, "tasks": tasks, "phase": "execute"}
+                    manager_notes=v.get("feedback",""), revision_count=rev+1,
+                    last_score=score)
+        s = {**state, "tasks": tasks, "phase": "execute",
+             "tokens_used": total_tokens, "last_verdict": last_v}
         write_status(s); return s
 
 
@@ -474,6 +497,8 @@ def specialist_review_node(state):
             HumanMessage(content=f"Task:{task['title']}\nReqs:{task['description']}"
                                   f"\n\n---\n{task['result']}"),
         ])
+        toks = extract_tokens(resp)
+        total_tokens = state.get("tokens_used", 0) + toks
         try:
             v = json.loads(resp.content.strip().replace("```json","").replace("```",""))
         except Exception:
@@ -486,11 +511,15 @@ def specialist_review_node(state):
         print(f"  {msg}"); log_event(msg)
         for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
         verdicts.append(verdict)
+        last_v = {"reviewer": reviewer["name"], "verdict": verdict, "score": score, "task_id": tid}
         if verdict == "FLAG" and v.get("feedback"):
             flags.append(f"[{reviewer['title']}]\n{v['feedback']}")
+        # Update score to latest reviewer score
+        tasks = upd(tasks, tid, last_score=score)
+        state = {**state, "tokens_used": total_tokens, "last_verdict": last_v}
 
     set_active_reviewer(None)
-    any_flags = any(v == "FLAG" for v in verdicts)
+    any_flags = any(vd == "FLAG" for vd in verdicts)
 
     if any_flags and rev < MAX_REVISIONS:
         msg = f"[PANEL] {len(flags)} reviewer(s) flagged {tid} — revising"
@@ -522,9 +551,13 @@ def synthesis_node(state):
         "Write a concise final executive report: accomplishments, key outputs, "
         "quality signals (revision counts), risks, and next steps."
     ))])
+    toks = extract_tokens(resp)
+    total_tokens = state.get("tokens_used", 0) + toks
     log_event("[MASTER] Done.")
     s = {**state, "messages": [AIMessage(content=resp.content)],
-         "finished": True, "phase": "done"}
+         "finished": True, "phase": "done",
+         "tokens_used": total_tokens,
+         "synthesis_report": resp.content}
     write_status(s); return s
 
 
@@ -588,6 +621,9 @@ def run(plan_path="plan.md"):
         "results":        {},
         "finished":       False,
         "phase":          "dispatch",
+        "tokens_used":    0,
+        "last_verdict":   None,
+        "synthesis_report": "",
     })
 
     print("\n" + "="*60 + "\nFINAL REPORT\n" + "="*60)

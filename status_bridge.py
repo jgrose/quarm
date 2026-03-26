@@ -134,13 +134,21 @@ def write_status(state: dict):
                 "revision_count": t.get("revision_count", 0),
                 "manager_notes":  t.get("manager_notes",  ""),
                 "reviewer_notes": t.get("reviewer_notes", ""),
+                "last_score":     t.get("last_score", 0),
+                "current_model":  t.get("current_model", ""),
+                "task_tokens":    t.get("task_tokens", 0),
+                "depends_on":     t.get("depends_on", []),
+                "result_preview": (t.get("result", "") or "")[:500],
             }
             for t in tasks
         ],
-        "results_count": len(state.get("results", {})),
-        "total_tasks":   len(tasks),
-        "log":           list(_log_lines),
-        "updated_at":    datetime.now(timezone.utc).isoformat(),
+        "results_count":    len(state.get("results", {})),
+        "total_tasks":      len(tasks),
+        "tokens_used":      state.get("tokens_used", 0),
+        "last_verdict":     state.get("last_verdict"),
+        "synthesis_report": state.get("synthesis_report", ""),
+        "log":              list(_log_lines),
+        "updated_at":       datetime.now(timezone.utc).isoformat(),
     }
     t = threading.Thread(target=_post, args=(payload,), daemon=True)
     t.start()
