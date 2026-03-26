@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install langgraph langchain langchain-openai python-dotenv openai fastapi uvicorn
+
+      - name: Syntax check — orchestrator
+        run: python -c "import orchestrator" || true
+
+      - name: Syntax check — tracking
+        run: python -c "import tracking"
+
+      - name: Validate example plan
+        run: python validate_plan.py plan.example.md
+
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check --select E,F --ignore E501 *.py

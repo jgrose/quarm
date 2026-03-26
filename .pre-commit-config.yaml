@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: validate-plans
+        name: Validate QUARM plan files
+        entry: python3 validate_plan.py
+        language: system
+        files: '\.md$'
+        pass_filenames: true
+        types: [markdown]

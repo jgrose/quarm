@@ -1,0 +1,57 @@
+name: Generate Plan from Issue
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  generate:
+    if: github.event.label.name == 'quarm'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install openai python-dotenv
+
+      - name: Generate plan from issue body
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        run: |
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          DESCRIPTION="${ISSUE_TITLE}. ${ISSUE_BODY}"
+          PLAN_FILE="plans/issue-${{ github.event.issue.number }}.md"
+          mkdir -p plans
+          python generate_plan.py "${DESCRIPTION}" "${PLAN_FILE}"
+
+      - name: Create PR with generated plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="plan/issue-${{ github.event.issue.number }}"
+          PLAN_FILE="plans/issue-${{ github.event.issue.number }}.md"
+          git checkout -b "${BRANCH}"
+          git add "${PLAN_FILE}"
+          git config user.name "QUARM Bot"
+          git config user.email "quarm@users.noreply.github.com"
+          git commit -m "Generate plan from issue #${{ github.event.issue.number }}"
+          git push origin "${BRANCH}"
+          gh pr create \
+            --title "Plan: ${{ github.event.issue.title }}" \
+            --body "Generated from issue #${{ github.event.issue.number }}.
+
+          Review the plan file, edit if needed, then merge. Run from the QUARM dashboard.
+
+          Closes #${{ github.event.issue.number }}" \
+            --base master \
+            --head "${BRANCH}"
