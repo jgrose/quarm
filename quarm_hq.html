@@ -4,6 +4,7 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100vh; overflow: hidden; }
   body {
     background: #06080f;
     display: flex;
@@ -11,7 +12,6 @@
     align-items: center;
     font-family: 'Press Start 2P', monospace;
     padding: 12px 24px;
-    min-height: 100vh;
     width: 100%;
     color: #ccc;
   }
@@ -26,14 +26,19 @@
     position: relative;
     border: 2px solid #2a2040;
     cursor: pointer;
-    width: 100%;
     overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   canvas {
     display: block;
     image-rendering: pixelated;
-    width: 100%;
-    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
   #panel {
     margin-top: 10px;
@@ -83,9 +88,10 @@
 </div>
 <div id="legend">
   <div class="leg"><div class="leg-dot" style="background:#ffd700"></div><span style="color:#ffd700">PLANE OF TIME</span></div>
-  <div class="leg"><div class="leg-dot" style="background:#44aaff"></div><span style="color:#44aaff">PLANES OF POWER</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#cc3300"></div><span style="color:#cc3300">PLANE OF WAR</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#44cc44"></div><span style="color:#44cc44">PLANE OF GROWTH</span></div>
   <div class="leg"><div class="leg-dot" style="background:#00ff88"></div><span style="color:#00ff88">ELEMENTAL PLANES</span></div>
-  <div class="leg"><div class="leg-dot" style="background:#bf44ff"></div><span style="color:#bf44ff">PLANES OF FEAR/HATE/JUSTICE</span></div>
+  <div class="leg"><div class="leg-dot" style="background:#bf44ff"></div><span style="color:#bf44ff">PLANES OF HATE/TRANQUILITY/JUSTICE</span></div>
 </div>
 
 <script>
@@ -120,15 +126,15 @@ const ROOMS = [
     c:2,r:2,w:32,h:9, fc:[P.floorAu,P.floorAuL], ac:P.gold, ch:'master',
     desc:'The Plane of Time. Quarm waits here — the convergence of all four elemental heads. Dispatches tasks in dependency order, monitors all planes, and synthesises the final report when every plane has yielded its output.',
     resp:['Task dispatch & sequencing','Dependency resolution','Cross-floor oversight','Final report synthesis']},
-  { id:'mgr_a', name:'PLANE OF WAR', role:'Engineering Architecture Lead',
-    floor:'FLOOR 2 · WEST SANCTUM', tier:'manager',
-    c:2,r:13,w:15,h:9, fc:[P.floorB,P.floorBL], ac:P.blue, ch:'manager_a',
-    desc:'Quality gate #1 for engineering and security outputs. Reviews sub-agent work with blended domain expertise. Issues scored PASS/FAIL verdicts with specific, actionable revision feedback.',
+  { id:'mgr_a', name:'PLANE OF WAR', role:'Rallos Zek — The Warlord',
+    floor:'FLOOR 2 · DOMAIN OF RALLOS ZEK', tier:'manager',
+    c:2,r:13,w:15,h:9, fc:['#1a0808','#220e0e'], ac:'#cc3300', ch:'manager_a',
+    desc:'The Plane of War. Rallos Zek the Warlord presides — creator of ogres, giants, and orcs. Reviews engineering and security outputs with the brutal precision of a war god. PASS or FAIL, no mercy.',
     resp:['Domain quality review','Scored verdicts (1–10)','Revision directives','Engineering standards']},
-  { id:'mgr_b', name:'PLANE OF GROWTH', role:'Product & Delivery Lead',
-    floor:'FLOOR 2 · EAST SANCTUM', tier:'manager',
-    c:19,r:13,w:15,h:9, fc:[P.floorB,P.floorBL], ac:P.blue, ch:'manager_b',
-    desc:'Quality gate #1 for product and delivery outputs. Parallel director with complementary expertise. Maintains independence from Director A to prevent review bias.',
+  { id:'mgr_b', name:'PLANE OF GROWTH', role:'Tunare — Mother of All',
+    floor:'FLOOR 2 · DOMAIN OF TUNARE', tier:'manager',
+    c:19,r:13,w:15,h:9, fc:['#0a1e0a','#0e280e'], ac:'#44cc44', ch:'manager_b',
+    desc:'The Plane of Growth. Tunare the Mother of All — elven goddess of nature and life, crowned with vines, dressed in flowing green and gold. Reviews product and delivery outputs with nurturing thoroughness.',
     resp:['Product quality review','Scored verdicts (1–10)','Revision directives','Delivery standards']},
   { id:'sa1', name:'FORGE OF FIRE', role:'Backend Engineer',
     floor:'FLOOR 1 · FENNIN RO', tier:'subagent',
@@ -150,20 +156,20 @@ const ROOMS = [
     c:27,r:24,w:7,h:8, fc:[P.floorAir,P.floorAirL], ac:P.acAir, ch:'writer',
     desc:'Produces READMEs, API references, user guides, and onboarding content. Writes simultaneously for engineers needing detail and stakeholders needing plain English.',
     resp:['Developer docs','API references','User guides','Onboarding content']},
-  { id:'rev_sec', name:'PLANE OF HATE', role:'Senior Security Engineer',
-    floor:'BASEMENT · INNORUUK', tier:'reviewer',
-    c:2,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.red, ch:'rev_sec',
-    desc:'Quality gate #2 — Plane of Hate. Innoruuk\'s domain: pure adversarial malice applied to every output. OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Hatred finds every flaw.',
+  { id:'rev_sec', name:'PLANE OF HATE', role:'Innoruuk — Prince of Hate',
+    floor:'BASEMENT · DOMAIN OF INNORUUK', tier:'reviewer',
+    c:2,r:34,w:10,h:8, fc:['#180818','#200e20'], ac:P.red, ch:'rev_sec',
+    desc:'Quality gate #2 — Plane of Hate. Innoruuk stands 60 feet tall, bat-like features pulled into a vicious sneer, infernal eyes that turn allies against each other. Father of the Teir\'Dal. Hatred finds every flaw.',
     resp:['OWASP Top 10','Auth & secrets audit','Input validation','Dependency risk']},
-  { id:'rev_ux', name:'PLANE OF TRANQUILITY', role:'Senior UX/UI Designer',
-    floor:'BASEMENT · QUELLIOUS', tier:'reviewer',
-    c:13,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.purple, ch:'rev_ux',
-    desc:'Quality gate #2 — Plane of Tranquility. Luclin\'s domain: form, clarity, and the elegance of what is seen. WCAG accessibility, visual hierarchy, information architecture, cognitive load. Nothing ugly passes.',
+  { id:'rev_ux', name:'PLANE OF TRANQUILITY', role:'Quellious — The Tranquil',
+    floor:'BASEMENT · DOMAIN OF QUELLIOUS', tier:'reviewer',
+    c:13,r:34,w:10,h:8, fc:['#181820','#1e1e2a'], ac:'#cc99ff', ch:'rev_ux',
+    desc:'Quality gate #2 — Plane of Tranquility. Quellious the child goddess of peace, serene in her white robe, rivals Xegony in tender innocence. WCAG accessibility, visual harmony, cognitive calm. Nothing discordant passes.',
     resp:['WCAG accessibility','Visual hierarchy','Info architecture','Interaction patterns']},
-  { id:'rev_usr', name:'PLANE OF JUSTICE', role:'End-User Representative',
+  { id:'rev_usr', name:'PLANE OF JUSTICE', role:'The Tribunal — Six Judges',
     floor:'BASEMENT · THE TRIBUNAL', tier:'reviewer',
     c:24,r:34,w:10,h:8, fc:[P.floorP,P.floorPL], ac:P.cyan, ch:'rev_usr',
-    desc:'Quality gate #2 — Plane of Justice. The Tribunal weighs all deeds. Reviews as a mortal user of no special knowledge. Clarity, plain language, workflow intuitiveness. The six judges render final verdict.',
+    desc:'Quality gate #2 — Plane of Justice. Six hooded, faceless judges armed with perfectly balanced warhammers. Their dark piercing gaze weighs all deeds. Reviews as a mortal user: clarity, plain language, workflow intuitiveness.',
     resp:['First-use clarity','Plain language audit','Workflow intuitiveness','Value assessment']},
 ];
 
@@ -172,149 +178,331 @@ const TIER_COLORS = { master:P.gold, manager:P.blue, subagent:P.green, reviewer:
 const PX = 2;
 function fp(ctx, bx, by, c, r) { ctx.fillRect(bx+c*PX, by+r*PX, PX, PX); }
 
+// Large pixel helper for Quarm (4px per pixel — 2x normal sprites)
+const BPX = 4;
+function bfp(ctx, bx, by, c, r) { ctx.fillRect(bx+c*BPX, by+r*BPX, BPX, BPX); }
+
+// ── QUARM — 4-headed dragon, each head an element (fire/water/earth/air) ─────
 function drawMaster(ctx, x, y) {
-  ctx.fillStyle='#ffd700';
-  [1,2,3,4,5,6].forEach(i=>fp(ctx,x,y,i,0));
-  [0,2,4,6].forEach(i=>fp(ctx,x,y,i,1));
-  ctx.fillStyle='#cc8800';
-  [0,1,2,3,4,5,6,7].forEach(i=>fp(ctx,x,y,i,2));
-  ctx.fillStyle='#f5c07a';
-  for(let c=1;c<=6;c++) for(let r=3;r<=6;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#2a1800'; fp(ctx,x,y,2,4); fp(ctx,x,y,5,4);
-  ctx.fillStyle='#7a3a10'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
-  ctx.fillStyle='#c87c00';
-  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#ffd700'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
-  ctx.fillStyle='#f5c07a'; fp(ctx,x,y,0,9); fp(ctx,x,y,7,9);
+  // ── Four distinct elemental heads on long necks ──
+  // Fire head (far left) — horns + red eye
+  ctx.fillStyle='#ff4400'; bfp(ctx,x,y,0,0); bfp(ctx,x,y,1,0); // fire horns
+  ctx.fillStyle='#cc3300'; bfp(ctx,x,y,0,1); bfp(ctx,x,y,1,1); // fire head
+  ctx.fillStyle='#ff0000'; bfp(ctx,x,y,1,1); // fire eye
+  ctx.fillStyle='#ff6600'; bfp(ctx,x,y,0,2); // flame wisp
+
+  // Water head (inner left) — crest + blue eye
+  ctx.fillStyle='#0088cc'; bfp(ctx,x,y,2,0); bfp(ctx,x,y,3,0); // water crest
+  ctx.fillStyle='#1166aa'; bfp(ctx,x,y,2,1); bfp(ctx,x,y,3,1); // water head
+  ctx.fillStyle='#00ddff'; bfp(ctx,x,y,3,1); // water eye
+  ctx.fillStyle='#00aaff'; bfp(ctx,x,y,2,2); // drip
+
+  // Earth head (inner right) — rocky crown + amber eye
+  ctx.fillStyle='#8a7a40'; bfp(ctx,x,y,5,0); bfp(ctx,x,y,6,0); // stone crown
+  ctx.fillStyle='#6a5a30'; bfp(ctx,x,y,5,1); bfp(ctx,x,y,6,1); // earth head
+  ctx.fillStyle='#ffaa00'; bfp(ctx,x,y,5,1); // amber eye
+  ctx.fillStyle='#c8a000'; bfp(ctx,x,y,6,2); // dust
+
+  // Air head (far right) — ethereal + white eye
+  ctx.fillStyle='#aabbff'; bfp(ctx,x,y,8,0); bfp(ctx,x,y,9,0); // air wisps
+  ctx.fillStyle='#8899cc'; bfp(ctx,x,y,8,1); bfp(ctx,x,y,9,1); // air head
+  ctx.fillStyle='#ddeeff'; bfp(ctx,x,y,9,1); // air eye
+  ctx.fillStyle='#ccddef'; bfp(ctx,x,y,9,2); // breeze
+
+  // ── Four necks converging into one body ──
+  ctx.fillStyle='#2a1830';
+  bfp(ctx,x,y,1,2); bfp(ctx,x,y,1,3);  // fire neck
+  bfp(ctx,x,y,3,2); bfp(ctx,x,y,3,3);  // water neck
+  bfp(ctx,x,y,6,2); bfp(ctx,x,y,6,3);  // earth neck
+  bfp(ctx,x,y,8,2); bfp(ctx,x,y,8,3);  // air neck
+  // Convergence
+  ctx.fillStyle='#221430';
+  for(let c=2;c<=7;c++) bfp(ctx,x,y,c,3);
+  bfp(ctx,x,y,4,2); bfp(ctx,x,y,5,2); // center merge
+
+  // ── Massive body — dark draconic scales ──
+  ctx.fillStyle='#1e102a';
+  for(let c=1;c<=8;c++) for(let r=4;r<=10;r++) bfp(ctx,x,y,c,r);
+  // Scale texture highlights
+  ctx.fillStyle='#2a1840';
+  bfp(ctx,x,y,2,5); bfp(ctx,x,y,5,5); bfp(ctx,x,y,8,5);
+  bfp(ctx,x,y,3,7); bfp(ctx,x,y,6,7);
+  bfp(ctx,x,y,2,9); bfp(ctx,x,y,7,9);
+
+  // ── Elemental chest runes (4 glowing marks) ──
+  ctx.fillStyle='#ff440088'; bfp(ctx,x,y,2,6); // fire rune
+  ctx.fillStyle='#00aaff88'; bfp(ctx,x,y,4,6); // water rune
+  ctx.fillStyle='#c8a00088'; bfp(ctx,x,y,6,6); // earth rune
+  ctx.fillStyle='#aabbff88'; bfp(ctx,x,y,8,6); // air rune
+
+  // ── Wings spread wide ──
+  ctx.fillStyle='#3a2050';
+  bfp(ctx,x,y,0,4); bfp(ctx,x,y,0,5); bfp(ctx,x,y,0,6); // left wing
+  bfp(ctx,x,y,9,4); bfp(ctx,x,y,9,5); bfp(ctx,x,y,9,6); // right wing
+  // Wing membrane
+  ctx.fillStyle='#2a1840';
+  bfp(ctx,x,y,0,7); bfp(ctx,x,y,9,7);
+  // Wing tips
+  ctx.fillStyle='#4a3060';
+  bfp(ctx,x,y,0,3); bfp(ctx,x,y,9,3);
+
+  // ── Legs and claws ──
+  ctx.fillStyle='#1e102a';
+  bfp(ctx,x,y,2,11); bfp(ctx,x,y,3,11); // left leg
+  bfp(ctx,x,y,7,11); bfp(ctx,x,y,8,11); // right leg
+  ctx.fillStyle='#555';
+  bfp(ctx,x,y,2,12); bfp(ctx,x,y,3,12); // left claws
+  bfp(ctx,x,y,7,12); bfp(ctx,x,y,8,12); // right claws
+
+  // ── Tail curving right ──
+  ctx.fillStyle='#2a1830';
+  bfp(ctx,x,y,4,11); bfp(ctx,x,y,5,11);
+  bfp(ctx,x,y,5,12); bfp(ctx,x,y,6,12);
+  ctx.fillStyle='#1e102a'; bfp(ctx,x,y,6,13); // tail tip
 }
 
+// ── RALLOS ZEK — Massive ogre warlord, dark plate armor, war helmet ─────────
 function drawManagerA(ctx, x, y) {
-  ctx.fillStyle='#1a1a40';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
-  ctx.fillStyle='#f5c07a';
-  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#001840'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#fff'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
-  ctx.fillStyle='#1a3a7a';
-  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#cc2200'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,9);
-  ctx.fillStyle='#44aaff'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
-}
-
-function drawManagerB(ctx, x, y) {
-  ctx.fillStyle='#3a2820';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
-  ctx.fillStyle='#f5d0a0';
-  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#2a1408'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#fff'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
-  ctx.fillStyle='#2a4a6a';
-  for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#aaddff'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8); fp(ctx,x,y,3,9);
-  ctx.fillStyle='#8899aa'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
-}
-
-function drawEng(ctx, x, y) {
-  ctx.fillStyle='#2a2a2a';
+  // War helmet — spiked dark iron
+  ctx.fillStyle='#3a3a3a';
   for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
-  ctx.fillStyle='#f5c07a';
-  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#000'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#1e3c1e';
-  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#3a7a3a'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
-  ctx.fillStyle='#777';
-  for(let c=1;c<=6;c++) fp(ctx,x,y,c,12);
-  ctx.fillStyle='#00ff44';
-  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
-}
-
-function drawSec(ctx, x, y) {
-  ctx.fillStyle='#0e0e20';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
-  ctx.fillStyle='#d09060';
+  ctx.fillStyle='#555'; fp(ctx,x,y,0,0); fp(ctx,x,y,7,0); // helmet spikes
+  ctx.fillStyle='#4a4a4a';
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  // Ogre face — green-grey skin
+  ctx.fillStyle='#7a8a60';
   for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
+  // Glowing red eyes
   ctx.fillStyle='#ff2200'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#0e0e20';
+  // Tusks
+  ctx.fillStyle='#ddd'; fp(ctx,x,y,2,5); fp(ctx,x,y,5,5);
+  // Heavy dark plate armor
+  ctx.fillStyle='#2a2a2a';
   for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#cc0000'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
-  ctx.fillStyle='#00ff44';
-  for(let c=2;c<=5;c++) fp(ctx,x,y,c,10); for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
-  ctx.fillStyle='#ff2200'; fp(ctx,x,y,2,9); fp(ctx,x,y,5,9);
+  // Blood-red trim and war insignia
+  ctx.fillStyle='#8b0000'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,7);
+  ctx.fillStyle='#cc2200'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
+  // Pauldrons
+  ctx.fillStyle='#4a4a4a'; fp(ctx,x,y,0,6); fp(ctx,x,y,1,6); fp(ctx,x,y,6,6); fp(ctx,x,y,7,6);
+  // Warhammer in hand
+  ctx.fillStyle='#666'; fp(ctx,x,y,0,8); fp(ctx,x,y,0,9); fp(ctx,x,y,0,10); fp(ctx,x,y,0,11);
+  ctx.fillStyle='#888'; fp(ctx,x,y,0,7); fp(ctx,x,y,1,7); // hammer head
 }
 
-function drawFE(ctx, x, y) {
-  ctx.fillStyle='#cc44aa';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=1;c<=6;c++) fp(ctx,x,y,c,1);
-  ctx.fillStyle='#f5d5b0';
-  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#6622aa'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#8822cc';
-  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#ff88cc'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
-  ctx.fillStyle='#444';
-  for(let c=1;c<=6;c++) fp(ctx,x,y,c,12);
-  ctx.fillStyle='#ff44cc';
-  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
-}
-
-function drawWriter(ctx, x, y) {
-  ctx.fillStyle='#5a3010';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0); for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
-  ctx.fillStyle='#f5c07a';
-  for(let c=1;c<=6;c++) for(let r=2;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#2a1008'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#2a4a2a';
-  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#5a8a5a'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
-  ctx.fillStyle='#fffff0';
-  for(let c=1;c<=5;c++) for(let r=10;r<=12;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#888'; fp(ctx,x,y,2,11); fp(ctx,x,y,3,11); fp(ctx,x,y,4,11);
-}
-
-function drawRevSec(ctx, x, y) {
-  ctx.fillStyle='#1a1a1a';
-  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
-  ctx.fillStyle='#c0905a';
+// ── TUNARE — Tall elven goddess, blonde hair, green/gold dress, vine crown ──
+function drawManagerB(ctx, x, y) {
+  // Vine crown with green jewels
+  ctx.fillStyle='#2a6a20';
+  fp(ctx,x,y,1,0); fp(ctx,x,y,3,0); fp(ctx,x,y,5,0); fp(ctx,x,y,7,0);
+  ctx.fillStyle='#00cc44'; fp(ctx,x,y,2,0); fp(ctx,x,y,6,0); // jewels
+  // Long blonde hair flowing down sides
+  ctx.fillStyle='#e8c840';
+  fp(ctx,x,y,0,1); fp(ctx,x,y,1,1); fp(ctx,x,y,6,1); fp(ctx,x,y,7,1);
+  fp(ctx,x,y,0,2); fp(ctx,x,y,0,3); fp(ctx,x,y,0,4); fp(ctx,x,y,0,5);
+  fp(ctx,x,y,7,2); fp(ctx,x,y,7,3); fp(ctx,x,y,7,4); fp(ctx,x,y,7,5);
+  fp(ctx,x,y,0,6); fp(ctx,x,y,7,6); // hair reaches waist
+  // Fair elven face
+  ctx.fillStyle='#f5dcc0';
   for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#000'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#7a0000';
-  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#cc0000'; fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
-  ctx.fillStyle='#c8a000';
-  for(let c=2;c<=5;c++) for(let r=9;r<=12;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#ff0000'; fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
+  // Gentle green eyes
+  ctx.fillStyle='#228844'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  // Serene smile
+  ctx.fillStyle='#cc8880'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5);
+  // Flowing green & gold dress
+  ctx.fillStyle='#1a5a2a';
+  for(let c=1;c<=6;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Gold dress trim
+  ctx.fillStyle='#c8a020'; fp(ctx,x,y,1,6); fp(ctx,x,y,6,6);
+  fp(ctx,x,y,2,9); fp(ctx,x,y,5,9);
+  fp(ctx,x,y,1,12); fp(ctx,x,y,6,12);
+  // Nature vines on dress
+  ctx.fillStyle='#2a8a3a'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,10);
+  // Golden shoes
+  ctx.fillStyle='#c8a020'; fp(ctx,x,y,2,13); fp(ctx,x,y,5,13);
 }
 
-function drawRevUX(ctx, x, y) {
-  ctx.fillStyle='#dd44aa';
-  for(let c=0;c<=7;c++) fp(ctx,x,y,c,0);
-  for(let c=0;c<=1;c++) for(let r=1;r<=4;r++) fp(ctx,x,y,c,r);
-  for(let c=6;c<=7;c++) for(let r=1;r<=4;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#f5d0b0';
-  for(let c=2;c<=5;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#882299'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#cc33cc';
-  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#ff88ff'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,8);
-  ctx.fillStyle='#fff';
-  for(let c=2;c<=5;c++) fp(ctx,x,y,c,11);
-  ctx.fillStyle='#ff44cc'; fp(ctx,x,y,3,10); fp(ctx,x,y,4,10);
-}
-
-function drawRevUsr(ctx, x, y) {
-  ctx.fillStyle='#6030a0';
-  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
-  ctx.fillStyle='#f0b070';
-  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#3a2010'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
-  ctx.fillStyle='#7a4010'; fp(ctx,x,y,2,5); fp(ctx,x,y,5,5); fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
-  ctx.fillStyle='#3a6aaa';
+// ── FENNIN RO — Fire humanoid, flame beard, obsidian body, glowing red eyes ─
+function drawEng(ctx, x, y) {
+  // Flame crown / hair
+  ctx.fillStyle='#ff4400'; fp(ctx,x,y,2,0); fp(ctx,x,y,5,0);
+  ctx.fillStyle='#ff8800'; fp(ctx,x,y,1,0); fp(ctx,x,y,3,0); fp(ctx,x,y,4,0); fp(ctx,x,y,6,0);
+  ctx.fillStyle='#ffcc00'; fp(ctx,x,y,3,1); fp(ctx,x,y,4,1);
+  // Fire head
+  ctx.fillStyle='#cc3300';
+  for(let c=1;c<=6;c++) for(let r=1;r<=4;r++) fp(ctx,x,y,c,r);
+  // Glowing red eyes
+  ctx.fillStyle='#ff0000'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  // Flame beard
+  ctx.fillStyle='#ff6600'; fp(ctx,x,y,2,5); fp(ctx,x,y,3,5); fp(ctx,x,y,4,5); fp(ctx,x,y,5,5);
+  ctx.fillStyle='#ff8800'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  // Obsidian body with magma cracks
+  ctx.fillStyle='#1a1010';
   for(let c=0;c<=7;c++) for(let r=7;r<=13;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#88aaff'; fp(ctx,x,y,1,9); fp(ctx,x,y,6,9);
-  ctx.fillStyle='#7a3a10';
-  for(let c=3;c<=5;c++) for(let r=10;r<=12;r++) fp(ctx,x,y,c,r);
-  ctx.fillStyle='#ffe0a0'; for(let c=3;c<=5;c++) fp(ctx,x,y,c,10);
+  // Magma lines on body
+  ctx.fillStyle='#ff4400'; fp(ctx,x,y,2,8); fp(ctx,x,y,5,10);
+  ctx.fillStyle='#ff6600'; fp(ctx,x,y,4,9); fp(ctx,x,y,3,11);
+  // Fire wings
+  ctx.fillStyle='#ff6600'; fp(ctx,x,y,0,7); fp(ctx,x,y,0,8); fp(ctx,x,y,7,7); fp(ctx,x,y,7,8);
+  ctx.fillStyle='#ff8800'; fp(ctx,x,y,0,6); fp(ctx,x,y,7,6);
+}
+
+// ── COIRNAV — Sea chimera, crystalline blue translucent body ────────────────
+function drawSec(ctx, x, y) {
+  // Crest / fins on top
+  ctx.fillStyle='#0088cc'; fp(ctx,x,y,3,0); fp(ctx,x,y,4,0);
+  ctx.fillStyle='#00aaee'; fp(ctx,x,y,2,0); fp(ctx,x,y,5,0);
+  // Water elemental head — translucent blue
+  ctx.fillStyle='#1166aa';
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  // Glowing white-blue eyes
+  ctx.fillStyle='#88ddff'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  // Ice crystal mouth
+  ctx.fillStyle='#aaeeff'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5);
+  // Fluid body — shifting blues
+  ctx.fillStyle='#0e4a7a';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Water current lines
+  ctx.fillStyle='#2288bb'; fp(ctx,x,y,1,7); fp(ctx,x,y,3,8); fp(ctx,x,y,5,9); fp(ctx,x,y,2,10);
+  ctx.fillStyle='#44aadd'; fp(ctx,x,y,6,8); fp(ctx,x,y,4,11);
+  // Tentacle/fin arms
+  ctx.fillStyle='#0077aa'; fp(ctx,x,y,0,7); fp(ctx,x,y,0,8); fp(ctx,x,y,0,9);
+  fp(ctx,x,y,7,7); fp(ctx,x,y,7,8); fp(ctx,x,y,7,9);
+  // Ice crystals at base (Triumvirate of Water easter egg — 3 crystals)
+  ctx.fillStyle='#aaeeff'; fp(ctx,x,y,2,12); fp(ctx,x,y,4,13); fp(ctx,x,y,6,12);
+}
+
+// ── RATHE COUNCIL — Earth elemental, stone body, amber eyes ─────────────────
+function drawFE(ctx, x, y) {
+  // Rocky crown / crag
+  ctx.fillStyle='#6a5a30'; fp(ctx,x,y,1,0); fp(ctx,x,y,3,0); fp(ctx,x,y,5,0); fp(ctx,x,y,7,0);
+  ctx.fillStyle='#8a7a40'; fp(ctx,x,y,2,0); fp(ctx,x,y,4,0); fp(ctx,x,y,6,0);
+  // Stone face
+  ctx.fillStyle='#7a6a40';
+  for(let c=0;c<=7;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  // Glowing amber eyes
+  ctx.fillStyle='#ffaa00'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  // Mouth — dark crevice
+  ctx.fillStyle='#3a2a10'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5);
+  // Massive earth/stone body
+  ctx.fillStyle='#5a4a28';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Ore veins and crystal deposits
+  ctx.fillStyle='#c8a000'; fp(ctx,x,y,2,7); fp(ctx,x,y,5,9); fp(ctx,x,y,3,11);
+  ctx.fillStyle='#8a7a40'; fp(ctx,x,y,4,8); fp(ctx,x,y,1,10); fp(ctx,x,y,6,11);
+  // Mossy patches
+  ctx.fillStyle='#3a5a20'; fp(ctx,x,y,1,8); fp(ctx,x,y,6,7); fp(ctx,x,y,3,12);
+  // Heavy stone arms
+  ctx.fillStyle='#6a5a30'; fp(ctx,x,y,0,7); fp(ctx,x,y,0,8); fp(ctx,x,y,7,7); fp(ctx,x,y,7,8);
+}
+
+// ── XEGONY — Queen of Air, elfin female, angel wings, ethereal white/blue ───
+function drawWriter(ctx, x, y) {
+  // Ethereal crown / halo
+  ctx.fillStyle='#ddeeff'; fp(ctx,x,y,2,0); fp(ctx,x,y,3,0); fp(ctx,x,y,4,0); fp(ctx,x,y,5,0);
+  // Delicate elfin face — pale luminous skin
+  ctx.fillStyle='#f0e8f5';
+  for(let c=2;c<=5;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  // Flowing silver-white hair
+  ctx.fillStyle='#ccddef';
+  fp(ctx,x,y,1,1); fp(ctx,x,y,6,1);
+  fp(ctx,x,y,1,2); fp(ctx,x,y,6,2);
+  fp(ctx,x,y,1,3); fp(ctx,x,y,6,3);
+  // Gentle blue eyes
+  ctx.fillStyle='#6688cc'; fp(ctx,x,y,3,3); fp(ctx,x,y,4,3);
+  // Serene expression
+  ctx.fillStyle='#ddbbcc'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5);
+  // Angel wings — large, luminous
+  ctx.fillStyle='#ccddef'; fp(ctx,x,y,0,5); fp(ctx,x,y,0,6); fp(ctx,x,y,0,7); fp(ctx,x,y,0,8);
+  fp(ctx,x,y,7,5); fp(ctx,x,y,7,6); fp(ctx,x,y,7,7); fp(ctx,x,y,7,8);
+  ctx.fillStyle='#aabbdd'; fp(ctx,x,y,0,4); fp(ctx,x,y,7,4); // wing tips
+  // Flowing white/sky-blue gown
+  ctx.fillStyle='#c8d8f0';
+  for(let c=1;c<=6;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Gown shimmer
+  ctx.fillStyle='#e0e8ff'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,9); fp(ctx,x,y,2,11);
+  // Bare feet, floating above ground
+  ctx.fillStyle='#f0e8f5'; fp(ctx,x,y,3,13); fp(ctx,x,y,4,13);
+}
+
+// ── INNORUUK — 60ft dark elf, bat-like face, dark cloak, infernal red eyes ──
+function drawRevSec(ctx, x, y) {
+  // Tall oblong head with bat-like ears
+  ctx.fillStyle='#2a1840';
+  fp(ctx,x,y,0,0); fp(ctx,x,y,7,0); // pointed bat ears
+  fp(ctx,x,y,1,0); fp(ctx,x,y,6,0);
+  // Dark elf face — dusky purple skin
+  ctx.fillStyle='#6a4a7a';
+  for(let c=1;c<=6;c++) for(let r=1;r<=5;r++) fp(ctx,x,y,c,r);
+  // Infernal glowing red eyes — "elicits combat between friends"
+  ctx.fillStyle='#ff0000'; fp(ctx,x,y,2,2); fp(ctx,x,y,5,2);
+  ctx.fillStyle='#ff4400'; fp(ctx,x,y,2,3); fp(ctx,x,y,5,3);
+  // Vicious sneer
+  ctx.fillStyle='#aa2244'; fp(ctx,x,y,3,5); fp(ctx,x,y,4,5);
+  ctx.fillStyle='#ddd'; fp(ctx,x,y,2,5); fp(ctx,x,y,5,5); // bared teeth
+  // Colorful shirt under great dark cloak (lore accurate!)
+  ctx.fillStyle='#1a0a20';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Bright shirt showing through cloak
+  ctx.fillStyle='#cc2244'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,7);
+  ctx.fillStyle='#2244cc'; fp(ctx,x,y,3,8); fp(ctx,x,y,4,8);
+  // Bright jewelry (lore: "bright jewelry")
+  ctx.fillStyle='#ffd700'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  // Dark cloak edges
+  ctx.fillStyle='#0e0618'; fp(ctx,x,y,0,6); fp(ctx,x,y,0,7); fp(ctx,x,y,7,6); fp(ctx,x,y,7,7);
+  fp(ctx,x,y,0,10); fp(ctx,x,y,7,10); fp(ctx,x,y,0,12); fp(ctx,x,y,7,12);
+}
+
+// ── QUELLIOUS — Small child goddess in white robe, peaceful aura ────────────
+function drawRevUX(ctx, x, y) {
+  // Small figure — offset down to show child-like size
+  // Simple brown hair
+  ctx.fillStyle='#8a6a40';
+  fp(ctx,x,y,2,3); fp(ctx,x,y,3,3); fp(ctx,x,y,4,3); fp(ctx,x,y,5,3);
+  fp(ctx,x,y,2,4); fp(ctx,x,y,5,4);
+  // Child face — soft, innocent
+  ctx.fillStyle='#f5dcc0';
+  fp(ctx,x,y,3,4); fp(ctx,x,y,4,4);
+  for(let c=2;c<=5;c++) for(let r=5;r<=7;r++) fp(ctx,x,y,c,r);
+  // Gentle closed eyes (peaceful/tranquil)
+  ctx.fillStyle='#8a7060'; fp(ctx,x,y,3,6); fp(ctx,x,y,4,6);
+  // Tiny serene smile
+  ctx.fillStyle='#ddaa99'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,7);
+  // Small white robe
+  ctx.fillStyle='#eeeef5';
+  for(let c=1;c<=6;c++) for(let r=8;r<=13;r++) fp(ctx,x,y,c,r);
+  // Robe folds
+  ctx.fillStyle='#ccccd5'; fp(ctx,x,y,2,9); fp(ctx,x,y,5,9); fp(ctx,x,y,3,11); fp(ctx,x,y,4,11);
+  // Peaceful aura glow (white shimmer around)
+  ctx.fillStyle='#ffffff33'; fp(ctx,x,y,1,5); fp(ctx,x,y,6,5);
+  fp(ctx,x,y,0,8); fp(ctx,x,y,7,8);
+  fp(ctx,x,y,1,7); fp(ctx,x,y,6,7);
+}
+
+// ── THE TRIBUNAL — Hooded faceless judge, dark robe, warhammer ──────────────
+function drawRevUsr(ctx, x, y) {
+  // Deep hood — no face visible
+  ctx.fillStyle='#3a3040';
+  for(let c=1;c<=6;c++) fp(ctx,x,y,c,0);
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,1);
+  for(let c=0;c<=7;c++) fp(ctx,x,y,c,2);
+  // Dark void where face should be — "dark piercing gaze"
+  ctx.fillStyle='#0a0010';
+  for(let c=2;c<=5;c++) for(let r=3;r<=5;r++) fp(ctx,x,y,c,r);
+  // Two faint glowing points for eyes deep in the hood
+  ctx.fillStyle='#8888cc'; fp(ctx,x,y,3,4); fp(ctx,x,y,4,4);
+  // Heavy dark judicial robes
+  ctx.fillStyle='#2a2438';
+  for(let c=0;c<=7;c++) for(let r=6;r<=13;r++) fp(ctx,x,y,c,r);
+  // Robe trim — dark purple
+  ctx.fillStyle='#4a3a5a'; fp(ctx,x,y,3,7); fp(ctx,x,y,4,7);
+  fp(ctx,x,y,2,10); fp(ctx,x,y,5,10);
+  // Balanced warhammer (lore: "perfectly balanced warhammers")
+  ctx.fillStyle='#888'; fp(ctx,x,y,7,6); fp(ctx,x,y,7,7); // hammer head
+  ctx.fillStyle='#666'; fp(ctx,x,y,7,8); fp(ctx,x,y,7,9); fp(ctx,x,y,7,10); fp(ctx,x,y,7,11); // shaft
+  // 6 small marks on robe — represents the six judges of the Tribunal
+  ctx.fillStyle='#8888cc';
+  fp(ctx,x,y,2,8); fp(ctx,x,y,3,9); fp(ctx,x,y,4,9);
+  fp(ctx,x,y,5,8); fp(ctx,x,y,3,11); fp(ctx,x,y,4,11);
 }
 
 function drawSprite(ctx, x, y, type, bob) {
@@ -323,6 +511,68 @@ function drawSprite(ctx, x, y, type, bob) {
     eng:drawEng, sec:drawSec, fe:drawFE, writer:drawWriter,
     rev_sec:drawRevSec, rev_ux:drawRevUX, rev_usr:drawRevUsr}[type];
   if(fn) fn(ctx, x, y - oy);
+}
+
+// ── Sprite wandering system ─────────────────────────────────────────────────
+// Each room's sprite wanders to random points, pauses, then picks a new target.
+// States: "walk" (moving toward target), "pause" (idle at a spot), "turn" (facing change)
+
+const _wander = {};  // roomId → { x, y, tx, ty, state, timer, dir }
+
+function initWander(roomId, cx, cy) {
+  if (_wander[roomId]) return _wander[roomId];
+  _wander[roomId] = {
+    x: cx, y: cy,       // current position (pixel offset from room center)
+    tx: 0, ty: 0,       // target offset
+    state: 'pause',      // walk | pause | turn
+    timer: 60 + Math.floor(Math.random()*80),
+    dir: 1,              // 1 = right, -1 = left
+  };
+  return _wander[roomId];
+}
+
+function updateWander(roomId, maxDx, maxDy, tick) {
+  const w = _wander[roomId];
+  if (!w) return;
+
+  w.timer--;
+
+  if (w.state === 'pause') {
+    if (w.timer <= 0) {
+      // Pick a new target within room bounds
+      w.tx = (Math.random() - 0.5) * maxDx * 2;
+      w.ty = (Math.random() - 0.5) * maxDy * 2;
+      w.state = 'walk';
+      w.timer = 200 + Math.floor(Math.random()*150);
+      // Face direction of travel
+      if (w.tx > w.x) w.dir = 1;
+      else if (w.tx < w.x) w.dir = -1;
+    }
+  } else if (w.state === 'walk') {
+    // Move toward target
+    const dx = w.tx - w.x, dy = w.ty - w.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 1 || w.timer <= 0) {
+      w.x = w.tx; w.y = w.ty;
+      w.state = 'pause';
+      w.timer = 80 + Math.floor(Math.random()*120);
+    } else {
+      const speed = 0.3;
+      w.x += (dx / dist) * speed;
+      w.y += (dy / dist) * speed;
+    }
+  }
+}
+
+// Tiny shadow under sprite feet
+function drawShadow(ctx, x, y, w) {
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(x + w/2, y, w*0.45, 2, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawDesk(ctx, x, y, w, tick) {
@@ -368,6 +618,232 @@ function drawPillar(ctx, x, y) {
   ctx.fillStyle=P.pillar; ctx.fillRect(x,y,T,T);
   ctx.fillStyle=P.pillarH; ctx.fillRect(x+2,y+2,T-4,6);
   ctx.fillStyle='#101020'; ctx.fillRect(x+T-4,y+4,3,T-6); ctx.fillRect(x+2,y+T-4,T-4,3);
+}
+
+// ── Plane-specific room decorations ──────────────────────────────────────────
+
+function drawHourglass(ctx, x, y, tick) {
+  ctx.fillStyle='#c8a020'; ctx.fillRect(x,y,9,2); ctx.fillRect(x,y+14,9,2); // frames
+  ctx.fillStyle='#886620'; ctx.fillRect(x+3,y+2,3,12); // glass
+  ctx.fillStyle='#ddd'; // sand
+  const sand = (tick % 200) / 200;
+  ctx.fillRect(x+4,y+3,1, Math.floor((1-sand)*5));
+  ctx.fillRect(x+4,y+11-Math.floor(sand*4),1,Math.floor(sand*4));
+}
+
+function drawElementOrb(ctx, x, y, color, tick) {
+  const pulse = 0.5 + 0.5*Math.sin(tick*0.06);
+  ctx.save();
+  ctx.globalAlpha = 0.4 + 0.3*pulse;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x+5,y+5,4+pulse,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(x+4,y+4,1.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawWeaponRack(ctx, x, y) {
+  ctx.fillStyle='#4a3020'; ctx.fillRect(x,y,T,T*2.5); // wood rack
+  ctx.fillStyle='#888'; // sword blades
+  ctx.fillRect(x+3,y+4,2,T*2-8);
+  ctx.fillRect(x+8,y+6,2,T*2-10);
+  ctx.fillStyle='#cc2200'; // red grip wraps
+  ctx.fillRect(x+3,y+T*2-6,2,4);
+  ctx.fillRect(x+8,y+T*2-4,2,3);
+  ctx.fillStyle='#c8a020'; // crossguards
+  ctx.fillRect(x+1,y+T*2-8,6,2);
+  ctx.fillRect(x+6,y+T*2-6,6,2);
+}
+
+function drawWarBanner(ctx, x, y, color) {
+  ctx.fillStyle='#5a3a1a'; ctx.fillRect(x+5,y,2,T*2.5); // pole
+  ctx.fillStyle=color; ctx.fillRect(x+7,y+3,10,8); // banner
+  ctx.fillStyle='#ffd700'; // Zek war crest
+  ctx.fillRect(x+10,y+5,3,1);
+  ctx.fillRect(x+11,y+4,1,3);
+}
+
+function drawTreeSapling(ctx, x, y, tick) {
+  ctx.fillStyle='#5a3010'; ctx.fillRect(x+5,y+T,4,T); // trunk
+  ctx.fillStyle='#0a5a18';
+  ctx.beginPath(); ctx.arc(x+7,y+T*0.6,T*0.5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a7a20';
+  ctx.beginPath(); ctx.arc(x+5,y+T*0.3,T*0.3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+9,y+T*0.4,T*0.35,0,Math.PI*2); ctx.fill();
+  // Leaf particle
+  const ly = y + (tick*0.3 % (T*2));
+  const lx = x + 3 + Math.sin(tick*0.05)*3;
+  ctx.fillStyle='#2a8a3a'; ctx.fillRect(lx,ly,2,2);
+}
+
+function drawFlower(ctx, x, y, tick) {
+  ctx.fillStyle='#2a5a10'; ctx.fillRect(x+3,y+4,2,8); // stem
+  const bloom = Math.sin(tick*0.04)*0.5+0.5;
+  ctx.fillStyle='#ff66aa';
+  ctx.beginPath(); ctx.arc(x+4,y+3,3+bloom,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffcc00';
+  ctx.beginPath(); ctx.arc(x+4,y+3,1.5,0,Math.PI*2); ctx.fill();
+}
+
+function drawAnvil(ctx, x, y) {
+  ctx.fillStyle='#555'; ctx.fillRect(x+2,y,T*1.5,6); // top
+  ctx.fillStyle='#444'; ctx.fillRect(x+5,y+6,T-2,8); // body
+  ctx.fillStyle='#333'; ctx.fillRect(x+3,y+14,T+2,4); // base
+  // Hot metal glow
+  ctx.fillStyle='#ff440033'; ctx.fillRect(x+6,y+1,6,3);
+}
+
+function drawLavaPool(ctx, x, y, tick) {
+  const wobble = Math.sin(tick*0.08)*1.5;
+  ctx.fillStyle='#330800'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T*0.7,T*0.9,T*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#cc3300'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T*0.7,T*0.7,T*0.35+wobble*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff6600'; ctx.beginPath();
+  ctx.ellipse(x+T+wobble,y+T*0.7,T*0.3,T*0.15,0,0,Math.PI*2); ctx.fill();
+}
+
+function drawCoral(ctx, x, y) {
+  ctx.fillStyle='#cc4466'; // coral pink
+  ctx.fillRect(x+3,y+6,3,T); ctx.fillRect(x+1,y+4,2,6);
+  ctx.fillRect(x+7,y+8,3,8);
+  ctx.fillStyle='#ee6688'; ctx.fillRect(x+3,y+3,4,4);
+  ctx.fillRect(x+8,y+6,3,3);
+  // Tiny sea anemone
+  ctx.fillStyle='#44cc88'; ctx.fillRect(x+12,y+12,2,4);
+  ctx.fillRect(x+11,y+10,1,3); ctx.fillRect(x+14,y+11,1,2);
+}
+
+function drawWaterPool(ctx, x, y, tick) {
+  const wobble = Math.sin(tick*0.06)*1;
+  ctx.fillStyle='#001830'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T*0.7,T*0.9,T*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#003366'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T*0.7,T*0.7,T*0.35,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0066aa'+('66'); ctx.beginPath();
+  ctx.ellipse(x+T+wobble,y+T*0.65,T*0.4,T*0.2,0,0,Math.PI*2); ctx.fill();
+  // Ripple
+  ctx.strokeStyle='#44aaff44'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(x+T,y+T*0.7,T*0.5+wobble*2,T*0.25,0,0,Math.PI*2); ctx.stroke();
+}
+
+function drawCrystal(ctx, x, y, color) {
+  ctx.fillStyle=color;
+  ctx.fillRect(x+5,y+2,4,12); // main crystal
+  ctx.fillRect(x+3,y+4,2,8); // left shard
+  ctx.fillRect(x+10,y+6,2,6); // right shard
+  ctx.fillStyle='#fff';
+  ctx.globalAlpha=0.4; ctx.fillRect(x+6,y+3,1,5); // highlight
+  ctx.globalAlpha=1;
+}
+
+function drawRuneStone(ctx, x, y, tick) {
+  ctx.fillStyle='#5a4a28'; ctx.fillRect(x,y,T*1.5,T*1.5); // stone block
+  ctx.fillStyle='#8a7a40'; ctx.fillRect(x+2,y+2,T*1.5-4,T*1.5-4);
+  // Glowing rune that pulses
+  const glow = 0.4 + 0.6*Math.abs(Math.sin(tick*0.05));
+  ctx.save(); ctx.globalAlpha=glow;
+  ctx.fillStyle='#ffaa00';
+  ctx.fillRect(x+6,y+4,3,1); ctx.fillRect(x+7,y+5,1,4);
+  ctx.fillRect(x+5,y+8,5,1); // rune shape
+  ctx.restore();
+}
+
+function drawCloudWisp(ctx, x, y, tick) {
+  const drift = Math.sin(tick*0.03)*3;
+  ctx.save(); ctx.globalAlpha=0.3;
+  ctx.fillStyle='#ccddef';
+  ctx.beginPath(); ctx.arc(x+6+drift,y+8,6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+12+drift,y+6,5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+9+drift,y+12,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawWindChimes(ctx, x, y, tick) {
+  ctx.fillStyle='#8899aa'; ctx.fillRect(x+2,y,T-4,2); // bar
+  const swing = Math.sin(tick*0.08)*2;
+  for(let i=0;i<4;i++){
+    const cx=x+3+i*3, cy=y+3;
+    ctx.fillStyle=['#ccddef','#aabbdd','#ddeeff','#99aacc'][i];
+    ctx.fillRect(cx+swing*(i%2?1:-1),cy,1,5+i*2);
+  }
+}
+
+function drawDarkAltar(ctx, x, y, tick) {
+  ctx.fillStyle='#1a0a18'; ctx.fillRect(x,y+8,T*2,T); // altar base
+  ctx.fillStyle='#2a1428'; ctx.fillRect(x+2,y+4,T*2-4,6); // altar top
+  // Unholy glow
+  const pulse = 0.3+0.4*Math.sin(tick*0.07);
+  ctx.save(); ctx.globalAlpha=pulse;
+  ctx.fillStyle='#ff0000';
+  ctx.beginPath(); ctx.arc(x+T,y+6,5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // Skull decoration
+  ctx.fillStyle='#aaa'; ctx.fillRect(x+T-2,y+5,4,3);
+  ctx.fillStyle='#300'; ctx.fillRect(x+T-1,y+6,1,1); ctx.fillRect(x+T+1,y+6,1,1);
+}
+
+function drawSoulOrb(ctx, x, y, tick, color) {
+  const float = Math.sin(tick*0.06)*3;
+  ctx.save();
+  ctx.globalAlpha = 0.5+0.3*Math.sin(tick*0.1);
+  ctx.fillStyle=color;
+  ctx.beginPath(); ctx.arc(x+T/2,y+T/2+float,5,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=0.8;
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(x+T/2-1,y+T/2-1+float,1.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawMeditationPool(ctx, x, y, tick) {
+  const shimmer = Math.sin(tick*0.04)*0.5;
+  ctx.fillStyle='#e8e0f0'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T,T*0.9,T*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#f5f0ff'; ctx.beginPath();
+  ctx.ellipse(x+T,y+T,T*0.6,T*0.3,0,0,Math.PI*2); ctx.fill();
+  // Gentle ripple
+  ctx.strokeStyle='#ffffff44'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(x+T,y+T,T*0.5+shimmer*4,T*0.25,0,0,Math.PI*2); ctx.stroke();
+}
+
+function drawCandles(ctx, x, y, tick) {
+  for(let i=0;i<3;i++){
+    const cx=x+i*6, cy=y+8;
+    ctx.fillStyle='#eee8d0'; ctx.fillRect(cx+1,cy,3,6); // wax
+    const flicker=Math.sin(tick*0.2+i*2)*1;
+    ctx.fillStyle='#ffcc44'; ctx.beginPath();
+    ctx.arc(cx+2.5,cy-1+flicker,2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath();
+    ctx.arc(cx+2.5,cy-0.5+flicker,0.8,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawScales(ctx, x, y, tick) {
+  // Balance post
+  ctx.fillStyle='#c8a020'; ctx.fillRect(x+T-1,y+2,2,T*1.2);
+  // Balance beam (tilts slightly)
+  const tilt = Math.sin(tick*0.03)*1.5;
+  ctx.save();
+  ctx.translate(x+T,y+3);
+  ctx.rotate(tilt*0.03);
+  ctx.fillStyle='#c8a020'; ctx.fillRect(-T*0.7,0,T*1.4,2);
+  // Pans
+  ctx.fillStyle='#aa8a10';
+  ctx.fillRect(-T*0.7-2,3,8,3);
+  ctx.fillRect(T*0.7-6,3,8,3);
+  ctx.restore();
+}
+
+function drawJudgePedestals(ctx, x, y) {
+  // 6 small stone pedestals — representing the 6 judges
+  for(let i=0;i<6;i++){
+    const px=x+(i%3)*8, py=y+(i<3?0:10);
+    ctx.fillStyle='#3a3040'; ctx.fillRect(px,py,6,8);
+    ctx.fillStyle='#4a4050'; ctx.fillRect(px+1,py+1,4,2);
+    // Tiny gavel on each
+    ctx.fillStyle='#888'; ctx.fillRect(px+2,py+4,2,1);
+  }
 }
 
 // ── Busy activity animations ─────────────────────────────────────────────────
@@ -609,38 +1085,104 @@ function drawRoom(ctx, room, selected, tick) {
     drawTorch(ctx,x+rw-T*2-7,y+5,tick);
   }
 
-  switch(tier){
-    case 'master':
+  // Room-specific decorations by plane identity
+  switch(room.id){
+    case 'master': // Plane of Time — Quarm's sanctum: hourglasses, time portals
       drawDesk(ctx,x+T,y+T*2,T*2.2,tick);
       drawDesk(ctx,x+rw-T*3.2,y+T*2,T*2.2,tick);
       drawShelf(ctx,x+T,y+T*4.5);
       drawShelf(ctx,x+rw-T*2,y+T*4.5);
-      drawPlant(ctx,x+rw-T*4,y+T*2);
-      drawPlant(ctx,x+T*2.8,y+T*5.5);
+      // Hourglass (easter egg: time theme)
+      drawHourglass(ctx,x+rw/2-4,y+T*2,tick);
+      // 4 elemental orbs in corners (fire,water,earth,air)
+      drawElementOrb(ctx,x+T*2,y+T*1.2,'#ff6600',tick);
+      drawElementOrb(ctx,x+rw-T*3,y+T*1.2,'#00aaff',tick);
+      drawElementOrb(ctx,x+T*2,y+rh-T*3.5,'#c8a000',tick);
+      drawElementOrb(ctx,x+rw-T*3,y+rh-T*3.5,'#aabbff',tick);
       break;
-    case 'manager':
+    case 'mgr_a': // Plane of War — Rallos Zek: weapon racks, war banners
       drawDesk(ctx,x+T*0.8,y+T*1.5,T*2,tick);
-      drawShelf(ctx,x+rw-T*2,y+T*1.5);
-      drawPlant(ctx,x+T,y+rh-T*3);
+      drawWeaponRack(ctx,x+rw-T*2.5,y+T*1.5);
+      drawWarBanner(ctx,x+T,y+rh-T*3.5,P.red);
       break;
-    case 'subagent':
-      drawDesk(ctx,x+2,y+T*1.5,T*2,tick);
-      break;
-    case 'reviewer':
+    case 'mgr_b': // Plane of Growth — Tunare: trees, flowers, nature
       drawDesk(ctx,x+T*0.8,y+T*1.5,T*2,tick);
-      drawPlant(ctx,x+rw-T*2,y+rh-T*3);
+      drawPlant(ctx,x+rw-T*2,y+T*1.5);
+      drawPlant(ctx,x+rw-T*3.5,y+T*2);
+      drawTreeSapling(ctx,x+T,y+rh-T*3.5,tick);
+      drawFlower(ctx,x+rw-T*2.5,y+rh-T*2.5,tick);
+      break;
+    case 'sa1': // Fennin Ro — Forge of Fire: anvil, lava pool
+      drawAnvil(ctx,x+2,y+T*1.5);
+      drawLavaPool(ctx,x+rw-T*2.5,y+rh-T*2.8,tick);
+      break;
+    case 'sa2': // Coirnav — Tide Chamber: coral, water pool
+      drawCoral(ctx,x+2,y+T*1.5);
+      drawWaterPool(ctx,x+rw-T*2.5,y+rh-T*2.8,tick);
+      break;
+    case 'sa3': // Rathe Council — Stone Hall: crystal, stone pillar
+      drawCrystal(ctx,x+2,y+T*1.5,P.acEarth);
+      drawRuneStone(ctx,x+rw-T*2.5,y+rh-T*2.8,tick);
+      break;
+    case 'sa4': // Xegony — Sky Sanctum: cloud wisps, wind chimes
+      drawCloudWisp(ctx,x+2,y+T*1.5,tick);
+      drawWindChimes(ctx,x+rw-T*2,y+T*1,tick);
+      break;
+    case 'rev_sec': // Innoruuk — Plane of Hate: dark altar, soul orbs
+      drawDarkAltar(ctx,x+T*0.8,y+T*1.5,tick);
+      drawSoulOrb(ctx,x+rw-T*2,y+rh-T*3,tick,'#ff0000');
+      break;
+    case 'rev_ux': // Quellious — Plane of Tranquility: meditation pool, candles
+      drawMeditationPool(ctx,x+T*0.8,y+T*1.5,tick);
+      drawCandles(ctx,x+rw-T*2.5,y+rh-T*3,tick);
+      break;
+    case 'rev_usr': // Tribunal — Plane of Justice: scales, 6 judge pedestals
+      drawScales(ctx,x+T*0.8,y+T*1.5,tick);
+      drawJudgePedestals(ctx,x+rw-T*3,y+rh-T*3);
       break;
   }
 
-  const bob=Math.floor(tick/35)%2===0;
-  const cx=x+Math.floor(rw/2)-8;
-  const cy=y+Math.floor(rh/2)-10;
-  if(ch) drawSprite(ctx,cx,cy,ch,bob);
+  const isMaster = (ch === 'master');
+  const sprW = isMaster ? 40 : 16;
+  const sprH = isMaster ? 56 : 28;
+  // Center position for this room
+  const baseCx = x + Math.floor(rw/2) - sprW/2;
+  const baseCy = y + Math.floor(rh/2) - sprH/2;
+  // Wander bounds — keep sprite inside room walls (with padding for pillars + furniture)
+  const padX = T*1.8, padY = T*1.5;
+  const wanderMaxX = (rw/2) - padX - sprW/2;
+  const wanderMaxY = (rh/2) - padY - sprH/2;
 
-  // Busy activities — only when room is active
+  if(ch) {
+    const ws = initWander(room.id, 0, 0);
+    updateWander(room.id, Math.max(wanderMaxX, 0), Math.max(wanderMaxY, 0), tick);
+    const wx = baseCx + ws.x;
+    const wy = baseCy + ws.y;
+    // Walking bob — faster when moving, slower when paused
+    const isWalking = ws.state === 'walk';
+    const bobSpeed = isWalking ? 18 : 35;
+    const bob = Math.floor(tick / bobSpeed) % 2 === 0;
+    // Draw shadow under feet
+    drawShadow(ctx, wx, wy + sprH, sprW);
+    // Flip sprite based on facing direction
+    if (ws.dir === -1) {
+      ctx.save();
+      ctx.translate(wx + sprW, 0);
+      ctx.scale(-1, 1);
+      drawSprite(ctx, 0, wy, ch, bob);
+      ctx.restore();
+    } else {
+      drawSprite(ctx, wx, wy, ch, bob);
+    }
+  }
+
+  // Busy activities — only when room is active, follows sprite position
   const roomState = liveRoomStates[room.id];
   if(roomState && roomState.statusKey !== "pending" && roomState.statusKey !== "done"){
-    drawBusyActivity(ctx, x, y, rw, rh, ac, tick, room.id);
+    const ws2 = _wander[room.id];
+    const actX = ws2 ? baseCx + ws2.x : x + rw/2;
+    const actY = ws2 ? baseCy + ws2.y : y + rh/2;
+    drawBusyActivity(ctx, actX - sprW, actY - sprH/2, sprW*3, sprH*2, ac, tick, room.id);
   }
 
   drawPillar(ctx,x,y);

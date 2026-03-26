@@ -9,10 +9,32 @@ Usage:
 
 import sys
 import os
+import threading
+import time
 import openai
 from dotenv import load_dotenv
 
 load_dotenv()
+
+DEFAULT_MODEL = "bedrock-claude-opus-4-6"
+
+
+def _pick_best_opus() -> str:
+    """Query available models and return the best opus-tier model."""
+    try:
+        client = openai.OpenAI()
+        available = sorted(m.id for m in client.models.list().data)
+        opus_models = [m for m in available if "opus" in m.lower()]
+        if opus_models:
+            # Prefer the highest-versioned opus model (sorted descending)
+            return sorted(opus_models, reverse=True)[0]
+        # No opus found — fall back to first available
+        print(f"[WARN] No opus model found, falling back to: {available[0]}")
+        return available[0]
+    except Exception as e:
+        print(f"[WARN] Could not fetch models: {e} — using default: {DEFAULT_MODEL}")
+        return DEFAULT_MODEL
+
 
 SYSTEM_PROMPT = """You are a technical project planner designing a 4-layer AI agent system.
 
@@ -91,16 +113,39 @@ RULES
 
 def generate_plan(description: str, output_path: str = "plan.md") -> str:
     client = openai.OpenAI()
-    print(f"Generating 4-layer plan for:\n  {description}\n")
+    model = _pick_best_opus()
+    print(f"Generating 4-layer plan for:\n  {description}")
+    print(f"Using model: {model}\n")
 
-    msg = client.chat.completions.create(
-        model="claude-opus-4-6",
-        max_tokens=4096,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": description},
-        ],
-    )
+    # Spinner to show progress during generation
+    stop_spinner = threading.Event()
+    def _spinner():
+        frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        start = time.time()
+        i = 0
+        while not stop_spinner.is_set():
+            elapsed = int(time.time() - start)
+            print(f"\r  {frames[i % len(frames)]} Generating plan... ({elapsed}s)", end="", flush=True)
+            i += 1
+            stop_spinner.wait(0.1)
+        elapsed = int(time.time() - start)
+        print(f"\r  ✓ Plan generated in {elapsed}s          ")
+
+    spinner = threading.Thread(target=_spinner, daemon=True)
+    spinner.start()
+
+    try:
+        msg = client.chat.completions.create(
+            model=model,
+            max_tokens=4096,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": description},
+            ],
+        )
+    finally:
+        stop_spinner.set()
+        spinner.join()
 
     plan = msg.choices[0].message.content.strip()
     if plan.startswith("```"):
