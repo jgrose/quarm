@@ -31,7 +31,10 @@ import logging
 import uuid
 import time
 import threading
+from dotenv import load_dotenv
 from checkpoint import has_checkpoint, clear_checkpoint
+
+load_dotenv()
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -340,6 +343,16 @@ def _resume_interrupted_runs():
             else:
                 log.warning(f"No checkpoint for interrupted run {plan_id} — marking failed")
                 _update_plan_status(plan_id, "failed")
+                _broadcast_queue()
+
+
+def _cleanup_running_plans():
+    """Mark any in-flight plan as failed on shutdown (graceful Ctrl+C)."""
+    with _running_lock:
+        plan_id = _running_plan_id
+    if plan_id:
+        log.info(f"Shutdown: marking running plan {plan_id} as failed")
+        _update_plan_status(plan_id, "failed")
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -355,6 +368,7 @@ async def lifespan(app: FastAPI):
     log.info(f"  WebSocket : ws://localhost:{PORT}/ws")
     _resume_interrupted_runs()
     yield
+    _cleanup_running_plans()
     _loop = None
     log.info("Server shutting down")
 
@@ -376,10 +390,12 @@ async def root():
 @app.post("/update")
 async def receive_update(request: Request):
     """Called by status_bridge.py on every orchestrator state change."""
+    global _last_update_time
     try:
         payload = await request.json()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+    _last_update_time = time.time()
     # Tag as orchestrator status so UI can distinguish from queue updates
     payload["type"] = "orchestrator"
     await manager.broadcast(payload)
@@ -546,15 +562,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 _server_start = time.time()
 _last_update_time = time.time()
-
-@app.post("/update")
-async def _track_update_time(request: Request):
-    """Wrapper — update the last-seen timestamp for health checks."""
-    global _last_update_time
-    _last_update_time = time.time()
-
-# Patch: the original /update handler is above; we just track time here
-# The actual broadcast happens in the original receive_update handler
 
 
 @app.get("/api/health")
