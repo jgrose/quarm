@@ -595,7 +595,9 @@ def run(plan_path="plan.md"):
         if isinstance(msg, AIMessage):
             print(msg.content)
 
-    with open("results.json", "w") as f:
+    base, _ = os.path.splitext(plan_path)
+    results_path = f"{base}_results.json"
+    with open(results_path, "w") as f:
         json.dump({
             "task_results": final["results"],
             "quality_log": [
@@ -607,7 +609,7 @@ def run(plan_path="plan.md"):
                 (m.content for m in final["messages"] if isinstance(m, AIMessage)), ""
             ),
         }, f, indent=2)
-    print("\nSaved → results.json")
+    print(f"\nSaved → {results_path}")
 
 
 if __name__ == "__main__":

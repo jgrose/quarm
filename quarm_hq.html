@@ -70,11 +70,174 @@
   }
   .leg { display: flex; align-items: center; gap: 5px; font-size: 5px; letter-spacing: 1px; }
   .leg-dot { width: 9px; height: 9px; }
+
+  /* ── Control bar ─────────────────────────────────────────────────────── */
+  #controlBar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #0d0d20;
+    border: 1px solid #2a2040;
+  }
+  #controlBar input[type="text"] {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    background: #06080f;
+    color: #ccc;
+    border: 1px solid #2a2040;
+    padding: 5px 8px;
+    outline: none;
+  }
+  #controlBar input[type="text"]:focus {
+    border-color: #ffd700;
+    color: #fff;
+  }
+  #controlBar input[type="text"]::placeholder {
+    color: #334;
+  }
+  #controlBar button {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    border: 1px solid #ffd700;
+    background: #1a1430;
+    color: #ffd700;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  #controlBar button:hover {
+    background: #ffd700;
+    color: #0d0d20;
+  }
+  #controlBar button:active {
+    background: #ccaa00;
+  }
+  #controlBar button.active {
+    background: #ffd70033;
+  }
+
+  /* ── Queue panel ─────────────────────────────────────────────────────── */
+  #queuePanel {
+    width: 100%;
+    display: none;
+    background: #0d0d20;
+    border: 1px solid #2a2040;
+    border-top: none;
+    margin-bottom: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2040 #0d0d20;
+  }
+  #queuePanel.visible { display: block; }
+  #queuePanel::-webkit-scrollbar { width: 6px; }
+  #queuePanel::-webkit-scrollbar-track { background: #0d0d20; }
+  #queuePanel::-webkit-scrollbar-thumb { background: #2a2040; }
+
+  #queueList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-bottom: 1px solid #1a1430;
+    font-size: 6px;
+    color: #ccc;
+    transition: background 0.1s;
+    cursor: default;
+  }
+  .queue-item:last-child { border-bottom: none; }
+  .queue-item:hover { background: #1a1430; }
+  .queue-item.drag-over {
+    border-top: 2px solid #ffd700;
+  }
+  .queue-item .drag-handle {
+    cursor: grab;
+    color: #444;
+    font-size: 8px;
+    user-select: none;
+    padding: 0 2px;
+  }
+  .queue-item .drag-handle:active { cursor: grabbing; }
+  .queue-item .plan-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .queue-item .status-badge {
+    font-size: 5px;
+    padding: 2px 5px;
+    border: 1px solid;
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .queue-item .plan-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .queue-item .plan-actions button {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 5px;
+    padding: 2px 5px;
+    cursor: pointer;
+    border: 1px solid;
+    background: none;
+    transition: background 0.15s;
+  }
+  .queue-item .btn-run {
+    color: #00ff88;
+    border-color: #00ff8866;
+  }
+  .queue-item .btn-run:hover {
+    background: #00ff8822;
+  }
+  .queue-item .btn-del {
+    color: #ff4444;
+    border-color: #ff444466;
+  }
+  .queue-item .btn-del:hover {
+    background: #ff444422;
+  }
+  .queue-empty {
+    padding: 10px;
+    text-align: center;
+    font-size: 5px;
+    color: #334;
+    letter-spacing: 1px;
+  }
+
+  @keyframes pulseBadge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .badge-pulse {
+    animation: pulseBadge 1.2s ease-in-out infinite;
+  }
 </style>
 </head>
 <body>
 
 <div id="header">◈ QUARM HQ ◈ PLANES OF OPERATIONS ◈</div>
+<div id="controlBar">
+  <input type="text" id="planInput" placeholder="Describe your project...">
+  <button id="btnGenerate" onclick="generatePlan()">GENERATE PLAN</button>
+  <button id="btnQueue" onclick="toggleQueue()">QUEUE</button>
+</div>
+<div id="queuePanel">
+  <ul id="queueList">
+    <li class="queue-empty">NO PLANS IN QUEUE</li>
+  </ul>
+</div>
 <div id="canvasWrap"><canvas id="c"></canvas></div>
 <div id="hint">CLICK A ROOM TO VIEW AGENT PROFILE</div>
 <div id="panel">
@@ -1568,7 +1731,17 @@ function connectWS() {
   };
 
   _ws.onmessage = evt => {
-    try { applyStatus(JSON.parse(evt.data)); } catch(e) { /* ignore */ }
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.type === 'queue') {
+        renderQueue(data.plans);
+      } else if (data.type === 'plan_event') {
+        handlePlanEvent(data);
+      } else {
+        // orchestrator status (existing behavior)
+        applyStatus(data);
+      }
+    } catch(e) { /* ignore */ }
   };
 
   _ws.onclose = () => {
@@ -1585,6 +1758,227 @@ function connectWS() {
 }
 
 connectWS();
+
+// ── Queue panel & plan generation ─────────────────────────────────────────────
+
+function toggleQueue() {
+  const panel = document.getElementById('queuePanel');
+  const btn   = document.getElementById('btnQueue');
+  const show  = !panel.classList.contains('visible');
+  panel.classList.toggle('visible', show);
+  btn.classList.toggle('active', show);
+  if (show) refreshQueue();
+}
+
+async function generatePlan() {
+  const input = document.getElementById('planInput');
+  const btn   = document.getElementById('btnGenerate');
+  const desc  = input.value.trim();
+  if (!desc) return;
+
+  btn.textContent = 'GENERATING...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    input.value = '';
+    // Open queue panel to show new item
+    const panel = document.getElementById('queuePanel');
+    if (!panel.classList.contains('visible')) toggleQueue();
+    else refreshQueue();
+  } catch (e) {
+    console.error('generatePlan:', e);
+  } finally {
+    btn.textContent = 'GENERATE PLAN';
+    btn.disabled = false;
+  }
+}
+
+async function refreshQueue() {
+  try {
+    const res = await fetch('/api/plans');
+    if (!res.ok) return;
+    const plans = await res.json();
+    renderQueue(plans);
+  } catch (e) {
+    console.error('refreshQueue:', e);
+  }
+}
+
+async function runPlan(id) {
+  try {
+    await fetch(`/api/plans/${id}/run`, { method: 'POST' });
+    refreshQueue();
+  } catch (e) {
+    console.error('runPlan:', e);
+  }
+}
+
+async function deletePlan(id) {
+  try {
+    await fetch(`/api/plans/${id}`, { method: 'DELETE' });
+    refreshQueue();
+  } catch (e) {
+    console.error('deletePlan:', e);
+  }
+}
+
+async function reorderQueue(orderedIds) {
+  try {
+    await fetch('/api/plans/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderedIds }),
+    });
+  } catch (e) {
+    console.error('reorderQueue:', e);
+  }
+}
+
+const QUEUE_STATUS_COLORS = {
+  generating: '#ff8800',
+  queued:     '#44aaff',
+  running:    '#00ff88',
+  done:       '#00ff88',
+  failed:     '#ff4444',
+};
+
+function renderQueue(plans) {
+  const ul = document.getElementById('queueList');
+  if (!plans || plans.length === 0) {
+    ul.innerHTML = '<li class="queue-empty">NO PLANS IN QUEUE</li>';
+    return;
+  }
+
+  ul.innerHTML = '';
+  plans.forEach(plan => {
+    const li = document.createElement('li');
+    li.className = 'queue-item';
+    li.draggable = true;
+    li.dataset.planId = plan.id;
+
+    // Drag handle
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.textContent = '\u2261';
+    li.appendChild(handle);
+
+    // Title
+    const title = document.createElement('span');
+    title.className = 'plan-title';
+    title.textContent = plan.title || plan.id || 'Untitled';
+    li.appendChild(title);
+
+    // Status badge
+    const badge = document.createElement('span');
+    badge.className = 'status-badge';
+    const statusText = (plan.status || 'queued').toUpperCase();
+    const statusColor = QUEUE_STATUS_COLORS[plan.status] || '#444';
+    badge.textContent = statusText;
+    badge.style.color = statusColor;
+    badge.style.borderColor = statusColor + '88';
+    if (plan.status === 'generating' || plan.status === 'running') {
+      badge.classList.add('badge-pulse');
+    }
+    li.appendChild(badge);
+
+    // Action buttons
+    const actions = document.createElement('span');
+    actions.className = 'plan-actions';
+
+    if (plan.status === 'queued' || plan.status === 'failed' || plan.status === 'done') {
+      const runBtn = document.createElement('button');
+      runBtn.className = 'btn-run';
+      runBtn.textContent = 'RUN';
+      runBtn.onclick = (e) => { e.stopPropagation(); runPlan(plan.id); };
+      actions.appendChild(runBtn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-del';
+    delBtn.textContent = '\u2715';
+    delBtn.onclick = (e) => { e.stopPropagation(); deletePlan(plan.id); };
+    actions.appendChild(delBtn);
+
+    li.appendChild(actions);
+
+    // Drag & drop events
+    li.addEventListener('dragstart', onDragStart);
+    li.addEventListener('dragover', onDragOver);
+    li.addEventListener('dragleave', onDragLeave);
+    li.addEventListener('drop', onDrop);
+    li.addEventListener('dragend', onDragEnd);
+
+    ul.appendChild(li);
+  });
+}
+
+let _draggedPlanId = null;
+
+function onDragStart(e) {
+  _draggedPlanId = e.currentTarget.dataset.planId;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const item = e.currentTarget.closest('.queue-item');
+  if (item && item.dataset.planId !== _draggedPlanId) {
+    item.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(e) {
+  e.currentTarget.closest('.queue-item')?.classList.remove('drag-over');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const target = e.currentTarget.closest('.queue-item');
+  if (!target) return;
+  target.classList.remove('drag-over');
+
+  const ul = document.getElementById('queueList');
+  const items = Array.from(ul.querySelectorAll('.queue-item'));
+  const draggedEl = items.find(el => el.dataset.planId === _draggedPlanId);
+  if (!draggedEl || draggedEl === target) return;
+
+  // Reorder DOM
+  const targetRect = target.getBoundingClientRect();
+  const mid = targetRect.top + targetRect.height / 2;
+  if (e.clientY < mid) {
+    ul.insertBefore(draggedEl, target);
+  } else {
+    ul.insertBefore(draggedEl, target.nextSibling);
+  }
+
+  // Collect new order and POST
+  const newOrder = Array.from(ul.querySelectorAll('.queue-item')).map(el => el.dataset.planId);
+  reorderQueue(newOrder);
+}
+
+function onDragEnd(e) {
+  e.currentTarget.style.opacity = '1';
+  _draggedPlanId = null;
+  document.querySelectorAll('.queue-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function handlePlanEvent(data) {
+  // Refresh the queue whenever a plan event comes in
+  refreshQueue();
+}
+
+// Allow Enter key in the input to trigger generation
+document.getElementById('planInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generatePlan();
+});
 
 </script>
 </body>
