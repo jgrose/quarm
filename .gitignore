@@ -5,11 +5,13 @@ __pycache__/
 results.json
 *_results.json
 plan.md
+nort_runs.db
 quarm_runs.db
 url_cache.db
 config.json
 qdrant_data/
 artifacts/
+output/
 plans/incoming/*.md
 plans/queue.json
 plans/*.md

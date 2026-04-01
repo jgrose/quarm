@@ -16,10 +16,10 @@ Run:
   http://localhost:8000/
 """
 
-import re, json, os
-from datetime import datetime, timezone
+import re, json, os, shutil
 from dataclasses import dataclass, field
 from typing import Annotated, TypedDict, Sequence, Optional
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
@@ -29,7 +29,6 @@ from langgraph.graph.message import add_messages
 from status_bridge import (
     write_status, log_event, set_project,
     set_active_reviewer, register_rosters,
-    set_session_id, add_transcript_entry,
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
@@ -38,8 +37,25 @@ from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
 
 load_dotenv()
 MAX_REVISIONS = 3
+DEFAULT_TOLERANCE = 6
 _run_id = ""  # set at run() start
 _plan_id = ""  # set at run() start, used for checkpointing
+
+
+def _infer_tags(description: str, extras: list) -> list:
+    """Extract relevant tags from a description string."""
+    keywords = {"python", "javascript", "react", "node", "api", "database", "sql",
+                "frontend", "backend", "fullstack", "devops", "docker", "kubernetes",
+                "security", "testing", "documentation", "design", "ui", "ux",
+                "html", "css", "infrastructure", "cloud", "aws", "data", "ml",
+                "mobile", "ios", "android", "performance", "architecture"}
+    desc_words = set(description.lower().split())
+    found = list(desc_words & keywords)
+    # Add any extras that look like tags
+    for e in extras:
+        if isinstance(e, str) and len(e) < 30:
+            found.append(e.lower().replace(" ", "_"))
+    return list(set(found))[:10]  # cap at 10 tags
 
 # ── Model discovery & auto-selection ─────────────────────────────────────────
 
@@ -128,6 +144,7 @@ class ManagerSpec:
     expertise_blend: list[str]
     oversees: list[str]
     model: str = ""
+    tolerance: int = 0
 
 @dataclass
 class ReviewerSpec:
@@ -137,6 +154,7 @@ class ReviewerSpec:
     focus_areas: list[str]
     applies_to: list[str]
     model: str = ""
+    tolerance: int = 0
 
 @dataclass
 class TaskSpec:
@@ -200,7 +218,7 @@ def parse_plan(path: str):
     objective = obj_m.group(1).strip() if obj_m else "No objective."
 
     proj_m = re.search(r"^# PROJECT PLAN: (.+)", text, re.MULTILINE)
-    set_project(proj_m.group(1).strip() if proj_m else "NORT")
+    set_project(proj_m.group(1).strip() if proj_m else "QUARM")
 
     def rx(pat, raw, default=""):
         m = re.search(pat, raw)
@@ -228,6 +246,7 @@ def parse_plan(path: str):
             expertise_blend=rxl(r"- expertise_blend:\s*\[(.+?)\]", b.group(2)),
             oversees=rxl(r"- oversees:\s*\[(.+?)\]", b.group(2)),
             model=rx(r"- model:\s*(.+)", b.group(2)),
+            tolerance=int(rx(r"- tolerance:\s*(\d+)", b.group(2), "0")),
         )
         for b in re.finditer(r"### MANAGER: (\S+)\s+(.*?)(?=\n###|\n##|\Z)", text, re.DOTALL)
     ]
@@ -240,6 +259,7 @@ def parse_plan(path: str):
             focus_areas=rxl(r"- focus_areas:\s*\[(.+?)\]", b.group(2)),
             applies_to=rxl(r"- applies_to:\s*\[(.+?)\]", b.group(2)),
             model=rx(r"- model:\s*(.+)", b.group(2)),
+            tolerance=int(rx(r"- tolerance:\s*(\d+)", b.group(2), "0")),
         )
         for b in re.finditer(r"### REVIEWER: (\S+)\s+(.*?)(?=\n###|\n##|\Z)", text, re.DOTALL)
     ]
@@ -268,6 +288,27 @@ def parse_plan(path: str):
         managers    = [m.__dict__ for m in managers],
         reviewers   = [r.__dict__ for r in all_reviewers],
     )
+
+    # ── Auto-register new agents into the persistent registry ──────────────
+    try:
+        from agent_registry import get_agent, create_agent
+        for agent in sub_agents:
+            d = agent.__dict__
+            if not get_agent("sub_agents", d["name"]):
+                tags = _infer_tags(d.get("description", ""), d.get("tools", []))
+                create_agent("sub_agents", {**d, "tags": tags})
+        for mgr in managers:
+            d = mgr.__dict__
+            if not get_agent("managers", d["name"]):
+                tags = _infer_tags(d.get("description", ""), d.get("expertise_blend", []))
+                create_agent("managers", {**d, "tags": tags})
+        for rev in custom:  # custom reviewers only, not builtins
+            d = rev.__dict__
+            if not get_agent("reviewers", d["name"]):
+                tags = d.get("applies_to", []) + d.get("focus_areas", [])[:3]
+                create_agent("reviewers", {**d, "tags": tags})
+    except Exception as e:
+        print(f"[DEBUG] Registry auto-save: {e}")
 
     return objective, managers, sub_agents, tasks, all_reviewers
 
@@ -314,6 +355,31 @@ def upd(tasks, tid, **kw):
 
 def find_mgr(agent, mgrs):
     return next((m for m in mgrs if agent in m.get("oversees", [])), None)
+
+def _resolve_tolerance(agent_name: str, agent_dict: dict) -> int:
+    """Resolve effective tolerance for a reviewer/manager.
+
+    Precedence: config per-agent > plan per-agent > config global > DEFAULT_TOLERANCE
+    """
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+
+    per_agent = cfg.get("tolerance_overrides", {}).get(agent_name)
+    if per_agent is not None and 1 <= per_agent <= 10:
+        return per_agent
+
+    plan_tol = agent_dict.get("tolerance", 0)
+    if plan_tol and 1 <= plan_tol <= 10:
+        return plan_tol
+
+    global_tol = cfg.get("default_tolerance")
+    if global_tol is not None and 1 <= global_tol <= 10:
+        return global_tol
+
+    return DEFAULT_TOLERANCE
 
 def _auto_ingest(task, results):
     """Auto-ingest completed task output into RAG for cross-run knowledge."""
@@ -372,13 +438,10 @@ def master_node(state):
 
     if ready:
         ready_ids = []
-        now = datetime.now(timezone.utc).isoformat()
         for t in ready:
             msg = f"[MASTER] Dispatching → {t['id']}: {t['title']}"
             print(f"\n{msg}"); log_event(msg)
-            add_transcript_entry("nexus", f"Dispatching {t['id']}: {t['title']} — {t.get('description', '')[:200]}", task_id=t["id"])
-            tasks = upd(tasks, t["id"], status="in_progress",
-                        spawned_at=t.get("spawned_at") or now)
+            tasks = upd(tasks, t["id"], status="in_progress")
             ready_ids.append(t["id"])
 
         if len(ready_ids) > 1:
@@ -501,7 +564,6 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
     tools_used = len(tool_calls_log)
     done_msg = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
     print(f"  {done_msg}"); log_event(done_msg)
-    add_transcript_entry("drone", draft[:2000], agent=task["agent"], task_id=tid)
 
     return (tid, draft, total_toks, tool_calls_log, model)
 
@@ -517,22 +579,13 @@ def sub_agent_node(state):
 
     # Fall back to single task if active_task_ids not populated
     if not active_ids:
-        tid = state.get("active_task_id")
-        if tid:
-            active_ids = [tid]
-        else:
-            # No tasks to execute — route back to dispatch
-            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
-            write_status(s); return s
+        active_ids = [state["active_task_id"]]
 
     if len(active_ids) == 1:
         # ── Single task — run directly ──
         tid = active_ids[0]
         tid, draft, toks, tool_log, model = _execute_single_task(tid, tasks, results, sub_agents)
         task = get_task(tid, tasks)
-        if not task:
-            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
-            write_status(s); return s
         total_tokens = state.get("tokens_used", 0) + toks
         tasks = upd(tasks, tid, status="in_manager_review", result=draft,
                     manager_notes="", reviewer_notes="",
@@ -579,23 +632,7 @@ def manager_review_node(state):
     tid     = state["active_task_id"]
     tasks   = state["tasks"]
     results = state["results"]
-
-    # After parallel batch, active_task_id may be None — find first task needing review
-    if not tid:
-        for t in tasks:
-            if t["status"] == "in_manager_review":
-                tid = t["id"]
-                break
-    if not tid:
-        # Nothing to review — skip to dispatch
-        s = {**state, "phase": "dispatch", "active_task_id": None}
-        write_status(s); return s
-
     task    = get_task(tid, tasks)
-    if not task:
-        s = {**state, "phase": "dispatch", "active_task_id": None}
-        write_status(s); return s
-
     rev     = task.get("revision_count", 0)
     set_active_reviewer(None)
     manager = find_mgr(task["agent"], state["managers"])
@@ -609,16 +646,23 @@ def manager_review_node(state):
     if rev >= MAX_REVISIONS:
         log_event(f"[{manager['name'].upper()}] Max revisions — force-approving {tid}")
         results = {**results, tid: task["result"]}
-        tasks   = upd(tasks, tid, status="done",
-                      completed_at=datetime.now(timezone.utc).isoformat())
+        tasks   = upd(tasks, tid, status="done")
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
 
+    tolerance = _resolve_tolerance(manager["name"], manager)
+    if tolerance >= 8:
+        strictness = " Only FAIL for critical blocking issues that would cause real harm."
+    elif tolerance >= 5:
+        strictness = " FAIL only for real, substantive problems — not minor preferences."
+    else:
+        strictness = " Apply thorough scrutiny. FAIL any real problems you find."
     system = (
         f"You are the {manager['title']}. {manager['description']}\n"
         f"Expertise: {', '.join(manager.get('expertise_blend', []))}.\n"
+        f"{strictness}\n"
         'Return ONLY JSON: {"verdict":"PASS"|"FAIL","score":1-10,'
         '"issues":["..."],"feedback":"..."}'
     )
@@ -644,15 +688,24 @@ def manager_review_node(state):
 
     verdict = v.get("verdict","PASS")
     score   = v.get("score",7)
+
+    if verdict == "FAIL" and score >= tolerance:
+        log_event(f"[{manager['name'].upper()}] Score {score} >= tolerance {tolerance} — overriding FAIL → PASS")
+        verdict = "PASS"
+
     msg     = f"[{manager['name'].upper()}] {tid}: {verdict} ({score}/10)"
     print(f"  {msg}"); log_event(msg)
     for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
-    add_transcript_entry("sentinel", f"{verdict} ({score}/10) — {v.get('feedback', '')}".strip(),
-                         agent=manager["name"], task_id=tid)
 
     last_v = {"reviewer": manager["name"], "verdict": verdict, "score": score, "task_id": tid}
     if _run_id:
         track_score(_run_id, tid, task["agent"], score, verdict, manager["name"], model, toks)
+
+    try:
+        from agent_registry import record_agent_performance
+        record_agent_performance("sub_agents", task["agent"], score, task.get("revision_count", 0))
+    except Exception:
+        pass
 
     if verdict == "PASS":
         log_event(f"[{manager['name'].upper()}] Approved → panel")
@@ -671,36 +724,40 @@ def manager_review_node(state):
         write_status(s); return s
 
 
-REVIEWER_PROMPT = (
-    "You are the {title}. {description}\n"
-    "Focus areas: {focus_areas}\n"
-    "Review from YOUR domain perspective only.\n"
-    'Return ONLY JSON: {{"reviewer":"{name}","verdict":"PASS"|"FLAG",'
-    '"score":1-10,"issues":["..."],"feedback":"Precise revision instructions"}}\n'
-    "FLAG only for real, specific problems."
-)
+def _build_reviewer_prompt(reviewer: dict, tolerance: int) -> str:
+    if tolerance >= 8:
+        strictness = (
+            "You have a HIGH tolerance threshold. Only FLAG critical, blocking issues "
+            "that would cause real harm in production. Minor style preferences, theoretical "
+            "concerns, and nice-to-haves should receive PASS with a note. "
+            "FLAG only for real, specific, severe problems."
+        )
+    elif tolerance >= 5:
+        strictness = (
+            "FLAG only for real, specific problems that meaningfully impact quality. "
+            "Do not flag minor style issues, theoretical edge cases with low probability, "
+            "or subjective preferences."
+        )
+    else:
+        strictness = (
+            "Apply thorough scrutiny. FLAG any real problems you find, including "
+            "moderate issues that could affect quality. Be specific and actionable."
+        )
+    return (
+        f"You are the {reviewer['title']}. {reviewer['description']}\n"
+        f"Focus areas: {', '.join(reviewer.get('focus_areas', []))}\n"
+        "Review from YOUR domain perspective only.\n"
+        f'{{"reviewer":"{reviewer["name"]}","verdict":"PASS"|"FLAG",'
+        '"score":1-10,"issues":["..."],"feedback":"Precise revision instructions"}}\n'
+        f"Return ONLY JSON in the format above.\n{strictness}"
+    )
 
 
 def specialist_review_node(state):
     tid      = state["active_task_id"]
     tasks    = state["tasks"]
     results  = state["results"]
-
-    # After routing, active_task_id may be None — find first task needing specialist review
-    if not tid:
-        for t in tasks:
-            if t["status"] == "in_specialist_review":
-                tid = t["id"]
-                break
-    if not tid:
-        s = {**state, "phase": "dispatch", "active_task_id": None}
-        write_status(s); return s
-
     task     = get_task(tid, tasks)
-    if not task:
-        s = {**state, "phase": "dispatch", "active_task_id": None}
-        write_status(s); return s
-
     rev      = task.get("revision_count", 0)
     rev_list = applicable_reviewers(task, state["reviewers"])
 
@@ -708,8 +765,7 @@ def specialist_review_node(state):
         log_event(f"[PANEL] No reviewers for {tid} — accepted")
         set_active_reviewer(None)
         results = {**results, tid: task["result"]}
-        tasks   = upd(tasks, tid, status="done",
-                      completed_at=datetime.now(timezone.utc).isoformat())
+        tasks   = upd(tasks, tid, status="done")
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
@@ -728,12 +784,8 @@ def specialist_review_node(state):
         model = resolve_model(task.get("model", ""), reviewer.get("model", ""), role="review")
         log_event(f"  [MODEL] {reviewer['name']} → {model}")
 
-        system = REVIEWER_PROMPT.format(
-            title=reviewer["title"],
-            description=reviewer["description"],
-            focus_areas=", ".join(reviewer.get("focus_areas", [])),
-            name=reviewer["name"],
-        )
+        tolerance = _resolve_tolerance(reviewer["name"], reviewer)
+        system = _build_reviewer_prompt(reviewer, tolerance)
         resp = llm(model).invoke([
             SystemMessage(content=system),
             HumanMessage(content=f"Task:{task['title']}\nReqs:{task['description']}"
@@ -749,15 +801,23 @@ def specialist_review_node(state):
 
         verdict = v.get("verdict","PASS")
         score   = v.get("score",8)
+
+        if verdict == "FLAG" and score >= tolerance:
+            log_event(f"[{reviewer['name'].upper()}] Score {score} >= tolerance {tolerance} — overriding FLAG → PASS")
+            verdict = "PASS"
+
         msg     = f"[{reviewer['name'].upper()}] {tid}: {verdict} ({score}/10)"
         print(f"  {msg}"); log_event(msg)
         for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
-        add_transcript_entry("probe", f"{verdict} ({score}/10) — {v.get('feedback', '')}".strip(),
-                             agent=reviewer["name"], task_id=tid)
         verdicts.append(verdict)
         last_v = {"reviewer": reviewer["name"], "verdict": verdict, "score": score, "task_id": tid}
         if _run_id:
             track_score(_run_id, tid, task["agent"], score, verdict, reviewer["name"], model, toks)
+        try:
+            from agent_registry import record_agent_performance
+            record_agent_performance("reviewers", reviewer["name"], score, 0)
+        except Exception:
+            pass
         if verdict == "FLAG" and v.get("feedback"):
             flags.append(f"[{reviewer['title']}]\n{v['feedback']}")
         # Update score to latest reviewer score
@@ -779,8 +839,7 @@ def specialist_review_node(state):
            else f"[PANEL] All reviewers passed {tid} ✓")
     print(f"  {msg}"); log_event(msg)
     results = {**results, tid: task["result"]}
-    tasks   = upd(tasks, tid, status="done", reviewer_notes="",
-                  completed_at=datetime.now(timezone.utc).isoformat())
+    tasks   = upd(tasks, tid, status="done", reviewer_notes="")
     _auto_ingest(task, results)
     s = {**state, "tasks": tasks, "results": results,
          "phase": "dispatch", "active_task_id": None}
@@ -813,15 +872,7 @@ def synthesis_node(state):
 
 def route_master(s):
     p = s.get("phase", "dispatch")
-    if p == "done":
-        return "synthesis"
-    if p == "execute":
-        return "sub_agent"
-    if p == "manager_review":
-        return "manager_review"
-    if p == "specialist_review":
-        return "specialist_review"
-    return "master"
+    return "synthesis" if p == "done" else "sub_agent" if p == "execute" else "master"
 
 def route_manager(s):
     p = s.get("phase")
@@ -845,8 +896,7 @@ def build_graph():
 
     g.set_entry_point("master")
     g.add_conditional_edges("master", route_master,
-        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master",
-         "manager_review":"manager_review","specialist_review":"specialist_review"})
+        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master"})
     g.add_edge("sub_agent", "manager_review")
     g.add_conditional_edges("manager_review", route_manager,
         {"sub_agent":"sub_agent","specialist_review":"specialist_review","master":"master"})
@@ -861,7 +911,7 @@ def build_graph():
 def _send_webhook(data: dict):
     """Fire-and-forget webhook notification."""
     import threading
-    url = os.environ.get("NORT_WEBHOOK_URL", os.environ.get("QUARM_WEBHOOK_URL", ""))
+    url = os.environ.get("QUARM_WEBHOOK_URL", "")
     if not url:
         # Try config.json
         try:
@@ -882,10 +932,85 @@ def _send_webhook(data: dict):
     threading.Thread(target=_post, daemon=True).start()
 
 
+def _slugify(text: str, max_len: int = 60) -> str:
+    """Turn an objective string into a filesystem-safe folder name."""
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:max_len].rstrip("-")
+
+
+def assemble_output(plan_id: str, objective: str, tasks: list,
+                    plan_path: str = "", results_path: str = "") -> tuple[str, dict]:
+    """Merge per-task artifacts into a single deliverable output folder.
+
+    Layout:  output/<slug>/
+               ├── <merged project files>
+               ├── MANIFEST.md
+               ├── plan.md          (copy of source plan)
+               └── results.json     (copy of results)
+    Returns (output_dir_path, artifacts_by_task) or ("", {}) if no artifacts.
+    """
+    artifacts_root = Path(__file__).parent / "artifacts" / plan_id
+    if not artifacts_root.is_dir():
+        return "", {}
+
+    slug = _slugify(objective) or plan_id
+    output_dir = Path(__file__).parent / "output" / f"{plan_id}_{slug}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_lines = [f"# {objective}\n", f"**Plan ID:** `{plan_id}`\n", "## Deliverables\n"]
+    files_copied = 0
+    artifacts_by_task = {}  # {TASK-001: ["src/index.html", ...]}
+
+    # Process tasks in order so later tasks overwrite earlier ones on conflict
+    task_ids = sorted(
+        [d.name for d in artifacts_root.iterdir() if d.is_dir()],
+        key=lambda t: int(re.search(r"\d+", t).group()) if re.search(r"\d+", t) else 0,
+    )
+
+    for tid in task_ids:
+        task_dir = artifacts_root / tid
+        task_label = next((t["id"] for t in tasks if t["id"] == tid), tid)
+        task_desc = next((t.get("description", "") for t in tasks if t["id"] == tid), "")
+        task_files = []
+
+        for src in sorted(task_dir.rglob("*")):
+            if not src.is_file():
+                continue
+            rel = src.relative_to(task_dir)
+            dest = output_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            task_files.append(str(rel))
+            files_copied += 1
+
+        if task_files:
+            artifacts_by_task[tid] = task_files
+            manifest_lines.append(f"### {task_label}")
+            if task_desc:
+                manifest_lines.append(f"{task_desc}\n")
+            for f in task_files:
+                manifest_lines.append(f"- `{f}`")
+            manifest_lines.append("")
+
+    if files_copied == 0:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        return "", {}
+
+    # Bundle source plan and results into the output package
+    if plan_path and os.path.isfile(plan_path):
+        shutil.copy2(plan_path, output_dir / "plan.md")
+    if results_path and os.path.isfile(results_path):
+        shutil.copy2(results_path, output_dir / "results.json")
+
+    manifest_lines.append(f"\n---\n*{files_copied} file(s) assembled from {len(task_ids)} task(s).*\n")
+    (output_dir / "MANIFEST.md").write_text("\n".join(manifest_lines))
+
+    return str(output_dir), artifacts_by_task
+
+
 def run(plan_path="plan.md", plan_id: str = ""):
     global _run_id, _plan_id
     _plan_id = plan_id
-    set_session_id(plan_id or os.path.splitext(os.path.basename(plan_path))[0])
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
@@ -970,8 +1095,18 @@ def run(plan_path="plan.md", plan_id: str = ""):
 
     base, _ = os.path.splitext(plan_path)
     results_path = f"{base}_results.json"
+
+    # ── Assemble output package ──
+    output_path = ""
+    artifacts_by_task = {}
+    if plan_id:
+        output_path, artifacts_by_task = assemble_output(
+            plan_id, objective, final["tasks"],
+            plan_path=plan_path, results_path="",  # results not written yet
+        )
+
     with open(results_path, "w") as f:
-        json.dump({
+        results_data = {
             "task_results": final["results"],
             "quality_log": [
                 {"id": t["id"], "status": t["status"],
@@ -981,8 +1116,18 @@ def run(plan_path="plan.md", plan_id: str = ""):
             "summary": next(
                 (m.content for m in final["messages"] if isinstance(m, AIMessage)), ""
             ),
-        }, f, indent=2)
+        }
+        if artifacts_by_task:
+            results_data["artifacts"] = artifacts_by_task
+        if output_path:
+            results_data["output_dir"] = output_path
+        json.dump(results_data, f, indent=2)
     print(f"\nSaved → {results_path}")
+
+    # Copy results.json into the output package now that it's written
+    if output_path:
+        shutil.copy2(results_path, os.path.join(output_path, "results.json"))
+        print(f"Output → {output_path}/")
 
     # ── Tracking & webhook ──
     total_tokens = final.get("tokens_used", 0)
