@@ -414,6 +414,26 @@ def _auto_ingest(task, results):
         log_event(f"  [RAG] Ingest failed: {e}")
 
 
+def snapshot_artifacts(plan_id: str, task_id: str, revision_num: int):
+    """Snapshot current task artifacts before a revision overwrites them."""
+    if not plan_id:
+        return
+    artifacts_root = Path(__file__).parent / "artifacts" / plan_id / task_id
+    if not artifacts_root.is_dir():
+        return
+    rev_dir = artifacts_root / "revisions" / f"rev_{revision_num}"
+    rev_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for src in artifacts_root.rglob("*"):
+        if src.is_file() and "revisions" not in src.parts:
+            rel = src.relative_to(artifacts_root)
+            dest = rev_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            copied += 1
+    log_event(f"  [SNAPSHOT] {task_id} rev_{revision_num}: {copied} files")
+
+
 def applicable_reviewers(task, reviewers):
     named  = set(task.get("reviewers", []))
     ttypes = set(task.get("task_type",  []))
@@ -755,6 +775,7 @@ def manager_review_node(state):
         write_status(s); return s
     else:
         log_event(f"[{manager['name'].upper()}] Returning {tid} for revision")
+        snapshot_artifacts(_plan_id, tid, rev + 1)
         tasks = upd(tasks, tid, status="revision",
                     manager_notes=v.get("feedback",""), revision_count=rev+1,
                     last_score=score)
@@ -884,6 +905,7 @@ def specialist_review_node(state):
     if any_flags and rev < MAX_REVISIONS:
         msg = f"[PANEL] {len(flags)} reviewer(s) flagged {tid} — revising"
         print(f"  {msg}"); log_event(msg)
+        snapshot_artifacts(_plan_id, tid, rev + 1)
         tasks = upd(tasks, tid, status="revision",
                     reviewer_notes="\n\n".join(flags), revision_count=rev+1)
         s = {**state, "tasks": tasks, "phase": "execute"}
@@ -922,6 +944,80 @@ def synthesis_node(state):
     write_status(s); return s
 
 
+def composition_node(state):
+    """Check cross-file coherence of assembled output."""
+    plan_id = _plan_id
+    if not plan_id:
+        return state
+
+    artifacts_root = Path(__file__).parent / "artifacts" / plan_id
+    if not artifacts_root.is_dir():
+        log_event("[COMPOSITION] No artifacts to check")
+        return state
+
+    # Gather file listing and content samples (cap at 20 files)
+    all_files = []
+    file_contents = {}
+    for f in sorted(artifacts_root.rglob("*")):
+        if f.is_file() and "revisions" not in f.parts:
+            rel = str(f.relative_to(artifacts_root))
+            all_files.append(rel)
+            if len(file_contents) < 20:
+                try:
+                    content = f.read_text(errors="replace")
+                    if len(content) < 10000:
+                        file_contents[rel] = content
+                except Exception:
+                    pass
+
+    if not all_files:
+        log_event("[COMPOSITION] No files to check")
+        return state
+
+    log_event("[COMPOSITION] Checking cross-file coherence...")
+    model = resolve_model(role="review")
+    log_event(f"  [MODEL] {model}")
+
+    file_listing = "\n".join(all_files)
+    content_samples = "\n\n".join(
+        f"=== {path} ===\n{content[:2000]}"
+        for path, content in list(file_contents.items())[:20]
+    )
+
+    prompt = (
+        f"You are a composition reviewer checking cross-file coherence for a project.\n\n"
+        f"## All Files\n{file_listing}\n\n"
+        f"## File Contents (samples)\n{content_samples}\n\n"
+        "Check for these issues:\n"
+        "1. Import references: Do any files import/reference other files that don't exist in the listing?\n"
+        "2. Config coherence: Do config values (paths, URLs, names) match actual file paths?\n"
+        "3. README accuracy: If there's a README, do its instructions match the actual project structure?\n"
+        "4. Missing files: Are there obvious missing files (e.g., referenced but not present)?\n\n"
+        "Return JSON:\n"
+        '{"coherent": true/false, "issues": [{"file": "path", "type": "import|config|readme|missing", '
+        '"description": "..."}], "summary": "1-2 sentence overall assessment"}'
+    )
+
+    try:
+        resp = llm(model).invoke([HumanMessage(content=prompt)])
+        toks = extract_tokens(resp)
+        total_tokens = state.get("tokens_used", 0) + toks
+
+        text = resp.content
+        json_match = re.search(r'\{[\s\S]*?\}(?=\s*$)', text)
+        if json_match:
+            report = json.loads(json_match.group())
+        else:
+            report = {"coherent": True, "issues": [], "summary": text[:500]}
+
+        log_event(f"[COMPOSITION] {'Coherent' if report.get('coherent') else 'Issues found'}: {report.get('summary', '')[:100]}")
+
+        return {**state, "coherence_report": report, "tokens_used": total_tokens}
+    except Exception as e:
+        log_event(f"[COMPOSITION] Error: {e}")
+        return {**state, "coherence_report": {"coherent": True, "issues": [], "summary": f"Check failed: {e}"}}
+
+
 # ── Graph ─────────────────────────────────────────────────────────────────────
 
 def route_master(s):
@@ -945,6 +1041,7 @@ def build_graph():
         ("manager_review",    manager_review_node),
         ("specialist_review", specialist_review_node),
         ("synthesis",         synthesis_node),
+        ("composition",       composition_node),
     ]:
         g.add_node(name, fn)
 
@@ -956,7 +1053,8 @@ def build_graph():
         {"sub_agent":"sub_agent","specialist_review":"specialist_review","master":"master"})
     g.add_conditional_edges("specialist_review", route_specialist,
         {"sub_agent":"sub_agent","master":"master"})
-    g.add_edge("synthesis", END)
+    g.add_edge("synthesis", "composition")
+    g.add_edge("composition", END)
     return g.compile()
 
 

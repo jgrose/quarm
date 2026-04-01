@@ -8,17 +8,23 @@ import os
 import subprocess
 import logging
 import threading
+import tempfile
+import shlex
+import resource
 from pathlib import Path
 from typing import Optional
 
 from langchain_core.tools import tool
 from langchain_core.messages import ToolMessage
-from status_bridge import record_file_touch
+from status_bridge import record_file_touch, log_event
 
 log = logging.getLogger("nort.tools")
 
 PROJECT_DIR = Path(__file__).parent
 ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
+
+SANDBOX_MODE = os.environ.get("NORT_SANDBOX_MODE", "subprocess").lower()
+_SENSITIVE_ENV_PATTERNS = {"API_KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "OPENAI", "ANTHROPIC", "AWS_"}
 
 # ── Approval system ─────────────────────────────────────────────────────────
 
@@ -130,6 +136,15 @@ def _artifacts_path() -> Path:
     return p
 
 
+def _path_is_within(target: Path, allowed_base: Path) -> bool:
+    """Check that target path resolves within allowed_base (prevents path traversal)."""
+    try:
+        target.resolve().relative_to(allowed_base.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 # ── Tool definitions ────────────────────────────────────────────────────────
 
 @tool
@@ -142,6 +157,14 @@ def web_search(query: str) -> str:
 @tool
 def browse_url(url: str) -> str:
     """Load a web page using headless Chromium and return its content as markdown. Handles JavaScript-rendered pages."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme == "file":
+        return "Blocked: file:// URLs are not allowed."
+    _blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]", "169.254.169.254"}
+    hostname = (parsed.hostname or "").lower()
+    if hostname in _blocked_hosts or hostname == "::1":
+        return f"Blocked: requests to {hostname} are not allowed."
     from tools_web import browse_url as _bu
     return _bu(url)
 
@@ -163,12 +186,19 @@ def rag_search(query: str) -> str:
 def rag_store(text: str, tags: str = "") -> str:
     """Store text in the NORT knowledge base for use in current and future projects. Provide comma-separated tags for categorization."""
     from rag import ingest_text
+    truncated = False
+    if len(text) > 100_000:
+        text = text[:100_000]
+        truncated = True
     ctx = _ctx()
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
     n = ingest_text(text, source=f"agent:{ctx['agent']}", content_type="manual",
                     plan_id=ctx["plan_id"], task_id=ctx["task_id"],
                     agent=ctx["agent"], tags=tag_list)
-    return f"Stored {n} chunk(s) in the knowledge base."
+    msg = f"Stored {n} chunk(s) in the knowledge base."
+    if truncated:
+        msg += " Note: input was truncated to 100,000 characters."
+    return msg
 
 
 @tool
@@ -180,12 +210,15 @@ def download_artifact(url: str) -> str:
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
         content = resp.text[:50000]
-        # Save to artifacts directory
         from urllib.parse import urlparse
-        filename = urlparse(url).path.split("/")[-1] or "download.txt"
-        path = _artifacts_path() / filename
+        filename = Path(urlparse(url).path.split("/")[-1]).name
+        if not filename:
+            filename = "download.txt"
+        artifacts = _artifacts_path()
+        path = artifacts / filename
+        if not _path_is_within(path, artifacts):
+            return "Access denied: filename would escape artifacts directory."
         path.write_text(content)
-        # Ingest into RAG
         ctx = _ctx()
         n = ingest_url(url, content, plan_id=ctx["plan_id"],
                        task_id=ctx["task_id"], agent=ctx["agent"])
@@ -198,10 +231,7 @@ def download_artifact(url: str) -> str:
 def read_file(path: str) -> str:
     """Read a file from the project workspace. Can read from artifacts/ or plans/ directories."""
     target = PROJECT_DIR / path
-    # Sandbox check
-    try:
-        target.resolve().relative_to(PROJECT_DIR.resolve())
-    except ValueError:
+    if not _path_is_within(target, PROJECT_DIR):
         return f"Access denied: {path} is outside the project directory."
     if not target.exists():
         return f"File not found: {path}"
@@ -210,7 +240,8 @@ def read_file(path: str) -> str:
         record_file_touch(path, "read", _ctx().get("agent", ""))
         return content
     except Exception as e:
-        return f"Error reading {path}: {e}"
+        log.warning(f"read_file error for {target}: {e}")
+        return f"Error reading {path}: operation failed."
 
 
 @tool
@@ -218,10 +249,7 @@ def write_file(path: str, content: str) -> str:
     """Write content to a file in the artifacts directory. Creates directories as needed."""
     artifacts = _artifacts_path()
     target = artifacts / path
-    # Sandbox check — prevent path traversal outside artifacts dir
-    try:
-        target.resolve().relative_to(artifacts.resolve())
-    except ValueError:
+    if not _path_is_within(target, artifacts):
         return f"Access denied: {path} would escape the artifacts directory."
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -229,25 +257,121 @@ def write_file(path: str, content: str) -> str:
         record_file_touch(str(target.relative_to(PROJECT_DIR)), "write", _ctx().get("agent", ""))
         return f"Written {len(content)} chars to {target.relative_to(PROJECT_DIR)}"
     except Exception as e:
-        return f"Error writing {path}: {e}"
+        log.warning(f"write_file error for {target}: {e}")
+        return f"Error writing {path}: operation failed."
+
+
+# ── Sandbox helpers for execute_code ────────────────────────────────────────
+
+def _format_exec_output(stdout: str, stderr: str) -> str:
+    """Format subprocess stdout/stderr into a single result string."""
+    output = ""
+    if stdout:
+        output += stdout
+    if stderr:
+        output += f"\nSTDERR:\n{stderr}"
+    return output.strip() or "(no output)"
+
+
+_cached_sanitized_env: dict[str, str] | None = None
+
+
+def _sanitized_env() -> dict[str, str]:
+    """Return a copy of os.environ with sensitive variables stripped. Cached after first call."""
+    global _cached_sanitized_env
+    if _cached_sanitized_env is not None:
+        return dict(_cached_sanitized_env)
+    safe_keys = {"PYTHONPATH", "PATH", "HOME", "LANG", "LC_ALL", "PYTHONDONTWRITEBYTECODE"}
+    env = {}
+    for k, v in os.environ.items():
+        if k in safe_keys:
+            env[k] = v
+        elif not any(pat in k.upper() for pat in _SENSITIVE_ENV_PATTERNS):
+            env[k] = v
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    _cached_sanitized_env = dict(env)
+    return env
+
+
+def _preexec_limits():
+    """Set resource limits for sandboxed subprocess (512 MB memory, 30s CPU)."""
+    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+    resource.setrlimit(resource.RLIMIT_CPU, (30, 30))
+
+
+def _execute_none(code: str, artifacts_path: Path) -> str:
+    """No sandbox -- bare subprocess, full env. For trusted environments."""
+    result = subprocess.run(
+        ["python3", "-c", code],
+        capture_output=True, text=True, timeout=30,
+        cwd=str(artifacts_path),
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    return _format_exec_output(result.stdout, result.stderr)
+
+
+def _execute_subprocess(code: str, artifacts_path: Path) -> str:
+    """Sandboxed subprocess with temp dir, stripped env, resource limits, and optional network isolation."""
+    tmpdir = tempfile.mkdtemp(prefix="nort_sandbox_")
+    try:
+        env = _sanitized_env()
+        try:
+            proc = subprocess.Popen(
+                ["unshare", "--net", "--map-root-user", "python3", "-c", code],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, cwd=tmpdir, env=env,
+                preexec_fn=_preexec_limits,
+            )
+            stdout, stderr = proc.communicate(timeout=30)
+        except (FileNotFoundError, PermissionError, OSError):
+            proc = subprocess.Popen(
+                ["python3", "-c", code],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, cwd=tmpdir, env=env,
+                preexec_fn=_preexec_limits,
+            )
+            stdout, stderr = proc.communicate(timeout=30)
+        return _format_exec_output(stdout, stderr)
+    finally:
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _execute_docker(code: str, artifacts_path: Path) -> str:
+    """Docker-based sandbox with no network, memory/cpu/pid limits."""
+    cmd = [
+        "docker", "run", "--rm",
+        "--network=none",
+        "--memory=256m",
+        "--cpus=0.5",
+        "--pids-limit=50",
+        "-v", f"{artifacts_path}:/work:rw",
+        "-w", "/work",
+        "python:3.12-slim",
+        "python3", "-c", code,
+    ]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30,
+        )
+        return _format_exec_output(result.stdout, result.stderr)
+    except FileNotFoundError:
+        return "Error: docker is not installed or not in PATH. Set NORT_SANDBOX_MODE=subprocess to use process-based sandboxing."
+    except subprocess.CalledProcessError as e:
+        return f"Error: docker execution failed ({e}). Set NORT_SANDBOX_MODE=subprocess to use process-based sandboxing."
 
 
 @tool
 def execute_code(code: str) -> str:
     """Execute Python code in a sandboxed subprocess with a 30-second timeout. Returns stdout and stderr."""
+    artifacts_path = _artifacts_path()
     try:
-        result = subprocess.run(
-            ["python3", "-c", code],
-            capture_output=True, text=True, timeout=30,
-            cwd=str(_artifacts_path()),
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-        )
-        output = ""
-        if result.stdout:
-            output += result.stdout
-        if result.stderr:
-            output += f"\nSTDERR:\n{result.stderr}"
-        return output.strip() or "(no output)"
+        if SANDBOX_MODE == "none":
+            return _execute_none(code, artifacts_path)
+        elif SANDBOX_MODE == "docker":
+            return _execute_docker(code, artifacts_path)
+        else:
+            return _execute_subprocess(code, artifacts_path)
     except subprocess.TimeoutExpired:
         return "Error: code execution timed out (30s limit)"
     except Exception as e:
@@ -274,13 +398,18 @@ TOOL_REGISTRY = {
 }
 
 
-def get_tools(tool_names: list[str]) -> list:
-    """Get LangChain tool objects for the given tool name strings."""
+def get_tools(tool_names: list[str], allowed_tools: list[str] = None) -> list:
+    """Get LangChain tool objects for the given tool name strings.
+    If allowed_tools is non-empty, only include tools in that list."""
     tools = []
     seen = set()
+    allowed_set = set(t.strip().lower() for t in allowed_tools) if allowed_tools else None
     for name in tool_names:
         name = name.strip().lower()
         if name in TOOL_REGISTRY and name not in seen:
+            if allowed_set and name not in allowed_set:
+                log_event(f"  [SECURITY] Tool '{name}' not in allowed_tools — skipped")
+                continue
             tools.append(TOOL_REGISTRY[name])
             seen.add(name)
     return tools
@@ -288,7 +417,8 @@ def get_tools(tool_names: list[str]) -> list:
 
 # ── Tool execution with approval ─────────────────────────────────────────────
 
-def execute_tool_call(tool_call: dict, tools: list, auto_approve_all: bool = False) -> str:
+def execute_tool_call(tool_call: dict, tools: list, auto_approve_all: bool = False,
+                      allowed_tools: list[str] = None) -> str:
     """Execute a single tool call, with approval check for dangerous tools."""
     name = tool_call["name"]
     args = tool_call["args"]
@@ -298,6 +428,13 @@ def execute_tool_call(tool_call: dict, tools: list, auto_approve_all: bool = Fal
     tool_fn = next((t for t in tools if t.name == name), None)
     if not tool_fn:
         return f"Unknown tool: {name}"
+
+    # Allowlist enforcement (defense-in-depth — tools are also filtered in get_tools)
+    if allowed_tools:
+        allowed_set = set(t.strip().lower() for t in allowed_tools)
+        if name.lower() not in allowed_set:
+            log_event(f"  [SECURITY] Agent attempted disallowed tool '{name}' — blocked")
+            return f"Tool '{name}' is not in this agent's allowed tools list."
 
     # Check if approval is needed
     needs_approval = name in APPROVAL_REQUIRED and not auto_approve_all

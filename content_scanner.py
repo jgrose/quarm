@@ -6,7 +6,6 @@ from pathlib import Path
 
 log = logging.getLogger("nort.scanner")
 
-# Patterns that match common secret/credential formats
 SECRET_PATTERNS = [
     (r'AKIA[0-9A-Z]{16}', "AWS Access Key ID"),
     (r'(?i)(aws_secret_access_key|aws_secret)\s*[=:]\s*\S+', "AWS Secret Key"),
@@ -19,7 +18,6 @@ SECRET_PATTERNS = [
     (r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----', "Private Key"),
 ]
 
-# Patterns for potentially malicious code
 INJECTION_PATTERNS = [
     (r'(?i)\beval\s*\(', "eval() call"),
     (r'(?i)\bexec\s*\(', "exec() call"),
@@ -29,7 +27,6 @@ INJECTION_PATTERNS = [
     (r'(?i)\bcompile\s*\([^)]*["\']exec["\']', "compile() with exec mode"),
 ]
 
-# File extensions to scan (text-based only)
 SCANNABLE_EXTENSIONS = {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.yaml', '.yml', '.toml', '.cfg', '.ini', '.env', '.sh', '.bash', '.md', '.txt', '.sql', '.xml', '.csv'}
 
 def scan_file(filepath: Path) -> list[dict]:
@@ -44,7 +41,6 @@ def scan_file(filepath: Path) -> list[dict]:
     except Exception:
         return findings
 
-    # Check for secrets
     for pattern, label in SECRET_PATTERNS:
         for match in re.finditer(pattern, content):
             line_num = content[:match.start()].count('\n') + 1
@@ -56,7 +52,6 @@ def scan_file(filepath: Path) -> list[dict]:
                 "match_preview": match.group()[:40] + "..." if len(match.group()) > 40 else match.group(),
             })
 
-    # Check for injection patterns (only in code files)
     code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.sh', '.bash'}
     if filepath.suffix.lower() in code_exts:
         for pattern, label in INJECTION_PATTERNS:
@@ -70,7 +65,6 @@ def scan_file(filepath: Path) -> list[dict]:
                     "match_preview": match.group()[:60],
                 })
 
-    # Check file permissions (Unix only)
     try:
         mode = filepath.stat().st_mode
         if mode & stat.S_IWOTH:  # world-writable
