@@ -240,3 +240,119 @@ async function saveToleranceAgent(name, value) {
     console.error('saveToleranceAgent:', e);
   }
 }
+
+// ── Agent Registry API ────────────────────────────────────────────────────
+
+async function fetchAgentVersions(agentType, name) {
+  try {
+    var res = await fetch('/api/agents/' + agentType + '/' + name + '/versions');
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.versions || [];
+  } catch (e) {
+    console.error('fetchAgentVersions:', e);
+    return [];
+  }
+}
+
+async function rollbackAgent(agentType, name, version) {
+  try {
+    var res = await fetch('/api/agents/' + agentType + '/' + name + '/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version: version })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('rollbackAgent:', e);
+    return null;
+  }
+}
+
+async function cloneAgent(agentType, name, newName) {
+  try {
+    var body = newName ? { new_name: newName } : {};
+    var res = await fetch('/api/agents/' + agentType + '/' + name + '/clone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('cloneAgent:', e);
+    return null;
+  }
+}
+
+async function retireAgent(agentType, name, retired) {
+  try {
+    var res = await fetch('/api/agents/' + agentType + '/' + name + '/retire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retired: retired })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('retireAgent:', e);
+    return null;
+  }
+}
+
+async function fetchTeams() {
+  try {
+    var res = await fetch('/api/teams');
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.teams || [];
+  } catch (e) {
+    console.error('fetchTeams:', e);
+    return [];
+  }
+}
+
+async function createTeam(spec) {
+  try {
+    var res = await fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec)
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('createTeam:', e);
+    return null;
+  }
+}
+
+async function deleteTeam(name) {
+  try {
+    await fetch('/api/teams/' + name, { method: 'DELETE' });
+  } catch (e) {
+    console.error('deleteTeam:', e);
+  }
+}
+
+async function exportAgentsData() {
+  try {
+    var res = await fetch('/api/agents/export');
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  } catch (e) {
+    console.error('exportAgentsData:', e);
+    return null;
+  }
+}
+
+async function importAgentsData(data, overwrite) {
+  try {
+    var res = await fetch('/api/agents/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data, overwrite: overwrite })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('importAgentsData:', e);
+    return null;
+  }
+}

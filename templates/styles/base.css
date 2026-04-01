@@ -641,6 +641,182 @@ a:hover { color: var(--holo-bright); }
   color: #ff5566;
 }
 
+/* ── 8b. Agent List Panel (left slide-in drawer) ──────────────────────── */
+
+#agentListPanel {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 320px;
+  z-index: 40;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  transition: transform 0.3s ease;
+  overflow: visible;
+}
+
+#agentListPanel.collapsed {
+  transform: translateX(-100%);
+}
+
+.agent-list-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  overflow: hidden;
+}
+
+#agentListToggle {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 56px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s, background 0.2s;
+  z-index: 1;
+}
+
+#agentListToggle:hover {
+  color: var(--text-primary);
+  background: rgba(100, 200, 255, 0.08);
+}
+
+#agentListBody {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.al-session {
+  margin-bottom: 10px;
+}
+
+.al-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(100, 200, 255, 0.04);
+  border: 1px solid rgba(100, 200, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  margin-bottom: 4px;
+}
+
+.al-session-header:hover {
+  background: rgba(100, 200, 255, 0.1);
+}
+
+.al-session-header.active {
+  border-color: rgba(100, 200, 255, 0.35);
+  background: rgba(100, 200, 255, 0.1);
+}
+
+.al-session-name {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+  color: var(--holo-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.al-session-badge {
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.al-agent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 16px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+  transition: background 0.15s;
+}
+
+.al-agent:hover {
+  background: rgba(100, 200, 255, 0.04);
+}
+
+.al-agent-icon {
+  font-size: 11px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.al-agent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.al-agent-name {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.al-agent-task {
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.al-agent-status {
+  font-family: 'Courier New', monospace;
+  font-size: 7px;
+  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.al-empty {
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 /* ── 9. Queue Panel ─────────────────────────────────────────────────────── */
 
 #queuePanel {
@@ -1698,3 +1874,122 @@ a:hover { color: var(--holo-bright); }
   border-color: rgba(100, 200, 255, 0.15);
   color: rgba(102, 204, 255, 0.56);
 }
+
+/* ── Output Browser ──────────────────────────────────────────────────────── */
+
+.output-browser-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 1000px);
+  height: min(80vh, 700px);
+  padding: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+
+.output-tree {
+  width: 280px;
+  min-width: 200px;
+  overflow-y: auto;
+  border-right: 1px solid var(--glass-border);
+  padding-right: 8px;
+}
+
+.output-preview {
+  flex: 1;
+  overflow: auto;
+  padding-left: 8px;
+}
+
+.output-preview-placeholder {
+  color: var(--text-dim);
+  padding: 24px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.tree-file, .tree-folder {
+  padding: 3px 4px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tree-file:hover {
+  background: var(--glass-highlight);
+}
+
+.tree-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-size {
+  color: var(--text-dim);
+  font-size: 8px;
+  flex-shrink: 0;
+}
+
+.preview-header {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--holo-base);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.syntax-pre {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: rgba(5, 5, 16, 0.6);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+  max-height: calc(100% - 40px);
+}
+
+.revision-select {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-family: inherit;
+}
+
+.btn-sm {
+  background: rgba(100, 200, 255, 0.1);
+  color: var(--holo-base);
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 1px;
+}
+
+.btn-sm:hover {
+  background: rgba(100, 200, 255, 0.2);
+}
+
+.validation-pass { color: var(--state-done); }
+.validation-fail { color: var(--state-error); }

@@ -85,6 +85,108 @@ function hideAgentDetail() {
   document.getElementById('agentDetailCard').classList.add('hidden');
 }
 
+// ── Agent List Panel ────────────────────────────────────────────────────────
+
+function toggleAgentList() {
+  var panel = document.getElementById('agentListPanel');
+  var btn = document.getElementById('agentListToggle');
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+  if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
+}
+
+function renderAgentList() {
+  var body = document.getElementById('agentListBody');
+  if (!body) return;
+  if (typeof _sessions === 'undefined') return;
+
+  var html = '';
+  for (var sid in _sessions) {
+    var sess = _sessions[sid];
+    var d = sess.data;
+    if (!d) continue;
+
+    var project = d.project || sid;
+    var phase = d.phase || 'idle';
+    var isActive = sid === _activeSessionId;
+    var done = d.results_count || 0;
+    var total = d.total_tasks || 0;
+
+    // Phase color
+    var phaseColor;
+    if (phase === 'done') phaseColor = C.done;
+    else if (phase === 'dispatch' || phase === 'execute') phaseColor = C.in_progress;
+    else phaseColor = C.textDim;
+
+    // Session header
+    html += '<div class="al-session">';
+    html += '<div class="al-session-header' + (isActive ? ' active' : '') +
+            '" onclick="switchSession(\'' + sid + '\')">';
+    html += '<span class="al-session-name">' + escapeHtml(project) + '</span>';
+    html += '<span class="al-session-badge" style="color:' + phaseColor +
+            ';border-color:' + phaseColor + '">' +
+            done + '/' + total + ' ' + phase.toUpperCase() + '</span>';
+    html += '</div>';
+
+    // Build categorized agent lists
+    var managers = d.managers || [];
+    var subAgents = d.sub_agents || [];
+    var reviewers = d.reviewers || [];
+    var tasks = d.tasks || [];
+
+    // Managers (sentinels)
+    for (var i = 0; i < managers.length; i++) {
+      html += _renderAgentRow(managers[i], 'sentinel', tasks);
+    }
+    // Sub-agents (drones)
+    for (var i = 0; i < subAgents.length; i++) {
+      html += _renderAgentRow(subAgents[i], 'drone', tasks);
+    }
+    // Reviewers (probes)
+    for (var i = 0; i < reviewers.length; i++) {
+      html += _renderAgentRow(reviewers[i], 'probe', tasks);
+    }
+
+    html += '</div>';
+  }
+
+  if (!html) {
+    html = '<div class="al-empty">No active sessions</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function _renderAgentRow(agent, tier, tasks) {
+  var tierInfo = TIERS[tier] || TIERS.drone;
+  var icon = tierInfo.icon;
+  var task = _findTaskForAgent(agent.name, tasks);
+  var status = task ? task.status : 'idle';
+  var statusColor = getStateColor(status);
+  var statusLabel = status.replace(/_/g, ' ').toUpperCase();
+  var taskTitle = task ? (task.title || task.id || '') : '';
+  var name = agent.title || agent.name.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+
+  var html = '<div class="al-agent">';
+  html += '<span class="al-agent-icon" style="color:' + statusColor + '">' + icon + '</span>';
+  html += '<div class="al-agent-info">';
+  html += '<div class="al-agent-name">' + escapeHtml(name) + '</div>';
+  if (taskTitle) {
+    html += '<div class="al-agent-task">' + escapeHtml(taskTitle) + '</div>';
+  }
+  html += '</div>';
+  html += '<span class="al-agent-status" style="color:' + statusColor + '">' + statusLabel + '</span>';
+  html += '</div>';
+  return html;
+}
+
+function _findTaskForAgent(agentName, tasks) {
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].agent === agentName) return tasks[i];
+  }
+  return null;
+}
+
 // ── Agent Chat (Event Log) ──────────────────────────────────────────────────
 
 function toggleChat() {
@@ -586,6 +688,45 @@ function showCompletion(data) {
 
   var body = document.getElementById('completionBody');
   if (body) body.textContent = data.synthesis_report || '';
+
+  // Show validation results
+  var valSection = document.getElementById('completionValidation');
+  var valBody = document.getElementById('completionValidationBody');
+  var validation = data.validation || {};
+  if (valBody && (validation.passed || validation.failed)) {
+    var valHtml = '<div style="margin-bottom:6px;color:var(--text-dim)">' + (validation.summary || '') + '</div>';
+    var failed = validation.failed || [];
+    var passed = validation.passed || [];
+    if (failed.length) {
+      valHtml += '<div style="margin-bottom:4px;color:var(--state-error);font-weight:600">FAILURES</div>';
+      for (var fi = 0; fi < failed.length; fi++) {
+        valHtml += '<div class="validation-fail">\u2717 ' + escapeHtml(failed[fi].file) + ' — ' + escapeHtml(failed[fi].error || '') + '</div>';
+      }
+    }
+    valHtml += '<div style="margin-top:4px;color:var(--state-done)">' + passed.length + ' file(s) passed</div>';
+    valBody.innerHTML = valHtml;
+    if (valSection) valSection.classList.remove('hidden');
+  }
+
+  // Show coherence report
+  var coherence = data.coherence_report || {};
+  if (coherence.summary && body) {
+    var cohHtml = '<div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--glass-border)">';
+    cohHtml += '<div style="font-size:9px;letter-spacing:1px;color:var(--text-dim);margin-bottom:4px">COHERENCE CHECK</div>';
+    cohHtml += '<div style="color:' + (coherence.coherent ? 'var(--state-done)' : 'var(--state-error)') + '">';
+    cohHtml += (coherence.coherent ? '\u2713 ' : '\u2717 ') + escapeHtml(coherence.summary);
+    cohHtml += '</div>';
+    var issues = coherence.issues || [];
+    if (issues.length) {
+      cohHtml += '<ul style="margin-top:4px;padding-left:16px;font-size:9px">';
+      for (var ci = 0; ci < issues.length; ci++) {
+        cohHtml += '<li style="color:var(--state-error)">' + escapeHtml(issues[ci].file || '') + ': ' + escapeHtml(issues[ci].description || '') + '</li>';
+      }
+      cohHtml += '</ul>';
+    }
+    cohHtml += '</div>';
+    body.innerHTML = body.textContent + cohHtml;
+  }
 
   overlay.classList.remove('hidden');
 }

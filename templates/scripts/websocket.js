@@ -6,6 +6,10 @@ var wsConnected = false;
 var agentNodeMap = {};
 var liveStartedAt = null;
 
+// ── Multi-session tracking ──────────────────────────────────────────────────
+var _sessions = {};           // session_id → { data }
+var _activeSessionId = null;  // which session drives the canvas + chat
+
 function connectWS() {
   ws = new WebSocket(WS_URL);
   ws.onopen = function() {
@@ -55,6 +59,22 @@ function handleMessage(data) {
 // ── Core Status Application ─────────────────────────────────────────────────
 
 function applyStatus(data) {
+  // ── Multi-session: store data and gate canvas updates ──
+  var sid = data.session_id || 'default';
+  _sessions[sid] = _sessions[sid] || {};
+  _sessions[sid].data = data;
+
+  // Auto-select first session
+  if (!_activeSessionId) {
+    _activeSessionId = sid;
+  }
+
+  // Always update the agent list panel (shows all sessions)
+  if (typeof renderAgentList === 'function') renderAgentList();
+
+  // Only update canvas/chat/effects for the active session
+  if (sid !== _activeSessionId) return;
+
   // 1. Build node graph from rosters (first time or on roster change)
   if (data.sub_agents || data.managers || data.reviewers) {
     rebuildNodes(data);
@@ -183,6 +203,11 @@ function applyStatus(data) {
     }
   }
 
+  // Store plan ID for output browser
+  if (data.session_id && typeof _outputPlanId !== 'undefined') {
+    _outputPlanId = data.session_id;
+  }
+
   // 8. Handle synthesis/completion
   if (data.synthesis_report && data.phase === 'done') {
     showCompletion(data);
@@ -193,6 +218,64 @@ function applyStatus(data) {
 
   // 9. Update heartbeat
   updateHeartbeat(data.phase || 'idle');
+}
+
+// ── Session Switching ───────────────────────────────────────────────────────
+
+function switchSession(sessionId) {
+  if (sessionId === _activeSessionId) return;
+  _activeSessionId = sessionId;
+
+  var sess = _sessions[sessionId];
+  if (!sess || !sess.data) return;
+  var d = sess.data;
+
+  // Clear and rebuild canvas for this session
+  nodes.clear();
+  edges.length = 0;
+  agentNodeMap = {};
+  if (typeof ambientPrograms !== 'undefined') ambientPrograms.length = 0;
+
+  // Suppress effects during switch
+  var wasReplay = _isReplay;
+  _isReplay = true;
+
+  // Rebuild from session data
+  if (d.sub_agents || d.managers || d.reviewers) {
+    rebuildNodes(d);
+    if (typeof syncProgramsToRoster === 'function') syncProgramsToRoster(d);
+    if (typeof updateChatRosters === 'function') updateChatRosters(d);
+  }
+
+  // Apply task states
+  var tasks = d.tasks || [];
+  for (var i = 0; i < tasks.length; i++) {
+    var task = tasks[i];
+    var node = getNodeByAgent(task.agent);
+    if (!node) continue;
+    node.state = task.status;
+    node.taskId = task.id;
+    node.taskTitle = task.title;
+    node.model = task.current_model || '';
+    node.tokens = task.task_tokens || 0;
+    node.toolCalls = task.tool_calls || [];
+    node.resultPreview = task.result_preview || '';
+    node.revisionCount = task.revision_count || 0;
+    node.lastScore = task.last_score || 0;
+    node.dependsOn = task.depends_on || [];
+  }
+
+  rebuildEdges(d);
+
+  // Update chat + stats
+  if (d.log) renderEventLog(d.log, d.project || 'NORT', d.results_count || 0, d.total_tasks || 0);
+  updateSessionStats(d.tokens_used || 0, d.results_count || 0, d.total_tasks || 0);
+  updateHeartbeat(d.phase || 'idle');
+
+  _isReplay = wasReplay;
+
+  // Refresh agent list highlighting
+  if (typeof renderAgentList === 'function') renderAgentList();
 }
 
 // ── Roster → Node Graph ─────────────────────────────────────────────────────

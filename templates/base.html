@@ -18,6 +18,7 @@
     <canvas id="canvas"></canvas>
     <div id="agentDetailCard" class="glass-card hidden"></div>
     {% include "components/event_log.html" %}
+    {% include "components/panels/agent_list.html" %}
   </div>
   {% include "components/panels/queue.html" %}
   {% include "components/panels/thinking.html" %}
@@ -32,6 +33,7 @@
   {% include "components/panels/file_attention.html" %}
   {% include "components/panels/roster.html" %}
   {% include "components/panels/agents.html" %}
+  {% include "components/panels/output_browser.html" %}
 
   <script>
     {% include "scripts/colors.js" %}

@@ -1,14 +1,37 @@
 <div id="agentsOverlay" class="glass-card agents-overlay hidden">
   <div class="agents-header">
     <span class="agents-title">AGENT REGISTRY</span>
-    <button class="close-btn" onclick="toggleAgentsPanel()">&times;</button>
+    <div class="agents-header-actions">
+      <button class="agents-action-btn" onclick="exportAgents()" title="Export all agents">EXPORT</button>
+      <button class="agents-action-btn" onclick="showImportAgents()" title="Import agents">IMPORT</button>
+      <label class="agents-toggle-label">
+        <input type="checkbox" id="showRetiredToggle" onchange="toggleShowRetired()">
+        <span>SHOW RETIRED</span>
+      </label>
+      <button class="close-btn" onclick="toggleAgentsPanel()">&times;</button>
+    </div>
   </div>
   <div class="agents-tabs">
-    <button class="agents-tab active" onclick="showAgentTab('sub_agents')">SUB-AGENTS</button>
-    <button class="agents-tab" onclick="showAgentTab('managers')">MANAGERS</button>
-    <button class="agents-tab" onclick="showAgentTab('reviewers')">REVIEWERS</button>
+    <button class="agents-tab active" onclick="showAgentTab('sub_agents', this)">SUB-AGENTS</button>
+    <button class="agents-tab" onclick="showAgentTab('managers', this)">MANAGERS</button>
+    <button class="agents-tab" onclick="showAgentTab('reviewers', this)">REVIEWERS</button>
+    <button class="agents-tab" onclick="showAgentTab('teams', this)">TEAMS</button>
   </div>
   <div id="agentsList"></div>
-  <button class="agents-create-btn" onclick="showCreateAgentForm()">+ CREATE AGENT</button>
+  <div id="agentsActions" style="padding:6px 8px;display:flex;gap:6px">
+    <button class="agents-create-btn" onclick="showCreateAgentForm()">+ CREATE AGENT</button>
+    <button class="agents-create-btn" id="createTeamBtn" style="display:none" onclick="showCreateTeamForm()">+ CREATE TEAM</button>
+  </div>
   <div id="agentFormArea" class="hidden"></div>
+  <div id="importArea" class="hidden" style="padding:8px">
+    <textarea id="importJson" class="agent-input" rows="6" placeholder="Paste exported JSON here..."></textarea>
+    <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
+      <label style="font-size:8px;color:rgba(102,204,255,0.7);display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="importOverwrite"> Overwrite existing
+      </label>
+      <button class="agent-save-btn" onclick="importAgents()">IMPORT</button>
+      <button class="agent-cancel-btn" onclick="document.getElementById('importArea').classList.add('hidden')">CANCEL</button>
+    </div>
+    <div id="importResult" style="font-size:8px;margin-top:4px;color:rgba(102,255,170,0.8)"></div>
+  </div>
 </div>

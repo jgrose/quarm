@@ -31,6 +31,8 @@ import logging
 import uuid
 import time
 import threading
+import zipfile
+import io
 from dotenv import load_dotenv
 from checkpoint import has_checkpoint, clear_checkpoint
 
@@ -40,7 +42,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
@@ -820,19 +822,114 @@ ARTIFACTS_DIR = STATIC_DIR / "artifacts"
 async def list_artifacts(plan_id: str):
     plan_dir = ARTIFACTS_DIR / plan_id
     if not plan_dir.exists():
-        return {"files": []}
+        return {"files": [], "tree": {}}
     files = []
+    tree = {}
     for f in sorted(plan_dir.rglob("*")):
         if f.is_file():
+            rel = f.relative_to(plan_dir)
+            parts = rel.parts
+            task_id = parts[0] if len(parts) > 1 else ""
             files.append({
                 "path": str(f.relative_to(ARTIFACTS_DIR)),
+                "rel_path": str(rel),
                 "size": f.stat().st_size,
                 "name": f.name,
+                "ext": f.suffix.lstrip("."),
+                "task_id": task_id,
             })
-    return {"files": files}
+            # Build nested tree
+            node = tree
+            for part in parts[:-1]:
+                node = node.setdefault(part, {})
+            node[f.name] = {"file": True, "path": str(f.relative_to(ARTIFACTS_DIR)), "size": f.stat().st_size, "ext": f.suffix.lstrip(".")}
+    return {"files": files, "tree": tree}
+
+
+@app.get("/api/artifacts/{plan_id}/file")
+async def get_artifact_file(plan_id: str, path: str = ""):
+    """Return the content of a specific artifact file."""
+    if not path:
+        raise HTTPException(status_code=400, detail="path parameter required")
+    # Security: prevent path traversal
+    safe = Path(path).resolve()
+    plan_dir = (ARTIFACTS_DIR / plan_id).resolve()
+    target = (plan_dir / path).resolve()
+    if not str(target).startswith(str(plan_dir)):
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    # Binary files: return metadata only
+    binary_exts = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf", ".zip", ".tar", ".gz"}
+    if target.suffix.lower() in binary_exts:
+        return {"path": path, "binary": True, "size": target.stat().st_size}
+    try:
+        content = target.read_text(errors="replace")
+        return {"path": path, "binary": False, "content": content, "size": target.stat().st_size}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/artifacts/{plan_id}/download")
+async def download_artifacts(plan_id: str):
+    """Download all artifacts for a plan as a zip file."""
+    plan_dir = ARTIFACTS_DIR / plan_id
+    if not plan_dir.exists():
+        raise HTTPException(status_code=404, detail="No artifacts found")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(plan_dir.rglob("*")):
+            if f.is_file():
+                zf.write(f, arcname=str(f.relative_to(plan_dir)))
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{plan_id}_artifacts.zip"'},
+    )
+
+
+@app.get("/api/artifacts/{plan_id}/revisions/{task_id}")
+async def list_revisions(plan_id: str, task_id: str):
+    """List revision snapshots for a task."""
+    rev_dir = ARTIFACTS_DIR / plan_id / task_id / "revisions"
+    if not rev_dir.exists():
+        return {"revisions": []}
+    revisions = []
+    for d in sorted(rev_dir.iterdir()):
+        if d.is_dir():
+            files = [str(f.relative_to(d)) for f in d.rglob("*") if f.is_file()]
+            revisions.append({
+                "revision": d.name,
+                "files": files,
+                "file_count": len(files),
+            })
+    return {"revisions": revisions}
 
 
 # ── Agent Registry API ──────────────────────────────────────────────────────
+
+# ── Agent Import/Export ────────────────────────────────────────────────────
+# NOTE: These must be registered BEFORE parameterized /api/agents/{agent_type}
+# routes, otherwise FastAPI matches "export"/"import" as agent_type.
+
+@app.get("/api/agents/export")
+async def api_export_agents():
+    from agent_registry import export_agents
+    return export_agents()
+
+@app.post("/api/agents/import")
+async def api_import_agents(request: Request):
+    from agent_registry import import_agents
+    body = await request.json()
+    data = body.get("data", body)
+    overwrite = body.get("overwrite", False)
+    try:
+        summary = import_agents(data, overwrite=overwrite)
+        return {"ok": True, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/api/agents")
 async def api_list_agents(type: str = None):
@@ -881,6 +978,82 @@ async def api_delete_agent(agent_type: str, name: str):
         return {"ok": True}
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+
+# ── Agent Versioning ───────────────────────────────────────────────────────
+
+@app.get("/api/agents/{agent_type}/{name}/versions")
+async def api_get_agent_versions(agent_type: str, name: str):
+    from agent_registry import get_agent_versions
+    versions = get_agent_versions(agent_type, name)
+    return {"versions": versions}
+
+@app.post("/api/agents/{agent_type}/{name}/rollback")
+async def api_rollback_agent(agent_type: str, name: str, request: Request):
+    from agent_registry import rollback_agent
+    body = await request.json()
+    version = body.get("version")
+    if version is None:
+        raise HTTPException(status_code=400, detail="version is required")
+    agent = rollback_agent(agent_type, name, int(version))
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent or version not found")
+    return {"ok": True, "agent": agent}
+
+
+# ── Agent Cloning ──────────────────────────────────────────────────────────
+
+@app.post("/api/agents/{agent_type}/{name}/clone")
+async def api_clone_agent(agent_type: str, name: str, request: Request):
+    from agent_registry import clone_agent
+    body = await request.json() if await request.body() else {}
+    new_name = body.get("new_name")
+    try:
+        agent = clone_agent(agent_type, name, new_name)
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        return {"ok": True, "agent": agent}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+# ── Agent Retirement ───────────────────────────────────────────────────────
+
+@app.post("/api/agents/{agent_type}/{name}/retire")
+async def api_retire_agent(agent_type: str, name: str, request: Request):
+    from agent_registry import retire_agent
+    body = await request.json() if await request.body() else {}
+    retired = body.get("retired", True)
+    agent = retire_agent(agent_type, name, retired)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"ok": True, "agent": agent}
+
+
+# ── Team Presets ───────────────────────────────────────────────────────────
+
+@app.get("/api/teams")
+async def api_list_teams():
+    from agent_registry import get_teams
+    return {"teams": get_teams()}
+
+@app.post("/api/teams")
+async def api_create_team(request: Request):
+    from agent_registry import create_team
+    spec = await request.json()
+    try:
+        team = create_team(spec)
+        return {"ok": True, "team": team}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/teams/{name}")
+async def api_delete_team(name: str):
+    from agent_registry import delete_team
+    ok = delete_team(name)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return {"ok": True}
 
 
 # ── Static file fallback (must be last) ──────────────────────────────────────

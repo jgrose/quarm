@@ -216,7 +216,13 @@ def read_file(path: str) -> str:
 @tool
 def write_file(path: str, content: str) -> str:
     """Write content to a file in the artifacts directory. Creates directories as needed."""
-    target = _artifacts_path() / path
+    artifacts = _artifacts_path()
+    target = artifacts / path
+    # Sandbox check — prevent path traversal outside artifacts dir
+    try:
+        target.resolve().relative_to(artifacts.resolve())
+    except ValueError:
+        return f"Access denied: {path} would escape the artifacts directory."
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)

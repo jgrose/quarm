@@ -2,8 +2,16 @@
   <div class="completion-card glass-card" onclick="event.stopPropagation()">
     <div class="completion-title">RUN COMPLETE</div>
     <div id="completionStats" class="stats-grid"></div>
+    <div id="completionValidation" class="hidden" style="margin-top:12px">
+      <div class="panel-header"><span>VALIDATION</span></div>
+      <div id="completionValidationBody" style="font-size:10px;max-height:120px;overflow-y:auto"></div>
+    </div>
     <div class="panel-header" style="margin-top:16px"><span>SYNTHESIS REPORT</span></div>
     <div id="completionBody" class="synthesis-body"></div>
-    <button onclick="hideCompletion()" style="margin-top:16px;width:100%">RETURN</button>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="downloadArtifacts()" style="flex:1">DOWNLOAD OUTPUT</button>
+      <button onclick="showOutputBrowser()" style="flex:1">BROWSE FILES</button>
+      <button onclick="hideCompletion()" style="flex:1">RETURN</button>
+    </div>
   </div>
 </div>

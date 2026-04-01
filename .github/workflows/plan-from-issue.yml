@@ -6,7 +6,7 @@ on:
 
 jobs:
   generate:
-    if: github.event.label.name == 'quarm'
+    if: github.event.label.name == 'nort'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -42,15 +42,15 @@ jobs:
           PLAN_FILE="plans/issue-${{ github.event.issue.number }}.md"
           git checkout -b "${BRANCH}"
           git add "${PLAN_FILE}"
-          git config user.name "QUARM Bot"
-          git config user.email "quarm@users.noreply.github.com"
+          git config user.name "NORT Bot"
+          git config user.email "nort@users.noreply.github.com"
           git commit -m "Generate plan from issue #${{ github.event.issue.number }}"
           git push origin "${BRANCH}"
           gh pr create \
             --title "Plan: ${{ github.event.issue.title }}" \
             --body "Generated from issue #${{ github.event.issue.number }}.
 
-          Review the plan file, edit if needed, then merge. Run from the QUARM dashboard.
+          Review the plan file, edit if needed, then merge. Run from the NORT dashboard.
 
           Closes #${{ github.event.issue.number }}" \
             --base master \

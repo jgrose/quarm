@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.key === 'c' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       if (typeof toggleChat === 'function') toggleChat();
     }
+    if (e.key === 'l' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      if (typeof toggleAgentList === 'function') toggleAgentList();
+    }
   });
 
   // Enter key on plan input
