@@ -616,7 +616,14 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            raw = await websocket.receive_text()
+            # Handle heartbeat ping from client
+            try:
+                msg = json.loads(raw)
+                if isinstance(msg, dict) and msg.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except (json.JSONDecodeError, TypeError):
+                pass
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
     except Exception:

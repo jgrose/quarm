@@ -131,3 +131,29 @@ function spawnCompleteEffect(x, y, color) {
     duration: 1.0,
   });
 }
+
+// ── City State Serialization ────────────────────────────────────────────────
+
+function serializeCityState() {
+  var result = { nodes: {}, savedAt: new Date().toISOString() };
+  for (var entry of nodes) {
+    var id = entry[0];
+    var n = entry[1];
+    result.nodes[id] = { x: n.x, y: n.y, state: n.state };
+  }
+  return result;
+}
+
+function deserializeCityState(data) {
+  if (!data || !data.nodes) return;
+  for (var entry of nodes) {
+    var id = entry[0];
+    var n = entry[1];
+    var saved = data.nodes[id];
+    if (saved) {
+      if (typeof saved.x === 'number') n.x = saved.x;
+      if (typeof saved.y === 'number') n.y = saved.y;
+      // Do NOT restore state — server state is authoritative
+    }
+  }
+}

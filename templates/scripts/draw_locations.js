@@ -1256,3 +1256,33 @@ function getLocationIdForState(status) {
   }
   return null;
 }
+
+// ── Building State Serialization ────────────────────────────────────────────
+
+function serializeBuildingState() {
+  var result = { buildings: {} };
+  for (var i = 0; i < gridLocations.length; i++) {
+    var loc = gridLocations[i];
+    result.buildings[loc.id] = {
+      taskCompletions: loc.taskCompletions || 0,
+      upgradeLevel: loc.upgradeLevel || 0
+    };
+  }
+  return result;
+}
+
+function deserializeBuildingState(data) {
+  if (!data || !data.buildings) return;
+  for (var i = 0; i < gridLocations.length; i++) {
+    var loc = gridLocations[i];
+    var saved = data.buildings[loc.id];
+    if (saved) {
+      loc.taskCompletions = saved.taskCompletions || 0;
+      // Recompute upgrade level from thresholds to stay consistent
+      if (loc.taskCompletions >= 15) loc.upgradeLevel = 3;
+      else if (loc.taskCompletions >= 7) loc.upgradeLevel = 2;
+      else if (loc.taskCompletions >= 3) loc.upgradeLevel = 1;
+      else loc.upgradeLevel = 0;
+    }
+  }
+}
