@@ -1,153 +1,235 @@
-# Plan: Live Orchestrator Integration Overhaul
+# Plan: Dynamic Agent Registry & Adaptive Role Assignment
 
 ## Context
 
-The Tron city has two completely separate visualization modes that don't interact:
-- **Idle**: 6 hardcoded ambient programs walk the city
-- **Active**: Programs hide entirely, floating hex nodes appear with force layout
+Currently, agents (sub-agents, managers, reviewers) are defined only inside plan markdown files — they're ephemeral, recreated from scratch each time. There's no way to reuse a well-tuned agent definition across plans, and the plan generator doesn't know about agents that have worked well before.
 
-This wastes the city. When a real orchestrator plan runs, the city should come alive — programs should represent actual agents, physically walk between buildings as tasks progress through the review chain, and the hex node system should be replaced by the city itself as the primary visualization.
+We need:
+1. **Persistent agent registry** — store agent definitions as JSON, reusable across plans
+2. **Dynamic agent creation** — plan generator selects/creates agents based on what the project needs
+3. **Adaptive enhancement** — agent definitions improve over time based on performance data
+4. **CRUD API** — create, read, update, delete agents via REST + UI
 
 ---
 
-## Core Design: Unified City Mode
+## Agent Registry Design
 
-**Remove the dual-mode split.** Instead of `nodes.size > 0` hiding everything:
+### Storage: `agents/registry.json`
 
-1. When orchestrator sends roster data, **spawn programs matching the real agent roster** (dynamic count, not hardcoded 6)
-2. Each program represents a real agent (drone/sentinel/probe matching agent tier)
-3. Programs physically walk to buildings matching their current task state
-4. Buildings stay at full alpha, gain activity indicators
-5. Hex nodes become optional overlay (small floating badges), not the primary viz
-6. When no orchestrator is running, fall back to idle ambient programs as before
+```json
+{
+  "sub_agents": {
+    "python_backend_dev": {
+      "name": "python_backend_dev",
+      "title": "Senior Python Backend Developer",
+      "description": "Expert in Python, FastAPI, SQLAlchemy, async patterns. Produces production-quality code with tests.",
+      "tools": ["write_file", "execute_code", "read_file", "web_search"],
+      "model": "",
+      "tags": ["python", "backend", "api", "database"],
+      "created_at": "2026-04-01T...",
+      "updated_at": "2026-04-01T...",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    }
+  },
+  "managers": {
+    "tech_lead": {
+      "name": "tech_lead",
+      "title": "Technical Lead",
+      "description": "Reviews code quality, architecture decisions, and production readiness.",
+      "expertise_blend": ["architecture", "code_quality", "testing", "performance"],
+      "oversees": [],
+      "model": "",
+      "tags": ["technical", "code", "architecture"],
+      "created_at": "...",
+      "runs": 0,
+      "avg_score": 0,
+      "builtin": false
+    }
+  },
+  "reviewers": {
+    "security_engineer": {
+      "name": "security_engineer",
+      "title": "Senior Security Engineer",
+      "description": "...",
+      "focus_areas": ["OWASP Top 10", ...],
+      "applies_to": ["code", "api", "auth", ...],
+      "model": "",
+      "tags": ["security"],
+      "runs": 0,
+      "avg_score": 0,
+      "builtin": true
+    }
+  }
+}
+```
+
+Key additions over current dataclasses:
+- **`tags`** — searchable keywords for plan generator to find relevant agents
+- **`runs`** — how many times this agent has been used
+- **`avg_score`** — average review score (tracks quality over time)
+- **`total_revisions`** — how many revisions triggered (lower = better)
+- **`builtin`** — whether it's a system-provided agent (can't delete, can customize)
+
+### Seed Data
+
+On first run, seed the registry with:
+- The 6 builtin reviewers (security_engineer, ux_designer, user_tester, creative_director, devils_advocate, performance_engineer) marked `builtin: true`
+- A few common sub-agents: `general_developer`, `frontend_developer`, `backend_developer`, `technical_writer`
+- A few common managers: `tech_lead`, `project_manager`
 
 ---
 
 ## Changes by File
 
-### Stream A: `draw_programs.js` — Dynamic roster-driven programs
+### 1. NEW: `agents/registry.json` — persistent agent storage
 
-**Remove hardcoded PROGRAM_COUNT = 6.** Replace with dynamic spawning:
+JSON file with the structure above. Created on first access if missing (seeded with builtins).
 
-```
-When applyStatus receives roster data:
-  1. Count total agents: sub_agents.length + managers.length + reviewers.length
-  2. If ambientPrograms.length !== agentCount, respawn programs matching roster
-  3. Each program gets: name (from roster), tier (drone/sentinel/probe), glow (from palette cycle)
-  4. Sentinel programs = managers, Drone programs = sub_agents, Probe programs = reviewers
-```
+### 2. NEW: `agent_registry.py` — registry CRUD module
 
-**Remove the three `nodes.size > 0` early-return guards:**
-- `updateAmbientPrograms` — remove guard, programs always update
-- `drawAmbientPrograms` — remove guard, programs always draw  
-- `routeProgramsToTasks` — remove guard, always route
+```python
+REGISTRY_FILE = Path("agents/registry.json")
 
-**Enhance `routeProgramsToTasks`:**
-- Match programs to tasks by agent name (not positional index)
-- When task status changes, program walks from current building to new building matching new state
-- Idle programs (no task) wander between idle locations as before
-- Track `program.agentName` field for roster binding
+def load_registry() -> dict
+def save_registry(data: dict)
+def seed_registry()  # creates initial builtins + common agents
 
-**Add task-carrying animation:**
-- When program walks between work buildings (task state change), show task title as small floating text above head
-- When program arrives at building, trigger bunker entry as normal
+# CRUD
+def list_agents(agent_type=None) -> list[dict]
+def get_agent(agent_type, name) -> dict | None
+def create_agent(agent_type, spec: dict) -> dict
+def update_agent(agent_type, name, updates: dict) -> dict
+def delete_agent(agent_type, name) -> bool  # blocks builtin deletion
 
-### Stream B: `draw_locations.js` — Active building indicators
+# Performance tracking
+def record_agent_performance(agent_type, name, score, revisions)
+def get_top_agents(agent_type, tags=None, limit=5) -> list[dict]
 
-**Remove alpha dimming** when nodes exist — buildings always full brightness.
-
-**Add active building indicators:**
-- When a building has programs working inside (occupants with assignedTask), draw a pulsing activity ring around it
-- Show task count badge: small "2/3" text showing how many tasks are active at that building
-- When a task completes at a building, trigger a completion burst effect (reuse existing `spawnCompleteEffect`)
-
-**Add building-to-building task flow arrows:**
-- When a task transitions (e.g., `in_progress` → `in_manager_review`), draw a brief animated arrow from Code Forge to Tribunal
-- Arrow follows the road path between buildings
-- Fades after 3 seconds
-
-### Stream C: `websocket.js` — Roster-to-program binding
-
-**Modify `applyStatus`:**
-
-```javascript
-// After rebuildNodes (keep nodes for data, but don't require rendering)
-if (data.sub_agents || data.managers || data.reviewers) {
-  rebuildNodes(data);  // keep for edge/data tracking
-  syncProgramsToRoster(data);  // NEW: spawn/update city programs from roster
-}
+# Plan generation helper
+def suggest_agents_for_description(description: str) -> dict
+  # Returns recommended sub_agents, managers, reviewers based on tags matching
 ```
 
-**New function `syncProgramsToRoster(data)`:**
-- Counts total agents from roster
-- If program count doesn't match, reinitializes `ambientPrograms` with correct count
-- Assigns each program: `agentName`, `tier`, `displayName` from roster
-- Preserves XP/level if roster hasn't changed (just task reassignment)
+### 3. MODIFY: `generate_plan.py` — use registry for agent selection
 
-**Modify task state change handling:**
-- On `in_progress → in_manager_review`: find program by agent name, retarget to Tribunal
-- On review → revision: retarget to Recompile  
-- On done: retarget to Data Vault, trigger building completion
-- On failed: retarget to Derezzed
+Update the system prompt to include available agents from the registry:
 
-### Stream D: `render.js` + `draw_agents.js` — Optional hex node overlay
+```python
+from agent_registry import list_agents, get_top_agents
 
-**Make hex nodes optional**, controlled by a new `config.hexNodes` flag (default: false):
+# Build available agent catalog for the LLM
+sub_agents = list_agents("sub_agents")
+managers = list_agents("managers")
+reviewers = list_agents("reviewers")
 
-```javascript
-// In render loop, gate agent node rendering:
-if (config.hexNodes) {
-  drawAllEdges(ctx, currentTime);
-  drawAllAgents(ctx, currentTime);
-}
+# Add to system prompt:
+AGENT_CATALOG = f"""
+## Available Agents (prefer reusing these over creating new ones)
+
+### Sub-Agents:
+{format_agent_list(sub_agents)}
+
+### Managers:
+{format_agent_list(managers)}
+
+### Reviewers:
+{format_agent_list(reviewers)}
+
+You may create new agent definitions if none of the above fit.
+When creating new agents, use descriptive names and comprehensive descriptions.
+"""
 ```
 
-The city IS the visualization now. Hex nodes become a debug/overlay mode you can toggle.
+The LLM sees the catalog and picks from existing agents or creates new ones. This is appended to the existing SYSTEM_PROMPT.
 
-Keep edges drawing optionally between buildings (as road highlights) rather than between floating nodes.
+### 4. MODIFY: `orchestrator.py` — save new agents + track performance
 
-### Stream E: `draw_roster.js` — Sync roster panel with real agents
+**After `parse_plan()`:** Any agent defined in the plan markdown that isn't in the registry gets auto-saved:
 
-Update roster panel to show real agent names/titles during active runs instead of TRON names:
-- When `syncProgramsToRoster` fires, update `rosterData` entries with real agent names
-- Show task assignment in roster: "TASK-001: Build auth API"
-- Show task state as status: "IN REVIEW" / "WORKING" / "REVISING"
-- When orchestrator finishes, revert to Tron names
+```python
+from agent_registry import get_agent, create_agent, record_agent_performance
+
+# In parse_plan(), after parsing:
+for agent in sub_agents:
+    if not get_agent("sub_agents", agent.name):
+        create_agent("sub_agents", agent.__dict__)
+
+for mgr in managers:
+    if not get_agent("managers", mgr.name):
+        create_agent("managers", mgr.__dict__)
+```
+
+**After task completion:** Record performance metrics:
+
+```python
+# In manager_review_node, after verdict:
+record_agent_performance("sub_agents", task["agent"], score, task["revision_count"])
+
+# In specialist_review_node, after each reviewer verdict:
+record_agent_performance("reviewers", reviewer["name"], score, 0)
+```
+
+### 5. MODIFY: `serve.py` — REST API for agent CRUD
+
+New endpoints:
+
+```
+GET    /api/agents                    — list all agents (optional ?type=sub_agents)
+GET    /api/agents/{type}/{name}      — get single agent
+POST   /api/agents/{type}             — create new agent
+PUT    /api/agents/{type}/{name}      — update agent
+DELETE /api/agents/{type}/{name}      — delete agent (blocks builtins)
+GET    /api/agents/suggest?desc=...   — suggest agents for a project description
+```
+
+### 6. MODIFY: `templates/` — Agent management UI panel
+
+New panel accessible from the top bar (new "AGENTS" button):
+
+- List all agents grouped by type (sub-agents, managers, reviewers)
+- Each shows: name, title, tags, runs count, avg score
+- Click to edit (name, description, tools, tags, etc.)
+- "Create Agent" button with form
+- Performance sparkline or badge (avg score, run count)
+- Can't delete builtins but can customize their description
 
 ---
 
 ## Execution Plan (3 parallel subagents)
 
-| Agent | Stream | Files | Why Together |
-|-------|--------|-------|-------------|
-| **Agent 1** | A+C | draw_programs.js, websocket.js | Tightly coupled — roster sync drives program spawning |
-| **Agent 2** | B+D | draw_locations.js, render.js, draw_agents.js | Building indicators + render pipeline changes |
-| **Agent 3** | E | draw_roster.js | Independent panel update |
+| Agent | Files | Scope |
+|-------|-------|-------|
+| **Agent 1** | NEW `agent_registry.py`, NEW `agents/registry.json` | Registry module + seed data |
+| **Agent 2** | `generate_plan.py`, `orchestrator.py` | Plan gen integration + performance tracking |
+| **Agent 3** | `serve.py`, NEW `templates/components/panels/agents.html`, `templates/scripts/panels.js` | REST API + UI panel |
 
-After agents complete, I wire config flags into `nodes.js` and keyboard shortcuts into `init.js`.
+After agents complete, I wire the UI button into `base.html` and add keyboard shortcut "A" in `init.js`.
 
 ---
 
-## Config Additions
+## Performance Enhancement Loop
 
-```javascript
-// nodes.js config
-config.hexNodes = false;    // show floating hex nodes (debug overlay)
-config.taskArrows = true;   // show task flow arrows between buildings
-config.activeIndicators = true; // show activity rings on buildings
-```
+Over time, the system self-improves:
+
+1. **Plan generates** → LLM sees agent catalog with scores → picks best agents
+2. **Tasks run** → scores and revision counts recorded
+3. **Registry updates** → avg_score and runs increment
+4. **Next plan** → LLM sees updated scores → prefers higher-scoring agents
+5. **Low-scoring agents** → LLM avoids them or the user can edit/delete them
+
+Agents with `runs > 5` and `avg_score > 7` naturally become the preferred picks because the catalog shows their track record.
 
 ---
 
 ## Verification
 
-1. **No plan running**: 6 ambient programs walk the city as before (idle mode unchanged)
-2. **Start a plan**: Programs respawn matching agent roster (e.g., 3 sub-agents + 1 manager + 2 reviewers = 6 programs with correct tiers)
-3. **Task dispatched**: Program walks from idle location to Code Forge, enters building
-4. **Task in review**: Program exits Code Forge, walks to Tribunal (manager review) or Analysis Bay (specialist review)
-5. **Task revised**: Program walks to Recompile station
-6. **Task done**: Program walks to Data Vault, building completion counter increments
-7. **Task failed**: Program walks to Derezzed zone
-8. **Roster panel (R key)**: Shows real agent names and task assignments during active run
-9. **Hex nodes (toggle)**: Can optionally enable floating hex nodes as overlay
-10. **Plan completes**: Programs revert to idle wandering with Tron names
+1. **Fresh start**: `agents/registry.json` auto-created with 6 builtin reviewers + common agents
+2. **Generate a plan**: system prompt shows agent catalog, LLM picks from existing agents
+3. **Run plan**: new agents auto-saved to registry, scores tracked
+4. **API**: `GET /api/agents` returns full catalog, CRUD works
+5. **UI**: Press "A" or click AGENTS button, see all agents with stats, edit one
+6. **Second plan**: LLM sees previously created agents with scores, reuses good ones
+7. **Delete**: can delete custom agents, blocked for builtins

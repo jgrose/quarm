@@ -16,6 +16,12 @@ import openai
 from dotenv import load_dotenv
 from model_config import load_allowed_models
 
+try:
+    from agent_registry import format_agent_catalog
+except ImportError:
+    def format_agent_catalog():
+        return ""
+
 load_dotenv()
 
 DEFAULT_MODEL = "bedrock-claude-opus-4-6"
@@ -174,7 +180,22 @@ def generate_plan_streaming(description: str, output_path: str = "plan.md"):
             ctx_window = size
             break
 
-    est_input = (len(SYSTEM_PROMPT) + len(description)) // 4
+    # Build agent catalog hint for the LLM
+    catalog = format_agent_catalog()
+    if catalog:
+        agent_hint = (
+            "\n\n## Agent Catalog\n"
+            "The following agents are available in the registry. "
+            "PREFER reusing these agents (especially high-scoring ones) over creating new ones. "
+            "You may create new agent definitions if none of the existing ones fit the project needs.\n"
+            + catalog
+        )
+    else:
+        agent_hint = ""
+
+    user_msg = f"{description}{agent_hint}"
+
+    est_input = (len(SYSTEM_PROMPT) + len(user_msg)) // 4
     yield {"event": "model", "model": model, "context_window": ctx_window,
            "estimated_input_tokens": est_input}
 
@@ -185,7 +206,7 @@ def generate_plan_streaming(description: str, output_path: str = "plan.md"):
             stream=True,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": description},
+                {"role": "user", "content": user_msg},
             ],
         )
     except Exception as e:
@@ -224,6 +245,21 @@ def generate_plan(description: str, output_path: str = "plan.md") -> str:
     print(f"Generating 4-layer plan for:\n  {description}")
     print(f"Using model: {model}\n")
 
+    # Build agent catalog hint for the LLM
+    catalog = format_agent_catalog()
+    if catalog:
+        agent_hint = (
+            "\n\n## Agent Catalog\n"
+            "The following agents are available in the registry. "
+            "PREFER reusing these agents (especially high-scoring ones) over creating new ones. "
+            "You may create new agent definitions if none of the existing ones fit the project needs.\n"
+            + catalog
+        )
+    else:
+        agent_hint = ""
+
+    user_msg = f"{description}{agent_hint}"
+
     # Spinner to show progress during generation
     stop_spinner = threading.Event()
     def _spinner():
@@ -247,7 +283,7 @@ def generate_plan(description: str, output_path: str = "plan.md") -> str:
             max_tokens=4096,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": description},
+                {"role": "user", "content": user_msg},
             ],
         )
     finally:

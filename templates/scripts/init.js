@@ -23,6 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (ledger) ledger.classList.add('hidden');
       var modelCfg = document.getElementById('modelConfigOverlay');
       if (modelCfg) modelCfg.classList.add('hidden');
+      var agentsOvl = document.getElementById('agentsOverlay');
+      if (agentsOvl) agentsOvl.classList.add('hidden');
     }
     if (e.key === 'q' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       toggleQueue();
@@ -32,6 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (e.key === 'm' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       config.minimap = !config.minimap;
+    }
+    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      if (typeof toggleAgentsPanel === 'function') toggleAgentsPanel();
+    }
+    if (e.key === 'c' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      if (typeof toggleChat === 'function') toggleChat();
     }
   });
 

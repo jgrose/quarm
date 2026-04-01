@@ -59,6 +59,7 @@ function applyStatus(data) {
   if (data.sub_agents || data.managers || data.reviewers) {
     rebuildNodes(data);
     if (typeof syncProgramsToRoster === 'function') syncProgramsToRoster(data);
+    if (typeof updateChatRosters === 'function') updateChatRosters(data);
   }
 
   // Track session start

@@ -188,7 +188,7 @@ def write_status(state: dict):
         "last_verdict":     state.get("last_verdict"),
         "synthesis_report": state.get("synthesis_report", ""),
         "log":              list(_log_lines),
-        "transcript":       list(_transcript[-50:]),  # last 50 entries
+        "transcript":       list(_transcript)[-50:],  # last 50 entries
         "files_touched": [
             {"path": p, "reads": d["reads"], "writes": d["writes"], "agents": list(d["agents"])}
             for p, d in _files_touched.items()

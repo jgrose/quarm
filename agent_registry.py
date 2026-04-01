@@ -1,0 +1,424 @@
+"""NORT Agent Registry — persistent agent definitions with performance tracking."""
+from pathlib import Path
+from datetime import datetime, timezone
+import json, logging
+
+log = logging.getLogger("nort.registry")
+REGISTRY_FILE = Path(__file__).parent / "agents" / "registry.json"
+
+
+# ── Core I/O ─────────────────────────────────────────────────────────────────
+
+
+def load_registry() -> dict:
+    """Load registry from disk. Returns {"sub_agents": {}, "managers": {}, "reviewers": {}}."""
+    if not REGISTRY_FILE.exists():
+        seed_registry()
+    try:
+        return json.loads(REGISTRY_FILE.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        log.error("Failed to load registry: %s — reseeding", exc)
+        seed_registry()
+        return json.loads(REGISTRY_FILE.read_text())
+
+
+def save_registry(data: dict):
+    """Write registry to disk."""
+    try:
+        REGISTRY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        REGISTRY_FILE.write_text(json.dumps(data, indent=2))
+    except OSError as exc:
+        log.error("Failed to save registry: %s", exc)
+        raise
+
+
+# ── Seed ─────────────────────────────────────────────────────────────────────
+
+
+def seed_registry():
+    """Create initial registry with builtin reviewers and common agents."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    def _base(name: str, *, builtin: bool = False, **kw) -> dict:
+        return {
+            "name": name,
+            "tags": kw.pop("tags", []),
+            "created_at": now,
+            "updated_at": now,
+            "runs": 0,
+            "avg_score": 0,
+            "total_revisions": 0,
+            "builtin": builtin,
+            **kw,
+        }
+
+    reviewers = {
+        "security_engineer": _base(
+            "security_engineer",
+            builtin=True,
+            title="Senior Security Engineer",
+            description=(
+                "Review for OWASP Top 10, broken auth, secrets exposure, "
+                "input validation, least privilege. Think like an attacker."
+            ),
+            focus_areas=[
+                "OWASP Top 10",
+                "auth & secrets",
+                "input validation",
+                "least privilege",
+                "dependency risk",
+            ],
+            applies_to=[
+                "code", "api", "auth", "data", "config",
+                "infrastructure", "backend", "security",
+            ],
+            tags=["security", "owasp", "auth", "infrastructure"],
+        ),
+        "ux_designer": _base(
+            "ux_designer",
+            builtin=True,
+            title="Senior UX/UI Designer",
+            description=(
+                "Review for WCAG 2.1 AA, visual hierarchy, information "
+                "architecture, cognitive load, interaction quality."
+            ),
+            focus_areas=[
+                "WCAG accessibility",
+                "visual hierarchy",
+                "info architecture",
+                "interaction patterns",
+                "cognitive load",
+            ],
+            applies_to=[
+                "ui", "frontend", "ux", "design", "report",
+                "dashboard", "form", "user_flow",
+            ],
+            tags=["ux", "ui", "accessibility", "design", "frontend"],
+        ),
+        "user_tester": _base(
+            "user_tester",
+            builtin=True,
+            title="End-User Representative",
+            description=(
+                "Review as a non-technical first-time user: clarity, plain "
+                "language, workflow intuitiveness, value delivered."
+            ),
+            focus_areas=[
+                "first-use clarity",
+                "plain language",
+                "workflow intuitiveness",
+                "value delivered",
+            ],
+            applies_to=[
+                "ui", "report", "documentation", "user_flow",
+                "dashboard", "api", "frontend",
+            ],
+            tags=["usability", "clarity", "user_flow", "documentation"],
+        ),
+        "creative_director": _base(
+            "creative_director",
+            builtin=True,
+            title="Creative Director",
+            description=(
+                "Challenge conventional thinking. Is this the obvious boring "
+                "solution or something genuinely clever? Push for innovation, "
+                "elegance, and delight. Ask: what would make someone say "
+                "'that's brilliant'? FLAG safe, generic, or copy-paste "
+                "solutions that lack originality or miss creative opportunities."
+            ),
+            focus_areas=[
+                "innovation",
+                "elegance",
+                "originality",
+                "lateral thinking",
+                "user delight",
+                "bold alternatives",
+            ],
+            applies_to=[
+                "code", "api", "ui", "frontend", "ux", "report",
+                "dashboard", "user_flow", "backend", "documentation",
+            ],
+            tags=["creativity", "innovation", "design", "elegance"],
+        ),
+        "devils_advocate": _base(
+            "devils_advocate",
+            builtin=True,
+            title="Devil's Advocate",
+            description=(
+                "Assume everything is wrong. Find the hidden assumptions, "
+                "logical flaws, unstated dependencies, and failure modes "
+                "nobody mentioned. Ask: what happens when this breaks at 3am? "
+                "What did they forget? What looks right but is subtly wrong? "
+                "Be ruthless but specific — vague skepticism is useless."
+            ),
+            focus_areas=[
+                "hidden assumptions",
+                "logical flaws",
+                "edge cases",
+                "failure modes",
+                "unstated dependencies",
+                "silent failures",
+            ],
+            applies_to=[
+                "code", "api", "auth", "data", "config",
+                "infrastructure", "backend", "security",
+                "ui", "frontend", "user_flow",
+            ],
+            tags=["critical_thinking", "edge_cases", "failure_modes", "review"],
+        ),
+        "performance_engineer": _base(
+            "performance_engineer",
+            builtin=True,
+            title="Performance Engineer",
+            description=(
+                "Review for scalability, efficiency, and production readiness. "
+                "Find N+1 queries, unbounded loops, memory leaks, missing "
+                "indexes, chatty APIs, blocking calls in async paths, missing "
+                "caching, and anything that will fall over at 10x traffic. "
+                "Think in terms of p99 latency and cost per request."
+            ),
+            focus_areas=[
+                "scalability",
+                "N+1 queries",
+                "memory management",
+                "caching",
+                "concurrency",
+                "latency",
+                "cost efficiency",
+            ],
+            applies_to=[
+                "code", "api", "data", "backend",
+                "infrastructure", "config",
+            ],
+            tags=["performance", "scalability", "latency", "optimization"],
+        ),
+    }
+
+    sub_agents = {
+        "general_developer": _base(
+            "general_developer",
+            title="General Developer",
+            description="Versatile full-stack developer. Handles any coding task.",
+            tools=["write_file", "read_file", "execute_code", "web_search"],
+            tags=["code", "general", "fullstack"],
+        ),
+        "frontend_developer": _base(
+            "frontend_developer",
+            title="Frontend Developer",
+            description=(
+                "Expert in HTML, CSS, JavaScript, React, responsive design."
+            ),
+            tools=["write_file", "read_file", "web_search"],
+            tags=["frontend", "ui", "html", "css", "javascript", "react"],
+        ),
+        "backend_developer": _base(
+            "backend_developer",
+            title="Backend Developer",
+            description=(
+                "Expert in Python, Node.js, APIs, databases, server infrastructure."
+            ),
+            tools=["write_file", "read_file", "execute_code", "web_search"],
+            tags=["backend", "python", "api", "database", "node"],
+        ),
+        "technical_writer": _base(
+            "technical_writer",
+            title="Technical Writer",
+            description=(
+                "Creates clear documentation, READMEs, guides, and API docs."
+            ),
+            tools=["write_file", "read_file", "web_search"],
+            tags=["documentation", "writing", "readme", "api_docs"],
+        ),
+    }
+
+    managers = {
+        "tech_lead": _base(
+            "tech_lead",
+            title="Technical Lead",
+            description=(
+                "Reviews code quality, architecture decisions, testing "
+                "strategy, and production readiness."
+            ),
+            expertise_blend=[
+                "architecture", "code_quality", "testing",
+                "performance", "security",
+            ],
+            tags=["technical", "code", "architecture"],
+        ),
+        "project_manager": _base(
+            "project_manager",
+            title="Project Manager",
+            description=(
+                "Ensures deliverables meet requirements, are well-structured, "
+                "and ready for stakeholders."
+            ),
+            expertise_blend=[
+                "requirements", "delivery", "quality", "communication",
+            ],
+            tags=["management", "delivery", "requirements"],
+        ),
+    }
+
+    data = {
+        "sub_agents": sub_agents,
+        "managers": managers,
+        "reviewers": reviewers,
+    }
+    save_registry(data)
+    log.info("Seeded agent registry with %d agents",
+             len(sub_agents) + len(managers) + len(reviewers))
+
+
+# ── Query helpers ────────────────────────────────────────────────────────────
+
+
+def list_agents(agent_type: str = None) -> list[dict]:
+    """List agents. If agent_type given, filter to that type."""
+    reg = load_registry()
+    if agent_type and agent_type in reg:
+        return list(reg[agent_type].values())
+    result = []
+    for atype in reg:
+        for agent in reg[atype].values():
+            result.append({**agent, "_type": atype})
+    return result
+
+
+def get_agent(agent_type: str, name: str) -> dict | None:
+    """Get a single agent by type and name."""
+    reg = load_registry()
+    return reg.get(agent_type, {}).get(name)
+
+
+# ── CRUD ─────────────────────────────────────────────────────────────────────
+
+
+def create_agent(agent_type: str, spec: dict) -> dict:
+    """Create a new agent. Adds metadata fields."""
+    reg = load_registry()
+    if agent_type not in reg:
+        reg[agent_type] = {}
+    name = spec.get("name", "").lower().replace(" ", "_")
+    if not name:
+        raise ValueError("Agent must have a name")
+    now = datetime.now(timezone.utc).isoformat()
+    agent = {
+        **spec,
+        "name": name,
+        "tags": spec.get("tags", []),
+        "created_at": spec.get("created_at", now),
+        "updated_at": now,
+        "runs": spec.get("runs", 0),
+        "avg_score": spec.get("avg_score", 0),
+        "total_revisions": spec.get("total_revisions", 0),
+        "builtin": spec.get("builtin", False),
+    }
+    reg[agent_type][name] = agent
+    save_registry(reg)
+    log.info("Created %s/%s", agent_type, name)
+    return agent
+
+
+def update_agent(agent_type: str, name: str, updates: dict) -> dict | None:
+    """Update an existing agent. Cannot change name or builtin status."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return None
+    updates.pop("name", None)
+    updates.pop("builtin", None)
+    agent.update(updates)
+    agent["updated_at"] = datetime.now(timezone.utc).isoformat()
+    reg[agent_type][name] = agent
+    save_registry(reg)
+    return agent
+
+
+def delete_agent(agent_type: str, name: str) -> bool:
+    """Delete a non-builtin agent. Raises ValueError for builtins."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return False
+    if agent.get("builtin"):
+        raise ValueError(f"Cannot delete builtin agent: {name}")
+    del reg[agent_type][name]
+    save_registry(reg)
+    log.info("Deleted %s/%s", agent_type, name)
+    return True
+
+
+# ── Performance tracking ─────────────────────────────────────────────────────
+
+
+def record_agent_performance(agent_type: str, name: str, score: int, revisions: int = 0):
+    """Update running average score and revision count after a task run."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return
+    runs = agent.get("runs", 0) + 1
+    old_avg = agent.get("avg_score", 0)
+    new_avg = ((old_avg * (runs - 1)) + score) / runs if runs > 0 else score
+    agent["runs"] = runs
+    agent["avg_score"] = round(new_avg, 2)
+    agent["total_revisions"] = agent.get("total_revisions", 0) + revisions
+    agent["updated_at"] = datetime.now(timezone.utc).isoformat()
+    reg[agent_type][name] = agent
+    save_registry(reg)
+
+
+# ── Ranking & suggestions ────────────────────────────────────────────────────
+
+
+def get_top_agents(agent_type: str, tags: list[str] = None, limit: int = 5) -> list[dict]:
+    """Get top-performing agents, optionally filtered by tags."""
+    agents = list_agents(agent_type)
+    if tags:
+        tag_set = set(t.lower() for t in tags)
+        agents = [a for a in agents if tag_set & set(t.lower() for t in a.get("tags", []))]
+    agents.sort(key=lambda a: (a.get("avg_score", 0), a.get("runs", 0)), reverse=True)
+    return agents[:limit]
+
+
+def suggest_agents_for_description(description: str) -> dict:
+    """Simple keyword matching to suggest agents for a project description."""
+    desc_lower = description.lower()
+    result = {"sub_agents": [], "managers": [], "reviewers": []}
+    for agent_type in result:
+        for agent in list_agents(agent_type):
+            tags = [t.lower() for t in agent.get("tags", [])]
+            if any(tag in desc_lower for tag in tags):
+                result[agent_type].append(agent)
+            elif any(word in desc_lower for word in agent.get("title", "").lower().split()):
+                result[agent_type].append(agent)
+    return result
+
+
+# ── Formatting ───────────────────────────────────────────────────────────────
+
+
+def format_agent_catalog() -> str:
+    """Format the full agent catalog as text for LLM consumption."""
+    reg = load_registry()
+    lines = []
+
+    for atype, label in [("sub_agents", "Sub-Agents"), ("managers", "Managers"), ("reviewers", "Reviewers")]:
+        agents = list(reg.get(atype, {}).values())
+        if not agents:
+            continue
+        lines.append(f"\n### Available {label}:")
+        for a in sorted(agents, key=lambda x: (-x.get("avg_score", 0), -x.get("runs", 0))):
+            score_info = ""
+            if a.get("runs", 0) > 0:
+                score_info = f" [score: {a['avg_score']:.1f}, runs: {a['runs']}]"
+            lines.append(
+                f"- **{a['name']}**: {a.get('title', a['name'])} "
+                f"-- {a.get('description', '')[:120]}{score_info}"
+            )
+            if a.get("tags"):
+                lines.append(f"  tags: {', '.join(a['tags'])}")
+            if atype == "sub_agents" and a.get("tools"):
+                lines.append(f"  tools: {', '.join(a['tools'])}")
+
+    return "\n".join(lines)

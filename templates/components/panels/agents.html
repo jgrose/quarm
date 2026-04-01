@@ -1,0 +1,14 @@
+<div id="agentsOverlay" class="glass-card agents-overlay hidden">
+  <div class="agents-header">
+    <span class="agents-title">AGENT REGISTRY</span>
+    <button class="close-btn" onclick="toggleAgentsPanel()">&times;</button>
+  </div>
+  <div class="agents-tabs">
+    <button class="agents-tab active" onclick="showAgentTab('sub_agents')">SUB-AGENTS</button>
+    <button class="agents-tab" onclick="showAgentTab('managers')">MANAGERS</button>
+    <button class="agents-tab" onclick="showAgentTab('reviewers')">REVIEWERS</button>
+  </div>
+  <div id="agentsList"></div>
+  <button class="agents-create-btn" onclick="showCreateAgentForm()">+ CREATE AGENT</button>
+  <div id="agentFormArea" class="hidden"></div>
+</div>

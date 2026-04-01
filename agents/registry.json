@@ -1,0 +1,355 @@
+{
+  "sub_agents": {
+    "general_developer": {
+      "name": "general_developer",
+      "tags": [
+        "code",
+        "general",
+        "fullstack"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "General Developer",
+      "description": "Versatile full-stack developer. Handles any coding task.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "execute_code",
+        "web_search"
+      ]
+    },
+    "frontend_developer": {
+      "name": "frontend_developer",
+      "tags": [
+        "frontend",
+        "ui",
+        "html",
+        "css",
+        "javascript",
+        "react"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "Frontend Developer",
+      "description": "Expert in HTML, CSS, JavaScript, React, responsive design.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "web_search"
+      ]
+    },
+    "backend_developer": {
+      "name": "backend_developer",
+      "tags": [
+        "backend",
+        "python",
+        "api",
+        "database",
+        "node"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "Backend Developer",
+      "description": "Expert in Python, Node.js, APIs, databases, server infrastructure.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "execute_code",
+        "web_search"
+      ]
+    },
+    "technical_writer": {
+      "name": "technical_writer",
+      "tags": [
+        "documentation",
+        "writing",
+        "readme",
+        "api_docs"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "Technical Writer",
+      "description": "Creates clear documentation, READMEs, guides, and API docs.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "web_search"
+      ]
+    }
+  },
+  "managers": {
+    "tech_lead": {
+      "name": "tech_lead",
+      "tags": [
+        "technical",
+        "code",
+        "architecture"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "Technical Lead",
+      "description": "Reviews code quality, architecture decisions, testing strategy, and production readiness.",
+      "expertise_blend": [
+        "architecture",
+        "code_quality",
+        "testing",
+        "performance",
+        "security"
+      ]
+    },
+    "project_manager": {
+      "name": "project_manager",
+      "tags": [
+        "management",
+        "delivery",
+        "requirements"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false,
+      "title": "Project Manager",
+      "description": "Ensures deliverables meet requirements, are well-structured, and ready for stakeholders.",
+      "expertise_blend": [
+        "requirements",
+        "delivery",
+        "quality",
+        "communication"
+      ]
+    }
+  },
+  "reviewers": {
+    "security_engineer": {
+      "name": "security_engineer",
+      "tags": [
+        "security",
+        "owasp",
+        "auth",
+        "infrastructure"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "Senior Security Engineer",
+      "description": "Review for OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Think like an attacker.",
+      "focus_areas": [
+        "OWASP Top 10",
+        "auth & secrets",
+        "input validation",
+        "least privilege",
+        "dependency risk"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security"
+      ]
+    },
+    "ux_designer": {
+      "name": "ux_designer",
+      "tags": [
+        "ux",
+        "ui",
+        "accessibility",
+        "design",
+        "frontend"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "Senior UX/UI Designer",
+      "description": "Review for WCAG 2.1 AA, visual hierarchy, information architecture, cognitive load, interaction quality.",
+      "focus_areas": [
+        "WCAG accessibility",
+        "visual hierarchy",
+        "info architecture",
+        "interaction patterns",
+        "cognitive load"
+      ],
+      "applies_to": [
+        "ui",
+        "frontend",
+        "ux",
+        "design",
+        "report",
+        "dashboard",
+        "form",
+        "user_flow"
+      ]
+    },
+    "user_tester": {
+      "name": "user_tester",
+      "tags": [
+        "usability",
+        "clarity",
+        "user_flow",
+        "documentation"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "End-User Representative",
+      "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
+      "focus_areas": [
+        "first-use clarity",
+        "plain language",
+        "workflow intuitiveness",
+        "value delivered"
+      ],
+      "applies_to": [
+        "ui",
+        "report",
+        "documentation",
+        "user_flow",
+        "dashboard",
+        "api",
+        "frontend"
+      ]
+    },
+    "creative_director": {
+      "name": "creative_director",
+      "tags": [
+        "creativity",
+        "innovation",
+        "design",
+        "elegance"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "Creative Director",
+      "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
+      "focus_areas": [
+        "innovation",
+        "elegance",
+        "originality",
+        "lateral thinking",
+        "user delight",
+        "bold alternatives"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "ui",
+        "frontend",
+        "ux",
+        "report",
+        "dashboard",
+        "user_flow",
+        "backend",
+        "documentation"
+      ]
+    },
+    "devils_advocate": {
+      "name": "devils_advocate",
+      "tags": [
+        "critical_thinking",
+        "edge_cases",
+        "failure_modes",
+        "review"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "Devil's Advocate",
+      "description": "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? What looks right but is subtly wrong? Be ruthless but specific \u2014 vague skepticism is useless.",
+      "focus_areas": [
+        "hidden assumptions",
+        "logical flaws",
+        "edge cases",
+        "failure modes",
+        "unstated dependencies",
+        "silent failures"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security",
+        "ui",
+        "frontend",
+        "user_flow"
+      ]
+    },
+    "performance_engineer": {
+      "name": "performance_engineer",
+      "tags": [
+        "performance",
+        "scalability",
+        "latency",
+        "optimization"
+      ],
+      "created_at": "2026-04-01T20:35:37.001047+00:00",
+      "updated_at": "2026-04-01T20:35:37.001047+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": true,
+      "title": "Performance Engineer",
+      "description": "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
+      "focus_areas": [
+        "scalability",
+        "N+1 queries",
+        "memory management",
+        "caching",
+        "concurrency",
+        "latency",
+        "cost efficiency"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "data",
+        "backend",
+        "infrastructure",
+        "config"
+      ]
+    }
+  }
+}
