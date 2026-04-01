@@ -229,12 +229,15 @@ def download_artifact(url: str) -> str:
 
 @tool
 def read_file(path: str) -> str:
-    """Read a file from the project workspace. Can read from artifacts/ or plans/ directories."""
+    """Read a file by path relative to the project root. If a directory path is given, lists its contents instead."""
     target = PROJECT_DIR / path
     if not _path_is_within(target, PROJECT_DIR):
         return f"Access denied: {path} is outside the project directory."
     if not target.exists():
         return f"File not found: {path}"
+    if target.is_dir():
+        entries = sorted(p.name + ("/" if p.is_dir() else "") for p in target.iterdir())
+        return f"{path} is a directory. Contents:\n" + "\n".join(entries)
     try:
         content = target.read_text()[:20000]
         record_file_touch(path, "read", _ctx().get("agent", ""))
