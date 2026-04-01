@@ -47,7 +47,65 @@ function worldToMinimap(wx, wy, mx, my, mw, mh) {
 }
 
 // ═══════════════════════════════════════════════════
-//  CLICK HANDLING
+//  HIT TESTING & DRAG STATE
+// ═══════════════════════════════════════════════════
+
+var _minimapDragging = false;
+
+function isOverMinimap(sx, sy, canvasH) {
+  if (!config.minimap || !_minimapBounds) return false;
+  var H = canvasH / dpr;
+  var panelX = MINIMAP_PAD;
+  var panelY = H - MINIMAP_H - MINIMAP_PAD;
+  if (sx < panelX || sx > panelX + MINIMAP_W) return false;
+  if (sy < panelY || sy > panelY + MINIMAP_H) return false;
+  return true;
+}
+
+function _centerCameraFromScreenCoords(sx, sy, canvas) {
+  var H = canvas.height / dpr;
+  var panelX = MINIMAP_PAD;
+  var panelY = H - MINIMAP_H - MINIMAP_PAD;
+  var drawX = panelX + MINIMAP_INSET;
+  var drawY = panelY + MINIMAP_INSET;
+  var drawW = MINIMAP_W - MINIMAP_INSET * 2;
+  var drawH = MINIMAP_H - MINIMAP_INSET * 2;
+
+  var bounds = _minimapBounds;
+  var nx = Math.max(0, Math.min(1, (sx - drawX) / drawW));
+  var ny = Math.max(0, Math.min(1, (sy - drawY) / drawH));
+
+  var worldX = bounds.minX + nx * (bounds.maxX - bounds.minX);
+  var worldY = bounds.minY + ny * (bounds.maxY - bounds.minY);
+
+  var W = canvas.width / dpr;
+  camera.x = W / 2 - worldX;
+  camera.y = H / 2 - worldY;
+}
+
+// ═══════════════════════════════════════════════════
+//  MINIMAP MOUSE HANDLERS (called from camera.js)
+// ═══════════════════════════════════════════════════
+
+function minimapMouseDown(e, canvas) {
+  if (!config.minimap || !_minimapBounds) return;
+  var rect = canvas.getBoundingClientRect();
+  _minimapDragging = true;
+  _centerCameraFromScreenCoords(e.clientX - rect.left, e.clientY - rect.top, canvas);
+}
+
+function minimapMouseMove(e, canvas) {
+  if (!_minimapDragging) return;
+  var rect = canvas.getBoundingClientRect();
+  _centerCameraFromScreenCoords(e.clientX - rect.left, e.clientY - rect.top, canvas);
+}
+
+function minimapMouseUp() {
+  _minimapDragging = false;
+}
+
+// ═══════════════════════════════════════════════════
+//  CLICK HANDLING (legacy — consumed by mousedown now)
 // ═══════════════════════════════════════════════════
 
 function handleMinimapClick(e) {
@@ -61,35 +119,10 @@ function handleMinimapClick(e) {
   var sx = e.clientX - rect.left;
   var sy = e.clientY - rect.top;
 
-  // Minimap screen position (bottom-left)
-  var H = canvas.height / dpr;
-  var panelX = MINIMAP_PAD;
-  var panelY = H - MINIMAP_H - MINIMAP_PAD;
-  var drawX = panelX + MINIMAP_INSET;
-  var drawY = panelY + MINIMAP_INSET;
-  var drawW = MINIMAP_W - MINIMAP_INSET * 2;
-  var drawH = MINIMAP_H - MINIMAP_INSET * 2;
+  if (!isOverMinimap(sx, sy, canvas.height)) return false;
 
-  // Check if click is inside the minimap
-  if (sx < panelX || sx > panelX + MINIMAP_W) return false;
-  if (sy < panelY || sy > panelY + MINIMAP_H) return false;
-
-  // Convert click to world coordinates
-  var bounds = _minimapBounds;
-  var nx = (sx - drawX) / drawW;
-  var ny = (sy - drawY) / drawH;
-  nx = Math.max(0, Math.min(1, nx));
-  ny = Math.max(0, Math.min(1, ny));
-
-  var worldX = bounds.minX + nx * (bounds.maxX - bounds.minX);
-  var worldY = bounds.minY + ny * (bounds.maxY - bounds.minY);
-
-  // Center camera on this world position
-  var W = canvas.width / dpr;
-  camera.x = W / 2 - worldX;
-  camera.y = H / 2 - worldY;
-
-  return true;  // consumed the click
+  _centerCameraFromScreenCoords(sx, sy, canvas);
+  return true;
 }
 
 // ═══════════════════════════════════════════════════

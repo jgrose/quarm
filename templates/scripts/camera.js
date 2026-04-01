@@ -12,6 +12,13 @@ function initCamera(canvas) {
 
   canvas.addEventListener('mousedown', function(e) {
     if (e.button === 0 && !getNodeAt(e)) {
+      var rect = canvas.getBoundingClientRect();
+      var sx = e.clientX - rect.left;
+      var sy = e.clientY - rect.top;
+      if (typeof isOverMinimap === 'function' && isOverMinimap(sx, sy, canvas.height)) {
+        minimapMouseDown(e, canvas);
+        return;
+      }
       camera.dragging = true;
       camera.lastMx = e.clientX;
       camera.lastMy = e.clientY;
@@ -20,6 +27,10 @@ function initCamera(canvas) {
   });
 
   canvas.addEventListener('mousemove', function(e) {
+    if (typeof _minimapDragging !== 'undefined' && _minimapDragging) {
+      minimapMouseMove(e, canvas);
+      return;
+    }
     if (camera.dragging) {
       camera.x += (e.clientX - camera.lastMx) / camera.zoom;
       camera.y += (e.clientY - camera.lastMy) / camera.zoom;
@@ -30,6 +41,7 @@ function initCamera(canvas) {
 
   var endDrag = function() {
     camera.dragging = false;
+    if (typeof minimapMouseUp === 'function') minimapMouseUp();
     canvas.style.cursor = 'grab';
   };
   canvas.addEventListener('mouseup', endDrag);
