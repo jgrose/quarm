@@ -1419,8 +1419,7 @@ function renderToleranceConfig(data) {
   if (data.active_preset) {
     highlightActivePreset(data.active_preset);
   } else {
-    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
-    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
+    highlightActivePreset('');
   }
 
   var body = document.getElementById('toleranceConfigBody');

@@ -166,6 +166,7 @@ class TaskSpec:
     reviewers:  list[str] = field(default_factory=list)
     depends_on: list[str] = field(default_factory=list)
     model: str = ""
+    tolerance: int = 0
     status: str = "pending"
     result: str = ""
     manager_notes:  str = ""
@@ -278,6 +279,7 @@ def parse_plan(path: str):
             reviewers=rxl(r"- reviewers:\s*\[(.+?)\]", b.group(2)),
             depends_on=rxl(r"- depends_on:\s*\[(.+?)\]", b.group(2)),
             model=rx(r"- model:\s*(.+)", b.group(2)),
+            tolerance=int(rx(r"- tolerance:\s*(\d+)", b.group(2), "0")),
         )
         for b in re.finditer(r"### (TASK-\w+)\s+(.*?)(?=\n###|\n##|\Z)", text, re.DOTALL)
     ]
@@ -758,6 +760,9 @@ def manager_review_node(state):
     if verdict == "FAIL" and score >= tolerance:
         log_event(f"[{manager['name'].upper()}] Score {score} >= tolerance {tolerance} — overriding FAIL → PASS")
         verdict = "PASS"
+        if _run_id:
+            from tracking import track_tolerance_override
+            track_tolerance_override(_run_id, tid, manager["name"], "FAIL", score, tolerance)
 
     msg     = f"[{manager['name'].upper()}] {tid}: {verdict} ({score}/10)"
     print(f"  {msg}"); log_event(msg)
@@ -882,7 +887,8 @@ def specialist_review_node(state):
         model = resolve_model(task.get("model", ""), reviewer.get("model", ""), role="review")
         log_event(f"  [MODEL] {reviewer['name']} → {model}")
 
-        tolerance = _resolve_tolerance(reviewer["name"], reviewer)
+        task_tolerance = task.get("tolerance", 0)
+        tolerance = _resolve_tolerance(reviewer["name"], reviewer, task_tolerance)
         system = _build_reviewer_prompt(reviewer, tolerance)
         resp = llm(model).invoke([
             SystemMessage(content=system),
@@ -903,6 +909,9 @@ def specialist_review_node(state):
         if verdict == "FLAG" and score >= tolerance:
             log_event(f"[{reviewer['name'].upper()}] Score {score} >= tolerance {tolerance} — overriding FLAG → PASS")
             verdict = "PASS"
+            if _run_id:
+                from tracking import track_tolerance_override
+                track_tolerance_override(_run_id, tid, reviewer["name"], "FLAG", score, tolerance)
 
         msg     = f"[{reviewer['name'].upper()}] {tid}: {verdict} ({score}/10)"
         print(f"  {msg}"); log_event(msg)
@@ -1388,6 +1397,24 @@ def run(plan_path="plan.md", plan_id: str = ""):
     total_tokens = final.get("tokens_used", 0)
     total_revisions = sum(t.get("revision_count", 0) for t in final["tasks"])
     track_run_end(_run_id, total_tokens, total_revisions, len(final["tasks"]))
+
+    # ── Adaptive tolerance analysis ──
+    try:
+        from tracking import get_override_stats
+        override_stats = get_override_stats(_run_id)
+        for stat in override_stats:
+            reviewer = stat["reviewer"]
+            count = stat["count"]
+            avg_score = stat.get("avg_score", 0)
+            if count >= 2:
+                suggested = min(10, int(avg_score) + 1) if avg_score else 8
+                suggestion = (f"[ADAPTIVE] {reviewer} was overridden {count} time(s) — "
+                             f"consider raising tolerance to {suggested}")
+                print(f"  {suggestion}")
+                log_event(suggestion)
+    except Exception as e:
+        log_event(f"[ADAPTIVE] Analysis failed: {e}")
+
     elapsed = int(_time.time() - _start_time)
     summary_preview = next(
         (m.content[:300] for m in final["messages"] if isinstance(m, AIMessage)), ""
