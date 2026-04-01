@@ -1,0 +1,279 @@
+<!-- Performance Overlay Panel — toggled via 'P' key or config -->
+<div id="perfPanel" class="glass-card perf-panel hidden">
+  <div class="perf-header">
+    <span class="perf-title">PERFORMANCE</span>
+    <button class="close-btn" onclick="togglePerfOverlay()">&times;</button>
+  </div>
+  <div class="perf-body">
+    <div class="perf-fps-row">
+      <span class="perf-fps-label">FPS</span>
+      <span id="perfFpsValue" class="perf-fps-value">--</span>
+    </div>
+    <div class="perf-budget-row">
+      <span class="perf-budget-label">FRAME</span>
+      <div class="perf-budget-bar-wrap">
+        <div id="perfBudgetBar" class="perf-budget-bar"></div>
+        <div class="perf-budget-line"></div>
+      </div>
+      <span id="perfBudgetValue" class="perf-budget-value">--</span>
+    </div>
+    <div class="perf-divider"></div>
+    <div id="perfSystemBars"></div>
+  </div>
+</div>
+
+<style>
+.perf-panel {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  width: 280px;
+  z-index: 90;
+  padding: 10px 12px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.perf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+  padding-bottom: 6px;
+}
+
+.perf-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #aaeeff;
+  font-weight: 600;
+}
+
+.perf-header .close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.perf-header .close-btn:hover {
+  color: var(--text-primary);
+}
+
+.perf-fps-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.perf-fps-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.perf-fps-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #66ffaa;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.perf-budget-label {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  min-width: 32px;
+}
+
+.perf-budget-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: rgba(100, 200, 255, 0.06);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.perf-budget-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: #66ffaa;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.perf-budget-line {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 187, 68, 0.6);
+}
+
+.perf-budget-value {
+  font-size: 8px;
+  color: var(--text-dim);
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-divider {
+  height: 1px;
+  background: rgba(100, 200, 255, 0.08);
+  margin: 4px 0 8px;
+}
+
+.perf-sys-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.perf-sys-label {
+  font-size: 8px;
+  color: var(--text-dim);
+  min-width: 52px;
+  letter-spacing: 0.5px;
+}
+
+.perf-sys-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: rgba(100, 200, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.perf-sys-bar {
+  height: 100%;
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.perf-sys-value {
+  font-size: 7px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+</style>
+
+<script>
+(function() {
+  var _perfSystems = ['hexGrid', 'locations', 'programs', 'force', 'edges', 'agents', 'weather', 'minimap', 'bloom'];
+  var _perfUpdateTimer = null;
+
+  // Register 'P' keyboard shortcut for perf overlay toggle, Escape to dismiss
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'p' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      togglePerfOverlay();
+    }
+    if (e.key === 'Escape' && config.perfOverlay) {
+      togglePerfOverlay();
+    }
+  });
+
+  window.togglePerfOverlay = function() {
+    config.perfOverlay = !config.perfOverlay;
+    var panel = document.getElementById('perfPanel');
+    if (!panel) return;
+    if (config.perfOverlay) {
+      panel.classList.remove('hidden');
+      _startPerfUpdate();
+    } else {
+      panel.classList.add('hidden');
+      _stopPerfUpdate();
+    }
+  };
+
+  function _startPerfUpdate() {
+    if (_perfUpdateTimer) return;
+    _buildSystemRows();
+    _perfUpdateTimer = setInterval(_updatePerfPanel, typeof PERF !== 'undefined' ? PERF.sampleInterval : 500);
+  }
+
+  function _stopPerfUpdate() {
+    if (_perfUpdateTimer) {
+      clearInterval(_perfUpdateTimer);
+      _perfUpdateTimer = null;
+    }
+  }
+
+  function _buildSystemRows() {
+    var container = document.getElementById('perfSystemBars');
+    if (!container || container.children.length > 0) return;
+    for (var i = 0; i < _perfSystems.length; i++) {
+      var name = _perfSystems[i];
+      var row = document.createElement('div');
+      row.className = 'perf-sys-row';
+      row.innerHTML =
+        '<span class="perf-sys-label">' + name + '</span>' +
+        '<div class="perf-sys-bar-wrap"><div class="perf-sys-bar" id="perfBar_' + name + '"></div></div>' +
+        '<span class="perf-sys-value" id="perfVal_' + name + '">--</span>';
+      container.appendChild(row);
+    }
+  }
+
+  function _updatePerfPanel() {
+    if (!config.perfOverlay) return;
+    var budgetMs = (typeof PERF !== 'undefined') ? PERF.budgetMs : 16.6;
+
+    // FPS
+    var fpsEl = document.getElementById('perfFpsValue');
+    if (fpsEl && typeof _fps !== 'undefined') {
+      fpsEl.textContent = _fps.toFixed(0);
+      if (_fps >= 55) fpsEl.style.color = '#66ffaa';
+      else if (_fps >= 30) fpsEl.style.color = '#ffbb44';
+      else fpsEl.style.color = '#ff5566';
+    }
+
+    // Budget bar
+    var budgetBar = document.getElementById('perfBudgetBar');
+    var budgetVal = document.getElementById('perfBudgetValue');
+    if (budgetBar && typeof _perfFrameTotal !== 'undefined') {
+      var pct = Math.min(100, (_perfFrameTotal / budgetMs) * 100);
+      budgetBar.style.width = pct + '%';
+      if (_perfFrameTotal <= budgetMs * 0.6) budgetBar.style.background = '#66ffaa';
+      else if (_perfFrameTotal <= budgetMs) budgetBar.style.background = '#ffbb44';
+      else budgetBar.style.background = '#ff5566';
+    }
+    if (budgetVal && typeof _perfFrameTotal !== 'undefined') {
+      budgetVal.textContent = _perfFrameTotal.toFixed(1) + 'ms';
+    }
+
+    // System bars
+    for (var i = 0; i < _perfSystems.length; i++) {
+      var name = _perfSystems[i];
+      var ms = (typeof _perfTimings !== 'undefined' && _perfTimings[name]) ? _perfTimings[name] : 0;
+      var bar = document.getElementById('perfBar_' + name);
+      var val = document.getElementById('perfVal_' + name);
+      if (bar) {
+        var pctSys = Math.min(100, (ms / budgetMs) * 100);
+        bar.style.width = pctSys + '%';
+        if (ms <= 1) bar.style.background = 'rgba(102, 255, 170, 0.6)';
+        else if (ms <= 4) bar.style.background = 'rgba(255, 187, 68, 0.6)';
+        else bar.style.background = 'rgba(255, 85, 102, 0.6)';
+      }
+      if (val) {
+        val.textContent = ms.toFixed(2) + 'ms';
+      }
+    }
+  }
+})();
+</script>
