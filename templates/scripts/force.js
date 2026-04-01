@@ -1,7 +1,28 @@
 // ═══ NORT FORCE SIMULATION ═══
 // Zone-constrained force layout, no D3
 
+var _forceSettled = false;
+var _settledFrames = 0;
+var _forceLastNodeCount = 0;
+var _forceLastEdgeCount = 0;
+var _forceLastStateHash = '';
+
+function resetForceSettled() {
+  _forceSettled = false;
+  _settledFrames = 0;
+}
+
 function tickForce(nodeArr, edgeArr, W, H, dt) {
+  // Auto-detect graph changes and reset settled state
+  var stateHash = '';
+  for (var ci = 0; ci < nodeArr.length; ci++) stateHash += nodeArr[ci].state;
+  if (nodeArr.length !== _forceLastNodeCount || edgeArr.length !== _forceLastEdgeCount || stateHash !== _forceLastStateHash) {
+    _forceLastNodeCount = nodeArr.length;
+    _forceLastEdgeCount = edgeArr.length;
+    _forceLastStateHash = stateHash;
+    resetForceSettled();
+  }
+  if (_forceSettled) return;
   var zoneCount = 4;
   var zoneH = H / (zoneCount + 1);
 
@@ -82,5 +103,19 @@ function tickForce(nodeArr, edgeArr, W, H, dt) {
     if (nd.x > W - pad) { nd.x = W - pad; nd.vx *= -0.5; }
     if (nd.y < pad) { nd.y = pad; nd.vy *= -0.5; }
     if (nd.y > H - pad) { nd.y = H - pad; nd.vy *= -0.5; }
+  }
+
+  // Check if simulation has settled (max velocity below threshold)
+  var maxVel = 0;
+  for (var si = 0; si < nodeArr.length; si++) {
+    var sn = nodeArr[si];
+    var vel = Math.abs(sn.vx) + Math.abs(sn.vy);
+    if (vel > maxVel) maxVel = vel;
+  }
+  if (maxVel < 0.5) {
+    _settledFrames++;
+    if (_settledFrames >= 60) _forceSettled = true;
+  } else {
+    _settledFrames = 0;
   }
 }

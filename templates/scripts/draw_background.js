@@ -95,12 +95,41 @@ function drawHexPath(ctx, cx, cy, r) {
   ctx.closePath();
 }
 
+// ─── Offscreen grid cache ───
+
+var _gridCache = null;
+var _gridCacheCanvas = null;
+var _cachedZoom = null;
+var _cachedPanX = null;
+var _cachedPanY = null;
+var _cachedW = 0;
+var _cachedH = 0;
+var _cachedTimeBucket = -1;
+
 // ─── Isometric grid renderer ───
 
 function drawHexGrid(ctx, W, H, time) {
   var view = (typeof getVisibleRect === 'function')
     ? getVisibleRect(W, H)
     : { x: 0, y: 0, w: W, h: H };
+
+  // Quantize time to ~4fps for the subtle pulse animation (refresh every 250ms)
+  var timeBucket = Math.floor(time * 4);
+
+  // Check if we can reuse the cached offscreen canvas
+  var panX = Math.round(camera.x * 10);
+  var panY = Math.round(camera.y * 10);
+  var zoom = Math.round(camera.zoom * 100);
+
+  if (_gridCacheCanvas && zoom === _cachedZoom && panX === _cachedPanX && panY === _cachedPanY &&
+      W === _cachedW && H === _cachedH && timeBucket === _cachedTimeBucket) {
+    // Blit cached grid — coordinates are already in world space from the ctx transform
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.drawImage(_gridCacheCanvas, view.x, view.y);
+    ctx.restore();
+    return;
+  }
 
   // Convert viewport corners to iso grid coords to find visible range
   var tl = screenToIso(view.x - TILE_W, view.y - TILE_H);
@@ -115,9 +144,21 @@ function drawHexGrid(ctx, W, H, time) {
 
   var timeSin = time * 0.5;
 
-  ctx.save();
-  ctx.strokeStyle = C.hexGrid;
-  ctx.lineWidth = 0.6;
+  // Render to offscreen canvas
+  var cw = Math.ceil(view.w) + 2;
+  var ch = Math.ceil(view.h) + 2;
+  if (!_gridCacheCanvas) {
+    _gridCacheCanvas = document.createElement('canvas');
+    _gridCache = _gridCacheCanvas.getContext('2d');
+  }
+  if (_gridCacheCanvas.width !== cw || _gridCacheCanvas.height !== ch) {
+    _gridCacheCanvas.width = cw;
+    _gridCacheCanvas.height = ch;
+  }
+
+  _gridCache.clearRect(0, 0, cw, ch);
+  _gridCache.strokeStyle = C.hexGrid;
+  _gridCache.lineWidth = 0.6;
 
   for (var col = minCol; col <= maxCol; col++) {
     for (var row = minRow; row <= maxRow; row++) {
@@ -126,12 +167,25 @@ function drawHexGrid(ctx, W, H, time) {
       var pulse = Math.sin(timeSin + dist * 0.003) * 0.3 + 0.7;
       var alpha = 0.3 * pulse;
 
-      ctx.globalAlpha = alpha;
-      drawIsoDiamond(ctx, pos.x, pos.y, TILE_W, TILE_H);
-      ctx.stroke();
+      _gridCache.globalAlpha = alpha;
+      drawIsoDiamond(_gridCache, pos.x - view.x, pos.y - view.y, TILE_W, TILE_H);
+      _gridCache.stroke();
     }
   }
 
+  _gridCache.globalAlpha = 1;
+
+  // Update cache state
+  _cachedZoom = zoom;
+  _cachedPanX = panX;
+  _cachedPanY = panY;
+  _cachedW = W;
+  _cachedH = H;
+  _cachedTimeBucket = timeBucket;
+
+  // Blit to main canvas
+  ctx.save();
   ctx.globalAlpha = 1;
+  ctx.drawImage(_gridCacheCanvas, view.x, view.y);
   ctx.restore();
 }

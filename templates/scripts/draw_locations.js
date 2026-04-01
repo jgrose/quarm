@@ -971,10 +971,15 @@ function drawAllLocations(ctx, W, H, time, dt) {
   // 2. Trees (behind buildings, depth-sorted by y)
   drawTrees(ctx, time);
 
-  // 3. Buildings (depth-sorted by y — back to front)
+  // 3. Buildings (depth-sorted by y — back to front, viewport culled)
+  var locView = (typeof getVisibleRect === 'function') ? getVisibleRect(W, H) : { x: 0, y: 0, w: W, h: H };
+  var locMargin = 100;
   var sorted = gridLocations.slice().sort(function(a, b) { return a.y - b.y; });
   for (var i = 0; i < sorted.length; i++) {
-    _drawSingleLocation(ctx, sorted[i], time);
+    var loc = sorted[i];
+    if (loc.x < locView.x - locMargin || loc.x > locView.x + locView.w + locMargin ||
+        loc.y < locView.y - locMargin || loc.y > locView.y + locView.h + locMargin) continue;
+    _drawSingleLocation(ctx, loc, time);
   }
 
   // 4. Task flow arrows between buildings

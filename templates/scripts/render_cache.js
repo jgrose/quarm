@@ -2,6 +2,8 @@
 // Pre-render glow sprites and cache text measurements
 
 var _glowCache = {};
+var _glowCacheKeys = [];
+var GLOW_CACHE_MAX = 500;
 var _textCache = {};
 var _textCacheCount = 0;
 var TEXT_CACHE_MAX = 2000;
@@ -27,6 +29,11 @@ function getGlowSprite(color, radius, innerAlpha, outerAlpha) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
   _glowCache[key] = c;
+  _glowCacheKeys.push(key);
+  if (_glowCacheKeys.length > GLOW_CACHE_MAX) {
+    var evict = _glowCacheKeys.splice(0, 100);
+    for (var ei = 0; ei < evict.length; ei++) delete _glowCache[evict[ei]];
+  }
   return c;
 }
 
@@ -51,6 +58,11 @@ function getAgentGlowSprite(color, innerR, outerR, glowAlpha) {
   ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
   ctx.fill();
   _glowCache[key] = c;
+  _glowCacheKeys.push(key);
+  if (_glowCacheKeys.length > GLOW_CACHE_MAX) {
+    var evict = _glowCacheKeys.splice(0, 100);
+    for (var ei = 0; ei < evict.length; ei++) delete _glowCache[evict[ei]];
+  }
   return c;
 }
 
