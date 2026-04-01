@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/quarm_logo.png" alt="QUARM" width="500">
+  <img src="assets/images/quarm_logo.png" alt="NORT" width="500">
 </p>
 
 # 4-Layer Multi-Agent Orchestrator

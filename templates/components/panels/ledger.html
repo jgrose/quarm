@@ -1,0 +1,13 @@
+<div id="ledgerOverlay" class="hidden">
+  <div class="ledger-card glass-card" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="config-title" style="margin:0">LEDGER</div>
+      <button class="close-btn" onclick="toggleLedger()">&times;</button>
+    </div>
+    <div class="ledger-tabs">
+      <button class="ledger-tab active" onclick="switchLedgerTab('costs', this)">COSTS</button>
+      <button class="ledger-tab" onclick="switchLedgerTab('scores', this)">SCORES</button>
+    </div>
+    <div id="ledgerBody"></div>
+  </div>
+</div>

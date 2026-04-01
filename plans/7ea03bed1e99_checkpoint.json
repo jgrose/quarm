@@ -1,0 +1,261 @@
+{
+  "plan_id": "7ea03bed1e99",
+  "saved_at": "2026-04-01T20:19:31.957161+00:00",
+  "objective": "Build a minimal \"Hello World\" web page served by Nginx, including the HTML content, Nginx configuration, and a Dockerized deployment setup for easy local running.",
+  "managers": [
+    {
+      "name": "delivery_lead",
+      "title": "Delivery Lead",
+      "description": "Ensures all files are correct, consistent, and the project can be spun up with a single command.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": ""
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "web_developer",
+      "description": "Creates HTML/CSS content and Nginx configuration files. Outputs complete, ready-to-use config and markup files.",
+      "tools": [
+        "write_file"
+      ],
+      "model": ""
+    },
+    {
+      "name": "infra_engineer",
+      "description": "Creates Docker and deployment artifacts for running the Nginx server locally. Outputs Dockerfiles and helper scripts.",
+      "tools": [
+        "write_file"
+      ],
+      "model": ""
+    }
+  ],
+  "reviewers": [
+    {
+      "name": "security_engineer",
+      "title": "Senior Security Engineer",
+      "description": "Review for OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Think like an attacker.",
+      "focus_areas": [
+        "OWASP Top 10",
+        "auth & secrets",
+        "input validation",
+        "least privilege",
+        "dependency risk"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security"
+      ],
+      "model": ""
+    },
+    {
+      "name": "ux_designer",
+      "title": "Senior UX/UI Designer",
+      "description": "Review for WCAG 2.1 AA, visual hierarchy, information architecture, cognitive load, interaction quality.",
+      "focus_areas": [
+        "WCAG accessibility",
+        "visual hierarchy",
+        "info architecture",
+        "interaction patterns",
+        "cognitive load"
+      ],
+      "applies_to": [
+        "ui",
+        "frontend",
+        "ux",
+        "design",
+        "report",
+        "dashboard",
+        "form",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "user_tester",
+      "title": "End-User Representative",
+      "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
+      "focus_areas": [
+        "first-use clarity",
+        "plain language",
+        "workflow intuitiveness",
+        "value delivered"
+      ],
+      "applies_to": [
+        "ui",
+        "report",
+        "documentation",
+        "user_flow",
+        "dashboard",
+        "api",
+        "frontend"
+      ],
+      "model": ""
+    },
+    {
+      "name": "creative_director",
+      "title": "Creative Director",
+      "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
+      "focus_areas": [
+        "innovation",
+        "elegance",
+        "originality",
+        "lateral thinking",
+        "user delight",
+        "bold alternatives"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "ui",
+        "frontend",
+        "ux",
+        "report",
+        "dashboard",
+        "user_flow",
+        "backend",
+        "documentation"
+      ],
+      "model": ""
+    },
+    {
+      "name": "devils_advocate",
+      "title": "Devil's Advocate",
+      "description": "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? What looks right but is subtly wrong? Be ruthless but specific \u2014 vague skepticism is useless.",
+      "focus_areas": [
+        "hidden assumptions",
+        "logical flaws",
+        "edge cases",
+        "failure modes",
+        "unstated dependencies",
+        "silent failures"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security",
+        "ui",
+        "frontend",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "performance_engineer",
+      "title": "Performance Engineer",
+      "description": "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
+      "focus_areas": [
+        "scalability",
+        "N+1 queries",
+        "memory management",
+        "caching",
+        "concurrency",
+        "latency",
+        "cost efficiency"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "data",
+        "backend",
+        "infrastructure",
+        "config"
+      ],
+      "model": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create Hello World HTML page",
+      "agent": "web_developer",
+      "description": "Write a clean, minimal `index.html` file that displays \"Hello, World!\" with basic styling. The page should have a proper HTML5 doctype, a centered heading, and a short subtitle line like \"Served by Nginx\". Save to `src/index.html`.",
+      "task_type": [],
+      "reviewers": [
+        "ux_designer"
+      ],
+      "depends_on": [],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    },
+    {
+      "id": "TASK-002",
+      "title": "Write Nginx configuration",
+      "agent": "web_developer",
+      "description": "Write an `nginx.conf` file that serves the static `index.html` on port 80. Use a simple single-server block listening on port 80, with root pointing to `/usr/share/nginx/html`. Include a proper `location /` block. Save to `nginx/nginx.conf`.",
+      "task_type": [],
+      "reviewers": [
+        "security_engineer",
+        "devils_advocate"
+      ],
+      "depends_on": [],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    },
+    {
+      "id": "TASK-003",
+      "title": "Create Dockerfile and docker-compose",
+      "agent": "infra_engineer",
+      "description": "Create a `Dockerfile` based on `nginx:alpine` that copies `src/index.html` to `/usr/share/nginx/html/` and copies `nginx/nginx.conf` to `/etc/nginx/nginx.conf`. Also create a `docker-compose.yml` that builds the image and maps host port 8080 to container port 80. Save both files to the project root.",
+      "task_type": [],
+      "reviewers": [
+        "security_engineer",
+        "devils_advocate"
+      ],
+      "depends_on": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    },
+    {
+      "id": "TASK-004",
+      "title": "Write README with run instructions",
+      "agent": "infra_engineer",
+      "description": "Write a `README.md` that explains the project, lists the file structure, and provides step-by-step instructions to run with `docker-compose up --build` and verify by visiting `http://localhost:8080`. Keep it concise.",
+      "task_type": [],
+      "reviewers": [
+        "user_tester"
+      ],
+      "depends_on": [
+        "TASK-003"
+      ],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    }
+  ],
+  "results": {},
+  "tokens_used": 0,
+  "phase": "dispatch",
+  "active_task_id": null,
+  "finished": false,
+  "synthesis_report": ""
+}

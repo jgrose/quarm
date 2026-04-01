@@ -1,0 +1,230 @@
+{
+  "plan_id": "a035568b0c57",
+  "saved_at": "2026-04-01T20:19:32.161897+00:00",
+  "objective": "Build a clean, visually appealing static HTML page that displays \"Hello World\" with modern styling, ready to be served from any static hosting environment.",
+  "managers": [
+    {
+      "name": "frontend_lead",
+      "title": "Frontend Delivery Lead",
+      "description": "Owns the quality of all frontend output \u2014 ensures clean markup, modern CSS, accessibility, and visual polish.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": ""
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "frontend_developer",
+      "description": "Builds static HTML/CSS/JS files. Outputs complete, ready-to-serve web files.",
+      "tools": [
+        "write_file"
+      ],
+      "model": ""
+    },
+    {
+      "name": "quality_reviewer",
+      "description": "Reviews the final output for correctness, accessibility, and cross-browser compatibility. Outputs a brief validation report.",
+      "tools": [
+        "read_file",
+        "write_file"
+      ],
+      "model": ""
+    }
+  ],
+  "reviewers": [
+    {
+      "name": "security_engineer",
+      "title": "Senior Security Engineer",
+      "description": "Review for OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Think like an attacker.",
+      "focus_areas": [
+        "OWASP Top 10",
+        "auth & secrets",
+        "input validation",
+        "least privilege",
+        "dependency risk"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security"
+      ],
+      "model": ""
+    },
+    {
+      "name": "ux_designer",
+      "title": "Senior UX/UI Designer",
+      "description": "Review for WCAG 2.1 AA, visual hierarchy, information architecture, cognitive load, interaction quality.",
+      "focus_areas": [
+        "WCAG accessibility",
+        "visual hierarchy",
+        "info architecture",
+        "interaction patterns",
+        "cognitive load"
+      ],
+      "applies_to": [
+        "ui",
+        "frontend",
+        "ux",
+        "design",
+        "report",
+        "dashboard",
+        "form",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "user_tester",
+      "title": "End-User Representative",
+      "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
+      "focus_areas": [
+        "first-use clarity",
+        "plain language",
+        "workflow intuitiveness",
+        "value delivered"
+      ],
+      "applies_to": [
+        "ui",
+        "report",
+        "documentation",
+        "user_flow",
+        "dashboard",
+        "api",
+        "frontend"
+      ],
+      "model": ""
+    },
+    {
+      "name": "creative_director",
+      "title": "Creative Director",
+      "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
+      "focus_areas": [
+        "innovation",
+        "elegance",
+        "originality",
+        "lateral thinking",
+        "user delight",
+        "bold alternatives"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "ui",
+        "frontend",
+        "ux",
+        "report",
+        "dashboard",
+        "user_flow",
+        "backend",
+        "documentation"
+      ],
+      "model": ""
+    },
+    {
+      "name": "devils_advocate",
+      "title": "Devil's Advocate",
+      "description": "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? What looks right but is subtly wrong? Be ruthless but specific \u2014 vague skepticism is useless.",
+      "focus_areas": [
+        "hidden assumptions",
+        "logical flaws",
+        "edge cases",
+        "failure modes",
+        "unstated dependencies",
+        "silent failures"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security",
+        "ui",
+        "frontend",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "performance_engineer",
+      "title": "Performance Engineer",
+      "description": "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
+      "focus_areas": [
+        "scalability",
+        "N+1 queries",
+        "memory management",
+        "caching",
+        "concurrency",
+        "latency",
+        "cost efficiency"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "data",
+        "backend",
+        "infrastructure",
+        "config"
+      ],
+      "model": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Build Hello World static page",
+      "agent": "frontend_developer",
+      "description": "Create a single `index.html` file containing a complete static page that displays \"Hello World\" prominently in the center of the viewport. Requirements: (1) Use semantic HTML5. (2) All CSS must be embedded in a `<style>` tag \u2014 no external dependencies. (3) Center the text both vertically and horizontally using modern CSS (flexbox). (4) Use a clean, modern font stack (system fonts). (5) Add a subtle gradient background and slight text shadow for visual polish. (6) Ensure the page has proper `<meta charset>`, `<meta viewport>`, and a `<title>` tag. (7) The page must look good on both desktop and mobile screens.",
+      "task_type": [
+        "frontend",
+        "ui"
+      ],
+      "reviewers": [
+        "ux_designer",
+        "user_tester"
+      ],
+      "depends_on": [],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    },
+    {
+      "id": "TASK-002",
+      "title": "Validate and finalize the page",
+      "agent": "quality_reviewer",
+      "description": "Read the generated `index.html` file and verify: (1) Valid HTML5 structure with no missing closing tags. (2) Proper meta tags for charset and viewport are present. (3) The CSS correctly centers content vertically and horizontally. (4) No external resource dependencies \u2014 the file must be fully self-contained. (5) Basic accessibility check \u2014 proper lang attribute on `<html>`, meaningful title, sufficient color contrast. Write a short validation report as `validation_report.md` confirming all checks pass or noting any issues found.",
+      "task_type": [
+        "report",
+        "frontend"
+      ],
+      "reviewers": [
+        "devils_advocate"
+      ],
+      "depends_on": [
+        "TASK-001"
+      ],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    }
+  ],
+  "results": {},
+  "tokens_used": 0,
+  "phase": "dispatch",
+  "active_task_id": null,
+  "finished": false,
+  "synthesis_report": ""
+}

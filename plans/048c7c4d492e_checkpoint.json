@@ -1,0 +1,196 @@
+{
+  "plan_id": "048c7c4d492e",
+  "saved_at": "2026-03-26T07:47:10.634750+00:00",
+  "objective": "Build a simple, clean, and well-styled \"Hello World\" HTML web page that demonstrates good web fundamentals including semantic HTML, CSS styling, and a polished visual presentation.",
+  "managers": [
+    {
+      "name": "frontend_lead",
+      "title": "Frontend Delivery Lead",
+      "description": "Ensures the HTML page follows best practices for semantic markup, accessibility, valid CSS, and clean visual design.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": ""
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "frontend_developer",
+      "description": "Builds HTML/CSS web pages with clean markup and modern styling. Produces complete, ready-to-open .html files.",
+      "tools": [
+        "write_file"
+      ],
+      "model": ""
+    }
+  ],
+  "reviewers": [
+    {
+      "name": "security_engineer",
+      "title": "Senior Security Engineer",
+      "description": "Review for OWASP Top 10, broken auth, secrets exposure, input validation, least privilege. Think like an attacker.",
+      "focus_areas": [
+        "OWASP Top 10",
+        "auth & secrets",
+        "input validation",
+        "least privilege",
+        "dependency risk"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security"
+      ],
+      "model": ""
+    },
+    {
+      "name": "ux_designer",
+      "title": "Senior UX/UI Designer",
+      "description": "Review for WCAG 2.1 AA, visual hierarchy, information architecture, cognitive load, interaction quality.",
+      "focus_areas": [
+        "WCAG accessibility",
+        "visual hierarchy",
+        "info architecture",
+        "interaction patterns",
+        "cognitive load"
+      ],
+      "applies_to": [
+        "ui",
+        "frontend",
+        "ux",
+        "design",
+        "report",
+        "dashboard",
+        "form",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "user_tester",
+      "title": "End-User Representative",
+      "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
+      "focus_areas": [
+        "first-use clarity",
+        "plain language",
+        "workflow intuitiveness",
+        "value delivered"
+      ],
+      "applies_to": [
+        "ui",
+        "report",
+        "documentation",
+        "user_flow",
+        "dashboard",
+        "api",
+        "frontend"
+      ],
+      "model": ""
+    },
+    {
+      "name": "creative_director",
+      "title": "Creative Director",
+      "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
+      "focus_areas": [
+        "innovation",
+        "elegance",
+        "originality",
+        "lateral thinking",
+        "user delight",
+        "bold alternatives"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "ui",
+        "frontend",
+        "ux",
+        "report",
+        "dashboard",
+        "user_flow",
+        "backend",
+        "documentation"
+      ],
+      "model": ""
+    },
+    {
+      "name": "devils_advocate",
+      "title": "Devil's Advocate",
+      "description": "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? What looks right but is subtly wrong? Be ruthless but specific \u2014 vague skepticism is useless.",
+      "focus_areas": [
+        "hidden assumptions",
+        "logical flaws",
+        "edge cases",
+        "failure modes",
+        "unstated dependencies",
+        "silent failures"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "auth",
+        "data",
+        "config",
+        "infrastructure",
+        "backend",
+        "security",
+        "ui",
+        "frontend",
+        "user_flow"
+      ],
+      "model": ""
+    },
+    {
+      "name": "performance_engineer",
+      "title": "Performance Engineer",
+      "description": "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
+      "focus_areas": [
+        "scalability",
+        "N+1 queries",
+        "memory management",
+        "caching",
+        "concurrency",
+        "latency",
+        "cost efficiency"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "data",
+        "backend",
+        "infrastructure",
+        "config"
+      ],
+      "model": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Build Hello World HTML page",
+      "agent": "frontend_developer",
+      "description": "Create a single index.html file containing a complete \"Hello World\" web page. Requirements: valid HTML5 doctype and structure, a centered \"Hello, World!\" heading, a brief welcome subtitle paragraph, tasteful CSS styling embedded in a <style> tag (modern font stack, pleasant background color, centered content, responsive design), a proper <meta viewport> tag for mobile, and a meaningful <title>. The page should look polished and clean when opened in any browser. Write the file as index.html.",
+      "task_type": [],
+      "reviewers": [
+        "ux_designer",
+        "user_tester"
+      ],
+      "depends_on": [],
+      "model": "",
+      "status": "pending",
+      "result": "",
+      "manager_notes": "",
+      "reviewer_notes": "",
+      "revision_count": 0
+    }
+  ],
+  "results": {},
+  "tokens_used": 0,
+  "phase": "dispatch",
+  "active_task_id": null,
+  "finished": false,
+  "synthesis_report": ""
+}

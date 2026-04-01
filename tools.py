@@ -1,5 +1,5 @@
 """
-tools.py — Tool registry and execution engine for QUARM agents.
+tools.py — Tool registry and execution engine for NORT agents.
 Maps tool name strings from plan.md to LangChain tool functions.
 Supports hybrid approval: read-only tools auto-execute, write tools require human approval.
 """
@@ -13,8 +13,9 @@ from typing import Optional
 
 from langchain_core.tools import tool
 from langchain_core.messages import ToolMessage
+from status_bridge import record_file_touch
 
-log = logging.getLogger("quarm.tools")
+log = logging.getLogger("nort.tools")
 
 PROJECT_DIR = Path(__file__).parent
 ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
@@ -53,7 +54,7 @@ def request_approval(tool_call_id: str, tool_name: str, args: dict,
             "task_id": task_id,
         }).encode()
         req = urllib.request.Request(
-            f"http://localhost:{os.environ.get('QUARM_PORT', '8000')}/update",
+            f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -84,7 +85,7 @@ def resolve_approval(tool_call_id: str, approved: bool):
             "approved": approved,
         }).encode()
         req = urllib.request.Request(
-            f"http://localhost:{os.environ.get('QUARM_PORT', '8000')}/update",
+            f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -147,7 +148,7 @@ def browse_url(url: str) -> str:
 
 @tool
 def rag_search(query: str) -> str:
-    """Search the QUARM knowledge base for relevant information from past projects, artifacts, and web content. Returns the top 5 most relevant text chunks with their sources."""
+    """Search the NORT knowledge base for relevant information from past projects, artifacts, and web content. Returns the top 5 most relevant text chunks with their sources."""
     from rag import search
     results = search(query)
     if not results:
@@ -160,7 +161,7 @@ def rag_search(query: str) -> str:
 
 @tool
 def rag_store(text: str, tags: str = "") -> str:
-    """Store text in the QUARM knowledge base for use in current and future projects. Provide comma-separated tags for categorization."""
+    """Store text in the NORT knowledge base for use in current and future projects. Provide comma-separated tags for categorization."""
     from rag import ingest_text
     ctx = _ctx()
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
@@ -205,7 +206,9 @@ def read_file(path: str) -> str:
     if not target.exists():
         return f"File not found: {path}"
     try:
-        return target.read_text()[:20000]
+        content = target.read_text()[:20000]
+        record_file_touch(path, "read", _ctx().get("agent", ""))
+        return content
     except Exception as e:
         return f"Error reading {path}: {e}"
 
@@ -217,6 +220,7 @@ def write_file(path: str, content: str) -> str:
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
+        record_file_touch(str(target.relative_to(PROJECT_DIR)), "write", _ctx().get("agent", ""))
         return f"Written {len(content)} chars to {target.relative_to(PROJECT_DIR)}"
     except Exception as e:
         return f"Error writing {path}: {e}"

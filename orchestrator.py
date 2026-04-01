@@ -17,6 +17,7 @@ Run:
 """
 
 import re, json, os
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Annotated, TypedDict, Sequence, Optional
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ from langgraph.graph.message import add_messages
 from status_bridge import (
     write_status, log_event, set_project,
     set_active_reviewer, register_rosters,
+    set_session_id, add_transcript_entry,
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
@@ -198,7 +200,7 @@ def parse_plan(path: str):
     objective = obj_m.group(1).strip() if obj_m else "No objective."
 
     proj_m = re.search(r"^# PROJECT PLAN: (.+)", text, re.MULTILINE)
-    set_project(proj_m.group(1).strip() if proj_m else "QUARM")
+    set_project(proj_m.group(1).strip() if proj_m else "NORT")
 
     def rx(pat, raw, default=""):
         m = re.search(pat, raw)
@@ -370,10 +372,13 @@ def master_node(state):
 
     if ready:
         ready_ids = []
+        now = datetime.now(timezone.utc).isoformat()
         for t in ready:
             msg = f"[MASTER] Dispatching → {t['id']}: {t['title']}"
             print(f"\n{msg}"); log_event(msg)
-            tasks = upd(tasks, t["id"], status="in_progress")
+            add_transcript_entry("nexus", f"Dispatching {t['id']}: {t['title']} — {t.get('description', '')[:200]}", task_id=t["id"])
+            tasks = upd(tasks, t["id"], status="in_progress",
+                        spawned_at=t.get("spawned_at") or now)
             ready_ids.append(t["id"])
 
         if len(ready_ids) > 1:
@@ -496,6 +501,7 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
     tools_used = len(tool_calls_log)
     done_msg = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
     print(f"  {done_msg}"); log_event(done_msg)
+    add_transcript_entry("drone", draft[:2000], agent=task["agent"], task_id=tid)
 
     return (tid, draft, total_toks, tool_calls_log, model)
 
@@ -511,13 +517,22 @@ def sub_agent_node(state):
 
     # Fall back to single task if active_task_ids not populated
     if not active_ids:
-        active_ids = [state["active_task_id"]]
+        tid = state.get("active_task_id")
+        if tid:
+            active_ids = [tid]
+        else:
+            # No tasks to execute — route back to dispatch
+            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
+            write_status(s); return s
 
     if len(active_ids) == 1:
         # ── Single task — run directly ──
         tid = active_ids[0]
         tid, draft, toks, tool_log, model = _execute_single_task(tid, tasks, results, sub_agents)
         task = get_task(tid, tasks)
+        if not task:
+            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
+            write_status(s); return s
         total_tokens = state.get("tokens_used", 0) + toks
         tasks = upd(tasks, tid, status="in_manager_review", result=draft,
                     manager_notes="", reviewer_notes="",
@@ -564,7 +579,23 @@ def manager_review_node(state):
     tid     = state["active_task_id"]
     tasks   = state["tasks"]
     results = state["results"]
+
+    # After parallel batch, active_task_id may be None — find first task needing review
+    if not tid:
+        for t in tasks:
+            if t["status"] == "in_manager_review":
+                tid = t["id"]
+                break
+    if not tid:
+        # Nothing to review — skip to dispatch
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     task    = get_task(tid, tasks)
+    if not task:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     rev     = task.get("revision_count", 0)
     set_active_reviewer(None)
     manager = find_mgr(task["agent"], state["managers"])
@@ -578,7 +609,8 @@ def manager_review_node(state):
     if rev >= MAX_REVISIONS:
         log_event(f"[{manager['name'].upper()}] Max revisions — force-approving {tid}")
         results = {**results, tid: task["result"]}
-        tasks   = upd(tasks, tid, status="done")
+        tasks   = upd(tasks, tid, status="done",
+                      completed_at=datetime.now(timezone.utc).isoformat())
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
@@ -615,6 +647,8 @@ def manager_review_node(state):
     msg     = f"[{manager['name'].upper()}] {tid}: {verdict} ({score}/10)"
     print(f"  {msg}"); log_event(msg)
     for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
+    add_transcript_entry("sentinel", f"{verdict} ({score}/10) — {v.get('feedback', '')}".strip(),
+                         agent=manager["name"], task_id=tid)
 
     last_v = {"reviewer": manager["name"], "verdict": verdict, "score": score, "task_id": tid}
     if _run_id:
@@ -651,7 +685,22 @@ def specialist_review_node(state):
     tid      = state["active_task_id"]
     tasks    = state["tasks"]
     results  = state["results"]
+
+    # After routing, active_task_id may be None — find first task needing specialist review
+    if not tid:
+        for t in tasks:
+            if t["status"] == "in_specialist_review":
+                tid = t["id"]
+                break
+    if not tid:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     task     = get_task(tid, tasks)
+    if not task:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     rev      = task.get("revision_count", 0)
     rev_list = applicable_reviewers(task, state["reviewers"])
 
@@ -659,7 +708,8 @@ def specialist_review_node(state):
         log_event(f"[PANEL] No reviewers for {tid} — accepted")
         set_active_reviewer(None)
         results = {**results, tid: task["result"]}
-        tasks   = upd(tasks, tid, status="done")
+        tasks   = upd(tasks, tid, status="done",
+                      completed_at=datetime.now(timezone.utc).isoformat())
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
@@ -702,6 +752,8 @@ def specialist_review_node(state):
         msg     = f"[{reviewer['name'].upper()}] {tid}: {verdict} ({score}/10)"
         print(f"  {msg}"); log_event(msg)
         for iss in v.get("issues",[]): log_event(f"    ↳ {iss}")
+        add_transcript_entry("probe", f"{verdict} ({score}/10) — {v.get('feedback', '')}".strip(),
+                             agent=reviewer["name"], task_id=tid)
         verdicts.append(verdict)
         last_v = {"reviewer": reviewer["name"], "verdict": verdict, "score": score, "task_id": tid}
         if _run_id:
@@ -727,7 +779,8 @@ def specialist_review_node(state):
            else f"[PANEL] All reviewers passed {tid} ✓")
     print(f"  {msg}"); log_event(msg)
     results = {**results, tid: task["result"]}
-    tasks   = upd(tasks, tid, status="done", reviewer_notes="")
+    tasks   = upd(tasks, tid, status="done", reviewer_notes="",
+                  completed_at=datetime.now(timezone.utc).isoformat())
     _auto_ingest(task, results)
     s = {**state, "tasks": tasks, "results": results,
          "phase": "dispatch", "active_task_id": None}
@@ -760,7 +813,15 @@ def synthesis_node(state):
 
 def route_master(s):
     p = s.get("phase", "dispatch")
-    return "synthesis" if p == "done" else "sub_agent" if p == "execute" else "master"
+    if p == "done":
+        return "synthesis"
+    if p == "execute":
+        return "sub_agent"
+    if p == "manager_review":
+        return "manager_review"
+    if p == "specialist_review":
+        return "specialist_review"
+    return "master"
 
 def route_manager(s):
     p = s.get("phase")
@@ -784,7 +845,8 @@ def build_graph():
 
     g.set_entry_point("master")
     g.add_conditional_edges("master", route_master,
-        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master"})
+        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master",
+         "manager_review":"manager_review","specialist_review":"specialist_review"})
     g.add_edge("sub_agent", "manager_review")
     g.add_conditional_edges("manager_review", route_manager,
         {"sub_agent":"sub_agent","specialist_review":"specialist_review","master":"master"})
@@ -799,7 +861,7 @@ def build_graph():
 def _send_webhook(data: dict):
     """Fire-and-forget webhook notification."""
     import threading
-    url = os.environ.get("QUARM_WEBHOOK_URL", "")
+    url = os.environ.get("NORT_WEBHOOK_URL", os.environ.get("QUARM_WEBHOOK_URL", ""))
     if not url:
         # Try config.json
         try:
@@ -823,6 +885,7 @@ def _send_webhook(data: dict):
 def run(plan_path="plan.md", plan_id: str = ""):
     global _run_id, _plan_id
     _plan_id = plan_id
+    set_session_id(plan_id or os.path.splitext(os.path.basename(plan_path))[0])
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")

@@ -1,12 +1,12 @@
 """
-serve.py — QUARM HQ WebSocket Server + Plan Queue Manager
+serve.py — NORT HQ WebSocket Server + Plan Queue Manager
 ============================================================
-Single entry point for the entire QUARM system. Run:
+Single entry point for the entire NORT system. Run:
   python serve.py
   # Open http://localhost:8000/
 
 Features:
-  - Serve the dashboard UI (quarm_hq.html)
+  - Serve the dashboard UI (nort_hq.html)
   - Accept POST /update from the orchestrator status bridge
   - Plan generation, queue management, and orchestrator execution via API
   - Real-time WebSocket broadcasts for all state changes
@@ -41,13 +41,16 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.templating import Jinja2Templates
 import uvicorn
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datefmt="%H:%M:%S")
-log = logging.getLogger("quarm")
+log = logging.getLogger("nort")
 
 STATIC_DIR = Path(__file__).parent
-PORT = int(os.environ.get("QUARM_PORT", 8000))
+TEMPLATES_DIR = STATIC_DIR / "templates"
+PORT = int(os.environ.get("NORT_PORT", os.environ.get("QUARM_PORT", 8000)))
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 PLANS_DIR = STATIC_DIR / "plans"
 QUEUE_FILE = PLANS_DIR / "queue.json"
 
@@ -144,7 +147,7 @@ class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
         self._lock = asyncio.Lock()
-        self._last_status: dict | None = None
+        self._sessions: dict[str, dict] = {}  # session_id → last status payload
         self._last_queue: list[dict] | None = None
 
     async def connect(self, ws: WebSocket):
@@ -165,10 +168,10 @@ class ConnectionManager:
                 await ws.send_json(queue_payload)
             except Exception:
                 pass
-        # Send last orchestrator state
-        if self._last_status:
+        # Send all active session states
+        for session_id, status in self._sessions.items():
             try:
-                await ws.send_json(self._last_status)
+                await ws.send_json(status)
             except Exception:
                 pass
 
@@ -177,11 +180,15 @@ class ConnectionManager:
             self.active = [c for c in self.active if c is not ws]
         log.info(f"WS disconnected  ({len(self.active)} total)")
 
+    def cleanup_session(self, session_id: str):
+        self._sessions.pop(session_id, None)
+
     async def broadcast(self, payload: dict):
         if payload.get("type") == "queue":
             self._last_queue = payload.get("plans")
         else:
-            self._last_status = payload
+            session_id = payload.get("session_id") or "default"
+            self._sessions[session_id] = payload
         dead = []
         async with self._lock:
             clients = list(self.active)
@@ -356,7 +363,7 @@ async def lifespan(app: FastAPI):
     global _loop
     _loop = asyncio.get_running_loop()
     _ensure_plans_dir()
-    log.info("QUARM HQ server starting")
+    log.info("NORT HQ server starting")
     log.info(f"  Dashboard : http://localhost:{PORT}/")
     log.info(f"  API       : http://localhost:{PORT}/api/plans")
     log.info(f"  WebSocket : ws://localhost:{PORT}/ws")
@@ -366,17 +373,14 @@ async def lifespan(app: FastAPI):
     _loop = None
     log.info("Server shutting down")
 
-app = FastAPI(title="QUARM HQ", lifespan=lifespan)
+app = FastAPI(title="NORT HQ", lifespan=lifespan)
 
 
 # ── Page routes ──────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
-async def root():
-    html_path = STATIC_DIR / "quarm_hq.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="quarm_hq.html not found")
-    return HTMLResponse(html_path.read_text())
+async def root(request: Request):
+    return templates.TemplateResponse(request, "base.html", {"port": PORT})
 
 
 # ── Orchestrator bridge route (existing) ─────────────────────────────────────
@@ -463,7 +467,6 @@ async def api_reorder(request: Request):
 @app.post("/api/plans/{plan_id}/run")
 async def api_run_plan(plan_id: str):
     """Start the orchestrator for a specific plan."""
-    global _running_plan_id
     queue = _load_queue()
     entry = next((e for e in queue if e["id"] == plan_id), None)
     if not entry:
@@ -553,6 +556,43 @@ async def api_save_models(request: Request):
     return {"ok": True, "allowed_count": len(allowed) if allowed else "all"}
 
 
+# ── Session API routes ────────────────────────────────────────────────────────
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """Return a list of active sessions with summary info."""
+    sessions = []
+    for sid, status in manager._sessions.items():
+        sessions.append({
+            "id": sid,
+            "project": status.get("project", "NORT"),
+            "phase": status.get("phase", "idle"),
+            "tasks_done": status.get("results_count", 0),
+            "tasks_total": status.get("total_tasks", 0),
+            "tokens": status.get("tokens_used", 0),
+            "updated_at": status.get("updated_at", ""),
+        })
+    return {"sessions": sessions}
+
+
+@app.get("/api/transcript/{session_id}")
+async def get_transcript(session_id: str):
+    """Return the transcript for a session."""
+    status = manager._sessions.get(session_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"transcript": status.get("transcript", [])}
+
+
+@app.get("/api/files/{session_id}")
+async def get_files_touched(session_id: str):
+    """Return file attention data for a session."""
+    status = manager._sessions.get(session_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"files": status.get("files_touched", [])}
+
+
 # ── WebSocket ────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
@@ -608,17 +648,6 @@ async def analytics_scores():
 
 # ── Webhook config endpoint ─────────────────────────────────────────────────
 
-CONFIG_FILE = STATIC_DIR / "config.json"
-
-def _load_config():
-    try:
-        return json.loads(CONFIG_FILE.read_text())
-    except Exception:
-        return {}
-
-def _save_config(cfg):
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
-
 @app.get("/api/config")
 async def get_config():
     return _load_config()
@@ -640,12 +669,12 @@ async def test_webhook(request: Request):
         raise HTTPException(status_code=400, detail="No webhook URL configured")
     import urllib.request
     payload = json.dumps({
-        "project": "QUARM Test",
+        "project": "NORT Test",
         "tasks_completed": 0,
         "total_revisions": 0,
         "tokens_used": 0,
         "elapsed_seconds": 0,
-        "summary": "This is a test webhook from QUARM HQ.",
+        "summary": "This is a test webhook from NORT HQ.",
     }).encode()
     try:
         req = urllib.request.Request(url, data=payload,

@@ -1,0 +1,45 @@
+<div id="configOverlay">
+  <div class="config-card glass-card" onclick="event.stopPropagation()">
+    <div class="config-title">SETTINGS</div>
+    <div class="config-row">
+      <span class="config-label">BLOOM</span>
+      <div class="cfg-toggle on" data-key="bloom" onclick="toggleConfig('bloom')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">HEX GRID</span>
+      <div class="cfg-toggle on" data-key="hexGrid" onclick="toggleConfig('hexGrid')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">PARTICLES</span>
+      <div class="cfg-toggle on" data-key="particles" onclick="toggleConfig('particles')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">NODE STATS</span>
+      <div class="cfg-toggle on" data-key="nodeStats" onclick="toggleConfig('nodeStats')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">TOOL CARDS</span>
+      <div class="cfg-toggle on" data-key="toolCards" onclick="toggleConfig('toolCards')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">EDGE LABELS</span>
+      <div class="cfg-toggle on" data-key="edgeLabels" onclick="toggleConfig('edgeLabels')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">COMPLETION FX</span>
+      <div class="cfg-toggle on" data-key="completionFx" onclick="toggleConfig('completionFx')"></div>
+    </div>
+    <div class="config-row">
+      <span class="config-label">SOUND</span>
+      <div class="cfg-toggle" data-key="sound" onclick="toggleConfig('sound')"></div>
+    </div>
+    <div class="config-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,200,255,0.08);">
+      <div class="config-label" style="margin-bottom: 6px;">WEBHOOK URL</div>
+      <div style="display:flex;gap:6px">
+        <input id="webhookInput" type="text" placeholder="https://..." style="flex:1">
+        <button onclick="saveWebhook(document.getElementById('webhookInput').value)">SAVE</button>
+        <button onclick="testWebhook().then(ok => alert(ok ? 'Sent!' : 'Failed'))">TEST</button>
+      </div>
+    </div>
+  </div>
+</div>

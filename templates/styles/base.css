@@ -1,0 +1,1255 @@
+/* ==========================================================================
+   NORT Dashboard — Base Styles
+   Holographic cyberpunk UI for the NORT multi-agent orchestrator
+   ========================================================================== */
+
+/* ── Font Import ────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── 1. CSS Variables ───────────────────────────────────────────────────── */
+
+:root {
+  --void: #050510;
+  --hex-grid: #0d0d1f;
+  --holo-base: #66ccff;
+  --holo-bright: #aaeeff;
+  --holo-hot: #ffffff;
+  --glass-bg: rgba(10, 15, 30, 0.7);
+  --glass-border: rgba(100, 200, 255, 0.15);
+  --glass-highlight: rgba(100, 200, 255, 0.08);
+  --text-primary: #aaeeff;
+  --text-dim: rgba(102, 204, 255, 0.56);
+  --text-muted: rgba(102, 204, 255, 0.31);
+  --state-idle: #66ccff;
+  --state-working: #66ccff;
+  --state-review: #ffbb44;
+  --state-specialist: #cc88ff;
+  --state-revision: #ff8800;
+  --state-done: #66ffaa;
+  --state-error: #ff5566;
+}
+
+/* ── 2. Reset & Base ────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--void);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+
+a { color: var(--holo-base); text-decoration: none; }
+a:hover { color: var(--holo-bright); }
+
+/* ── 3. Glass Card ──────────────────────────────────────────────────────── */
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  position: relative;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+  border-radius: 8px 8px 0 0;
+  pointer-events: none;
+}
+
+.glass-card input,
+.glass-card textarea,
+.glass-card select {
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.glass-card input::placeholder,
+.glass-card textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.glass-card input:focus,
+.glass-card textarea:focus,
+.glass-card select:focus {
+  border-color: rgba(102, 204, 255, 0.3);
+  outline: none;
+  box-shadow: 0 0 8px rgba(102, 204, 255, 0.1);
+}
+
+.glass-card button {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--holo-base);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.glass-card button:hover {
+  background: rgba(100, 200, 255, 0.1);
+  border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* Glass card scrollbar */
+.glass-card ::-webkit-scrollbar { width: 4px; }
+.glass-card ::-webkit-scrollbar-track { background: transparent; }
+.glass-card ::-webkit-scrollbar-thumb { background: rgba(100, 200, 255, 0.15); border-radius: 2px; }
+.glass-card ::-webkit-scrollbar-thumb:hover { background: rgba(100, 200, 255, 0.25); }
+
+/* ── 4. Top Bar ─────────────────────────────────────────────────────────── */
+
+#topBar {
+  height: 40px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: rgba(8, 12, 24, 0.95);
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  z-index: 60;
+  position: relative;
+}
+
+#topBar .logo {
+  font-weight: 700;
+  letter-spacing: 3px;
+  font-size: 14px;
+  color: var(--holo-bright);
+  white-space: nowrap;
+}
+
+#sessionTabs {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.session-tab {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.session-tab:hover {
+  background: rgba(100, 200, 255, 0.08);
+}
+
+.session-tab.active {
+  border-color: rgba(100, 200, 255, 0.3);
+  background: rgba(100, 200, 255, 0.15);
+  color: var(--holo-bright);
+}
+
+#sessionStats {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+#connectionStatus {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+}
+
+.top-bar-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--state-done);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.disconnected {
+  background: var(--state-error);
+}
+
+#topBar button {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--holo-base);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#topBar button:hover {
+  background: rgba(100, 200, 255, 0.1);
+  border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* ── 5. Control Bar ─────────────────────────────────────────────────────── */
+
+#controlBar {
+  height: 36px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  padding: 0 12px;
+  align-items: center;
+  background: rgba(8, 12, 24, 0.6);
+  border-bottom: 1px solid rgba(100, 200, 255, 0.08);
+  flex-shrink: 0;
+}
+
+#planInput {
+  flex: 1;
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+#planInput:focus {
+  outline: none;
+  border-color: rgba(102, 204, 255, 0.3);
+  box-shadow: 0 0 8px rgba(102, 204, 255, 0.1);
+}
+
+#planInput::placeholder {
+  color: var(--text-muted);
+}
+
+#btnGenerate {
+  background: rgba(102, 204, 255, 0.12);
+  border: 1px solid rgba(102, 204, 255, 0.4);
+  color: var(--holo-bright);
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+#btnGenerate:hover {
+  background: rgba(102, 204, 255, 0.2);
+}
+
+#heartbeat {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.heartbeat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-done);
+  flex-shrink: 0;
+}
+
+.heartbeat-dot.running {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── 6. Canvas ──────────────────────────────────────────────────────────── */
+
+#canvasWrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+
+#canvasWrap.dragging {
+  cursor: grabbing;
+}
+
+#canvasWrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── 7. Agent Detail Card ───────────────────────────────────────────────── */
+
+.agent-detail-card {
+  position: absolute;
+  z-index: 100;
+  width: 260px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.agent-detail-card .agent-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--holo-bright);
+}
+
+.agent-detail-card .agent-tier {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.agent-detail-card .agent-state {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-detail-card .state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.agent-detail-card .agent-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+
+.agent-detail-card .stat-label {
+  color: var(--text-muted);
+}
+
+.agent-detail-card .stat-value {
+  color: var(--text-primary);
+}
+
+.agent-detail-card .tool-list {
+  list-style: none;
+  padding: 0;
+}
+
+.agent-detail-card .tool-item {
+  padding: 3px 0;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+.agent-detail-card .result-preview {
+  max-height: 100px;
+  overflow-y: auto;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: rgba(102, 255, 170, 0.7);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.agent-detail-card .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.agent-detail-card .close-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ── 8. Event Log ───────────────────────────────────────────────────────── */
+
+#eventLog {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 240px;
+  max-height: calc(100% - 16px);
+  z-index: 40;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  overflow-y: auto;
+}
+
+.log-entry {
+  padding: 3px 0;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+}
+
+.log-dispatch  { color: #cc88ff; }
+.log-execute   { color: #66ccff; }
+.log-review    { color: #ffbb44; }
+.log-done      { color: #66ffaa; }
+.log-error     { color: #ff5566; }
+.log-master    { color: #ffd700; }
+
+/* ── 9. Queue Panel ─────────────────────────────────────────────────────── */
+
+#queuePanel {
+  position: absolute;
+  left: 12px;
+  top: 84px;
+  z-index: 50;
+  width: 300px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+  cursor: grab;
+  transition: background 0.15s ease;
+}
+
+.queue-item:hover {
+  background: rgba(100, 200, 255, 0.05);
+}
+
+.queue-title {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-status {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.queue-status.queued  { background: rgba(102, 204, 255, 0.1); color: var(--holo-base); }
+.queue-status.running { background: rgba(102, 255, 170, 0.1); color: var(--state-done); }
+.queue-status.done    { background: rgba(102, 255, 170, 0.05); color: rgba(102, 255, 170, 0.5); }
+.queue-status.failed  { background: rgba(255, 85, 102, 0.1); color: var(--state-error); }
+
+.queue-actions button {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--holo-base);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-actions button:hover {
+  background: rgba(100, 200, 255, 0.1);
+  border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* ── 10. Thinking Panel ─────────────────────────────────────────────────── */
+
+#thinkingPanel {
+  position: absolute;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: 500px;
+  max-height: 300px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.thinking-label {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.thinking-body {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-y: auto;
+  max-height: 250px;
+  line-height: 1.6;
+}
+
+.thinking-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  background: var(--holo-base);
+  animation: blink 0.8s infinite;
+  vertical-align: text-bottom;
+}
+
+/* ── 11. Config Overlay ─────────────────────────────────────────────────── */
+
+#configOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#configOverlay.visible {
+  display: flex;
+}
+
+.config-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 320px;
+  padding: 20px;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.config-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--holo-bright);
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.config-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+.config-label {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+.toggle-switch {
+  width: 36px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(100, 200, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.toggle-switch.on {
+  background: rgba(102, 204, 255, 0.3);
+}
+
+.toggle-switch .toggle-knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+}
+
+.toggle-switch.on .toggle-knob {
+  transform: translateX(18px);
+}
+
+/* ── 12. Completion Overlay ─────────────────────────────────────────────── */
+
+#completionOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#completionOverlay.visible {
+  display: flex;
+}
+
+.completion-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 480px;
+  padding: 24px;
+  text-align: center;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.completion-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--holo-bright);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.stat-box {
+  background: rgba(10, 15, 30, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--state-done);
+}
+
+.stat-label {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.synthesis-body {
+  text-align: left;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(100, 200, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+/* ── 13. Ledger Overlay ─────────────────────────────────────────────────── */
+
+#ledgerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#ledgerOverlay.visible {
+  display: flex;
+}
+
+.ledger-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 520px;
+  padding: 20px;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.ledger-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.ledger-tab {
+  padding: 6px 16px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  transition: all 0.2s ease;
+}
+
+.ledger-tab.active {
+  border-bottom-color: var(--holo-base);
+  color: var(--holo-bright);
+}
+
+.ledger-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.ledger-body {
+  padding: 12px;
+}
+
+.ledger-chart {
+  height: 120px;
+  position: relative;
+}
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+
+.ledger-table th {
+  color: var(--text-dim);
+  text-align: left;
+  padding: 4px;
+  border-bottom: 1px solid var(--glass-border);
+  font-weight: 500;
+}
+
+.ledger-table td {
+  padding: 4px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+}
+
+/* ── 14. Approval Banner ────────────────────────────────────────────────── */
+
+#approvalBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: rgba(255, 170, 51, 0.1);
+  border-bottom: 1px solid rgba(255, 170, 51, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+#approvalBanner.visible {
+  display: flex;
+}
+
+#approvalBanner .btn-approve {
+  background: transparent;
+  border: 1px solid var(--state-done);
+  color: var(--state-done);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#approvalBanner .btn-approve:hover {
+  background: rgba(102, 255, 170, 0.15);
+}
+
+#approvalBanner .btn-reject {
+  background: transparent;
+  border: 1px solid var(--state-error);
+  color: var(--state-error);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#approvalBanner .btn-reject:hover {
+  background: rgba(255, 85, 102, 0.15);
+}
+
+/* ── 15. Transcript Panel ───────────────────────────────────────────────── */
+
+#transcriptPanel {
+  position: absolute;
+  right: 280px;
+  top: 8px;
+  bottom: 8px;
+  width: 380px;
+  z-index: 60;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  overflow-y: auto;
+}
+
+.transcript-entry {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+}
+
+.transcript-role {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.transcript-content {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* ── 16. Timeline Panel ─────────────────────────────────────────────────── */
+
+#timelinePanel {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  height: 120px;
+  z-index: 40;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ── 17. File Attention Panel ───────────────────────────────────────────── */
+
+#fileAttention {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 260px;
+  z-index: 40;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+  overflow-y: auto;
+}
+
+.file-entry {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+
+.file-heat {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--holo-base), var(--state-review), var(--state-error));
+  flex-shrink: 0;
+}
+
+/* ── 18. Model Config Overlay ───────────────────────────────────────────── */
+
+#modelConfigOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#modelConfigOverlay.visible {
+  display: flex;
+}
+
+.model-config-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 400px;
+  padding: 20px;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.model-list-item {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+.model-name {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+.tier-label {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── 19. Plan Viewer ────────────────────────────────────────────────────── */
+
+#planViewer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#planViewer.visible {
+  display: flex;
+}
+
+.plan-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 600px;
+  max-height: 70vh;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.plan-card pre {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.6;
+}
+
+/* ── 20. Animations ─────────────────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ── 21. Global Scrollbar ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 200, 255, 0.15);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 200, 255, 0.25);
+}
+
+/* ── 22. Roster Panel ──────────────────────────────────────────────────── */
+
+.roster-panel {
+  position: fixed;
+  right: 8px;
+  top: 80px;
+  width: 240px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  z-index: 90;
+  padding: 12px;
+}
+
+.roster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+  padding-bottom: 6px;
+}
+
+.roster-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #aaeeff;
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.roster-item:hover {
+  background: rgba(100, 200, 255, 0.05);
+}
+
+.roster-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.roster-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.roster-name {
+  font-size: 10px;
+  color: #aaeeff;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.roster-status {
+  font-size: 8px;
+  color: rgba(102, 204, 255, 0.56);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-level {
+  font-size: 9px;
+  color: #aaeeff;
+  font-family: monospace;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.xp-bar-outer {
+  width: 100%;
+  height: 3px;
+  background: rgba(100, 200, 255, 0.1);
+  margin-top: 3px;
+  border-radius: 1px;
+}
+
+.xp-bar-inner {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.3s;
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NORT</title>
+  <style>
+    {% include "styles/base.css" %}
+  </style>
+</head>
+<body>
+
+  {% include "components/approval_banner.html" %}
+  {% include "components/top_bar.html" %}
+  {% include "components/control_bar.html" %}
+
+  <div id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <div id="agentDetailCard" class="glass-card hidden"></div>
+    {% include "components/event_log.html" %}
+  </div>
+  {% include "components/panels/queue.html" %}
+  {% include "components/panels/thinking.html" %}
+  {% include "components/panels/config.html" %}
+  {% include "components/panels/completion.html" %}
+  {% include "components/panels/ledger.html" %}
+  {% include "components/panels/plan_viewer.html" %}
+  {% include "components/panels/model_config.html" %}
+  {% include "components/panels/transcript.html" %}
+  {% include "components/panels/timeline.html" %}
+  {% include "components/panels/file_attention.html" %}
+  {% include "components/panels/roster.html" %}
+
+  <script>
+    {% include "scripts/colors.js" %}
+    {% include "scripts/constants.js" %}
+    {% include "scripts/render_cache.js" %}
+    {% include "scripts/audio.js" %}
+    {% include "scripts/nodes.js" %}
+    {% include "scripts/force.js" %}
+    {% include "scripts/draw_background.js" %}
+    {% include "scripts/draw_agents.js" %}
+    {% include "scripts/draw_edges.js" %}
+    {% include "scripts/draw_effects.js" %}
+    {% include "scripts/draw_tools.js" %}
+    {% include "scripts/draw_bubbles.js" %}
+    {% include "scripts/draw_context.js" %}
+    {% include "scripts/draw_cost.js" %}
+    {% include "scripts/draw_discoveries.js" %}
+    {% include "scripts/draw_programs.js" %}
+    {% include "scripts/draw_locations.js" %}
+    {% include "scripts/draw_atmosphere.js" %}
+    {% include "scripts/draw_weather.js" %}
+    {% include "scripts/draw_minimap.js" %}
+    {% include "scripts/draw_roster.js" %}
+    {% include "scripts/bloom.js" %}
+    {% include "scripts/camera.js" %}
+    {% include "scripts/render.js" %}
+    {% include "scripts/websocket.js" %}
+    {% include "scripts/api.js" %}
+    {% include "scripts/panels.js" %}
+    {% include "scripts/init.js" %}
+  </script>
+
+</body>
+</html>

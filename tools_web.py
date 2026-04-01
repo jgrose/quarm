@@ -1,5 +1,5 @@
 """
-tools_web.py — Web browsing and search tools for QUARM agents.
+tools_web.py — Web browsing and search tools for NORT agents.
 browse_url: Headless Chromium via Playwright, returns markdown.
 web_search: DuckDuckGo search, returns top results.
 """
@@ -10,7 +10,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-log = logging.getLogger("quarm.tools_web")
+log = logging.getLogger("nort.tools_web")
 
 # ── URL cache (SQLite, 1-hour TTL) ──────────────────────────────────────────
 

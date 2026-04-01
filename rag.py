@@ -18,10 +18,10 @@ logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
-log = logging.getLogger("quarm.rag")
+log = logging.getLogger("nort.rag")
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
-COLLECTION = "quarm_artifacts"
+COLLECTION = "nort_artifacts"
 EMBED_MODEL = "intfloat/e5-base-v2"
 EMBED_DIM = 768
 CHUNK_SIZE = 1000

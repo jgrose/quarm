@@ -6,14 +6,15 @@ Now includes full agent/manager/reviewer rosters so the UI can build all
 room mappings dynamically — zero manual config required.
 
 Environment:
-  QUARM_SERVER   (default: http://localhost:8000)
-  QUARM_SECRET   optional shared secret header
+  NORT_SERVER    (default: http://localhost:8000)  [QUARM_SERVER also accepted]
+  NORT_SECRET    optional shared secret header     [QUARM_SECRET also accepted]
 """
 
 import json
 import threading
 import os
 import logging
+from collections import deque
 from datetime import datetime, timezone
 
 try:
@@ -23,23 +24,31 @@ except ImportError:
     import urllib.request as _urllib
     _HAS_REQUESTS = False
 
-SERVER_URL = os.environ.get("QUARM_SERVER", "http://localhost:8000").rstrip("/")
+SERVER_URL = os.environ.get("NORT_SERVER", os.environ.get("QUARM_SERVER", "http://localhost:8000")).rstrip("/")
 UPDATE_URL = f"{SERVER_URL}/update"
-SECRET     = os.environ.get("QUARM_SECRET", "")
+SECRET     = os.environ.get("NORT_SECRET", os.environ.get("QUARM_SECRET", ""))
 MAX_LOG    = 80
 
-log = logging.getLogger("quarm.bridge")
+log = logging.getLogger("nort.bridge")
 
 # ── Internal state ────────────────────────────────────────────────────────────
 
-_log_lines:       list[str]       = []
-_project:         str             = "QUARM"
+_state_lock = threading.Lock()
+_log_lines:       deque[str]       = deque(maxlen=80)
+_project:         str             = "NORT"
 _active_reviewer: str | None      = None
+_session_id:      str             = ""
 
 # Rosters — set once at plan-parse time, sent in every payload
 _sub_agents:  list[dict] = []   # [{"name": "backend_engineer", "title": "Backend Engineer"}, ...]
 _managers:    list[dict] = []   # [{"name": "eng_director",     "title": "Engineering Director"}, ...]
 _reviewers:   list[dict] = []   # [{"name": "security_engineer","title": "Senior Security Engineer"}, ...]
+
+# File attention heatmap — tracks read/write operations across agents
+_files_touched: dict[str, dict] = {}  # path → {reads: int, writes: int, agents: set}
+
+# Transcript — ordered log of agent communications for replay
+_transcript: deque[dict] = deque(maxlen=200)
 
 
 # ── Registration (called once from orchestrator at startup) ───────────────────
@@ -52,6 +61,35 @@ def set_project(name: str):
 def set_active_reviewer(name: str | None):
     global _active_reviewer
     _active_reviewer = name
+
+
+def set_session_id(sid: str):
+    global _session_id
+    _session_id = sid
+
+
+def record_file_touch(path: str, operation: str, agent: str):
+    """Record a file read/write for the file attention heatmap."""
+    with _state_lock:
+        if path not in _files_touched:
+            _files_touched[path] = {"reads": 0, "writes": 0, "agents": set()}
+        if operation == "read":
+            _files_touched[path]["reads"] += 1
+        elif operation == "write":
+            _files_touched[path]["writes"] += 1
+        _files_touched[path]["agents"].add(agent)
+
+
+def add_transcript_entry(role: str, content: str, agent: str = "", task_id: str = ""):
+    """Add a message to the transcript for replay."""
+    with _state_lock:
+        _transcript.append({
+            "role": role,
+            "content": content[:2000],
+            "agent": agent,
+            "task_id": task_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
 
 def register_rosters(
@@ -90,8 +128,6 @@ def _title_from(agent: dict) -> str:
 
 def log_event(msg: str):
     _log_lines.append(msg)
-    if len(_log_lines) > MAX_LOG:
-        _log_lines.pop(0)
 
 
 # ── Push ──────────────────────────────────────────────────────────────────────
@@ -117,6 +153,7 @@ def write_status(state: dict):
     payload = {
         # ── Identity ──────────────────────────────────────────────────
         "project":         _project,
+        "session_id":      _session_id,
         # ── Rosters (dynamic — drives UI room mapping + labels) ───────
         "sub_agents":      _sub_agents,
         "managers":        _managers,
@@ -140,6 +177,8 @@ def write_status(state: dict):
                 "depends_on":     t.get("depends_on", []),
                 "result_preview": (t.get("result", "") or "")[:500],
                 "tool_calls":     t.get("tool_calls", []),
+                "spawned_at":     t.get("spawned_at", ""),
+                "completed_at":   t.get("completed_at", ""),
             }
             for t in tasks
         ],
@@ -149,6 +188,11 @@ def write_status(state: dict):
         "last_verdict":     state.get("last_verdict"),
         "synthesis_report": state.get("synthesis_report", ""),
         "log":              list(_log_lines),
+        "transcript":       list(_transcript[-50:]),  # last 50 entries
+        "files_touched": [
+            {"path": p, "reads": d["reads"], "writes": d["writes"], "agents": list(d["agents"])}
+            for p, d in _files_touched.items()
+        ],
         "updated_at":       datetime.now(timezone.utc).isoformat(),
     }
     t = threading.Thread(target=_post, args=(payload,), daemon=True)

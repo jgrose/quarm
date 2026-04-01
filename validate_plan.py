@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-validate_plan.py — Schema validator for QUARM plan.md files.
+validate_plan.py — Schema validator for NORT plan.md files.
 Checks: agent references, task ID validity, dependency integrity, reviewer names.
 
 Usage:

@@ -1,5 +1,5 @@
 """
-tracking.py — SQLite-based cost & score tracking for QUARM runs.
+tracking.py — SQLite-based cost & score tracking for NORT runs.
 Stores run history, per-task scores, token usage, and model choices.
 """
 
@@ -8,7 +8,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "quarm_runs.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "nort_runs.db")
 
 
 def _conn():
