@@ -216,8 +216,7 @@ async function saveToleranceGlobal(value) {
       body: JSON.stringify({ default_tolerance: value }),
     });
     // Clear preset highlight on manual change
-    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
-    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
+    if (typeof highlightActivePreset === 'function') highlightActivePreset('');
   } catch (e) {
     console.error('saveToleranceGlobal:', e);
   }
@@ -240,8 +239,7 @@ async function saveToleranceAgent(name, value) {
       body: JSON.stringify({ tolerance_overrides: overrides }),
     });
     // Clear preset highlight on manual change
-    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
-    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
+    if (typeof highlightActivePreset === 'function') highlightActivePreset('');
   } catch (e) {
     console.error('saveToleranceAgent:', e);
   }
