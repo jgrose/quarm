@@ -36,3 +36,9 @@ var BUBBLE_FADE_IN = 0.3;
 var BUBBLE_FADE_OUT = 1.5;
 var TOOL_CARD_W = 170;
 var TOOL_CARD_H = 36;
+
+var PERF = {
+  sampleInterval: 500,
+  emaAlpha: 0.1,
+  budgetMs: 16.6,
+};
