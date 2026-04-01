@@ -85,27 +85,237 @@ function hideAgentDetail() {
   document.getElementById('agentDetailCard').classList.add('hidden');
 }
 
-// ── Event Log ───────────────────────────────────────────────────────────────
+// ── Agent Chat (Event Log) ──────────────────────────────────────────────────
+
+function toggleChat() {
+  var panel = document.getElementById('eventLog');
+  var btn = document.getElementById('chatToggle');
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+  if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
+}
+
+var _agentColorMap = {};
+var _CHAT_PALETTE = [
+  '#66ccff', '#cc88ff', '#ffbb44', '#66ffaa', '#ff8866',
+  '#88ddff', '#dd99ff', '#ffcc66', '#88ffcc', '#ff99aa',
+  '#44ddbb', '#bb88ff'
+];
+var _chatColorIdx = 0;
+var _chatRosters = { sub_agents: [], managers: [], reviewers: [] };
+
+function getChatColor(agentName) {
+  if (!agentName) return C.textDim;
+  var key = agentName.toLowerCase();
+  if (key === 'master') return '#ffd700';
+  if (_agentColorMap[key]) return _agentColorMap[key];
+  _agentColorMap[key] = _CHAT_PALETTE[_chatColorIdx % _CHAT_PALETTE.length];
+  _chatColorIdx++;
+  return _agentColorMap[key];
+}
+
+function updateChatRosters(data) {
+  if (data.sub_agents) _chatRosters.sub_agents = data.sub_agents;
+  if (data.managers) _chatRosters.managers = data.managers;
+  if (data.reviewers) _chatRosters.reviewers = data.reviewers;
+}
+
+function getAgentTier(agentKey) {
+  var name = agentKey.toLowerCase();
+  if (name === 'master') return 'nexus';
+  var i;
+  for (i = 0; i < _chatRosters.managers.length; i++) {
+    if (_chatRosters.managers[i].name === name) return 'sentinel';
+  }
+  for (i = 0; i < _chatRosters.reviewers.length; i++) {
+    if (_chatRosters.reviewers[i].name === name) return 'probe';
+  }
+  for (i = 0; i < _chatRosters.sub_agents.length; i++) {
+    if (_chatRosters.sub_agents[i].name === name) return 'drone';
+  }
+  return null;
+}
+
+function getAgentTitle(agentKey) {
+  var name = agentKey.toLowerCase();
+  var all = _chatRosters.sub_agents.concat(_chatRosters.managers, _chatRosters.reviewers);
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].name === name) return all[i].title || name.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+  }
+  if (name === 'master') return 'NEXUS';
+  return agentKey.replace(/_/g, ' ');
+}
+
+var _SYSTEM_AGENTS = ['TOOL', 'MODEL', 'RAG'];
+var _META_AGENTS = ['PARALLEL', 'PANEL', 'NO MANAGER'];
+
+function parseLogLine(line) {
+  var trimmed = line.replace(/^\s+/, '');
+
+  // Issue sub-item (reviewer feedback lines starting with ↳ or indented ↳)
+  if (/^\u21b3/.test(trimmed) || /^\s{2,}\u21b3/.test(line)) {
+    return { agent: null, type: 'issue', content: trimmed.replace(/^\u21b3\s*/, ''), raw: line };
+  }
+
+  // Bracketed agent: [AGENT_NAME] ...
+  var m = trimmed.match(/^\[([A-Z][A-Z0-9_ ]*)\]\s*(.*)/);
+  if (m) {
+    var agentKey = m[1];
+    var content = m[2];
+    if (_SYSTEM_AGENTS.indexOf(agentKey) >= 0) {
+      return { agent: agentKey, type: 'meta', content: content, raw: line };
+    }
+    if (_META_AGENTS.indexOf(agentKey) >= 0) {
+      return { agent: agentKey, type: 'system', content: content, raw: line };
+    }
+    if (agentKey === 'MASTER') {
+      return { agent: agentKey, type: 'master', content: content, raw: line };
+    }
+    return { agent: agentKey, type: 'message', content: content, raw: line };
+  }
+
+  // Fallback: plain text system line
+  return { agent: null, type: 'system', content: trimmed, raw: line };
+}
+
+function groupChatMessages(parsed) {
+  var groups = [];
+  var current = null;
+
+  for (var i = 0; i < parsed.length; i++) {
+    var p = parsed[i];
+
+    // Meta and issue lines attach to current group
+    if (p.type === 'meta' || p.type === 'issue') {
+      if (current) {
+        current.meta.push(p);
+      }
+      continue;
+    }
+
+    // System/master messages are standalone
+    if (p.type === 'system' || p.type === 'master') {
+      if (current) groups.push(current);
+      groups.push({ agent: p.agent, type: p.type, messages: [p.content], meta: [] });
+      current = null;
+      continue;
+    }
+
+    // Agent message — group consecutive same-agent
+    if (current && current.agent === p.agent && current.type === 'message') {
+      current.messages.push(p.content);
+    } else {
+      if (current) groups.push(current);
+      current = { agent: p.agent, type: 'message', messages: [p.content], meta: [] };
+    }
+  }
+  if (current) groups.push(current);
+  return groups;
+}
+
+function buildChatHTML(groups) {
+  var html = '';
+  var prevAgent = null;
+
+  for (var i = 0; i < groups.length; i++) {
+    var g = groups[i];
+
+    // System / master: centered text
+    if (g.type === 'system' || g.type === 'master') {
+      var sysCls = g.type === 'master' ? 'chat-system master' : 'chat-system';
+      html += '<div class="' + sysCls + '">' + escapeHtml(g.messages.join(' ')) + '</div>';
+      prevAgent = null;
+      continue;
+    }
+
+    // Agent message bubble
+    var agentKey = g.agent;
+    var color = getChatColor(agentKey);
+    var tier = getAgentTier(agentKey);
+    var tierInfo = tier ? TIERS[tier] : null;
+    var icon = tierInfo ? tierInfo.icon : '\u25CF';
+    var displayName = getAgentTitle(agentKey);
+    var isCont = (prevAgent === agentKey);
+
+    if (isCont) {
+      html += '<div class="chat-group continuation">';
+    } else {
+      html += '<div class="chat-group">';
+      html += '<div class="chat-avatar" style="border-color:' + color +
+              ';background:' + hexToRgba(color, 0.12) + ';color:' + color + '">' +
+              icon + '</div>';
+    }
+
+    html += '<div class="chat-body">';
+
+    if (!isCont) {
+      html += '<div class="chat-name" style="color:' + color + '">' +
+              escapeHtml(displayName) + '</div>';
+    }
+
+    // Bubble(s)
+    for (var j = 0; j < g.messages.length; j++) {
+      var msg = g.messages[j];
+      var verdictMatch = msg.match(/^(\S+):\s*(PASS|FAIL|FLAG)\s*\((\d+)\/10\)/);
+
+      html += '<div class="chat-bubble" style="border-left-color:' + color +
+              ';background:' + hexToRgba(color, 0.06) + '">';
+      if (verdictMatch) {
+        var vCls = verdictMatch[2].toLowerCase();
+        html += '<span class="chat-verdict ' + vCls + '">' + verdictMatch[2] +
+                '</span> ' + escapeHtml(verdictMatch[1]) +
+                ' <span style="color:' + C.textDim + '">(' + verdictMatch[3] + '/10)</span>';
+        // Render remaining text after the verdict prefix
+        var remainder = msg.slice(verdictMatch[0].length).trim();
+        if (remainder) html += '<br>' + escapeHtml(remainder);
+      } else {
+        html += escapeHtml(msg);
+      }
+      html += '</div>';
+    }
+
+    // Attached meta (TOOL, MODEL) and issues
+    for (var k = 0; k < g.meta.length; k++) {
+      var meta = g.meta[k];
+      if (meta.type === 'issue') {
+        html += '<div class="chat-issue">' + escapeHtml(meta.content) + '</div>';
+      } else {
+        html += '<div class="chat-meta">' + escapeHtml((meta.agent ? '[' + meta.agent + '] ' : '') + meta.content) + '</div>';
+      }
+    }
+
+    html += '</div></div>'; // .chat-body, .chat-group
+    prevAgent = agentKey;
+  }
+
+  return html;
+}
 
 function renderEventLog(lines, project, done, total) {
-  var el = document.getElementById('eventLogBody');
-  if (!el) return;
+  var progressEl = document.getElementById('eventLogProgress');
+  var bodyEl = document.getElementById('eventLogBody');
+  if (!bodyEl) return;
+
+  // Progress bar (pinned header)
   var pct = total ? Math.round(done / total * 100) : 0;
   var bar = '\u2588'.repeat(Math.floor(pct / 5)) + '\u2591'.repeat(20 - Math.floor(pct / 5));
+  if (progressEl) {
+    progressEl.innerHTML = '<div class="chat-progress">' +
+      escapeHtml(project) + ' ' + bar + ' ' + pct + '% ' + done + '/' + total + '</div>';
+  }
 
-  var rows = lines.slice(-30).map(function(l) {
-    var cls = '';
-    if (l.includes('[MASTER]')) cls = 'log-master';
-    else if (l.includes('PASS') || l.includes('\u2713')) cls = 'log-done';
-    else if (l.includes('FLAG') || l.includes('FAIL') || l.includes('revis')) cls = 'log-review';
-    else if (l.includes('Dispatch') || l.includes('Execut')) cls = 'log-execute';
-    else if (/SECURITY|UX|USER_TEST/i.test(l)) cls = 'log-dispatch';
-    return '<div class="log-entry ' + cls + '">' + escapeHtml(l) + '</div>';
-  }).join('');
+  // Parse, group, render
+  var recent = lines.slice(-40);
+  var parsed = recent.map(parseLogLine);
+  var groups = groupChatMessages(parsed);
+  var html = buildChatHTML(groups);
 
-  el.innerHTML = '<div class="log-entry log-master">' + escapeHtml(project) + ' ' +
-    bar + ' ' + pct + '% ' + done + '/' + total + '</div>' + rows;
-  el.scrollTop = el.scrollHeight;
+  // Smart scroll: only auto-scroll if user was already at bottom
+  var isAtBottom = bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight < 40;
+  bodyEl.innerHTML = html;
+  if (isAtBottom) {
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+  }
 }
 
 // ── Queue Panel ─────────────────────────────────────────────────────────────
@@ -571,4 +781,272 @@ function toggleModel(el) {
 function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Agent Registry Panel ───────────────────────────────────────────────────
+
+var _agentsActiveTab = 'sub_agents';
+var _agentsData = null;
+
+function toggleAgentsPanel() {
+  var el = document.getElementById('agentsOverlay');
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) loadAgentsData();
+}
+
+function loadAgentsData() {
+  fetch('/api/agents')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _agentsData = data.agents;
+      renderAgentsList();
+    })
+    .catch(function(e) { console.error('Failed to load agents:', e); });
+}
+
+function showAgentTab(tab) {
+  _agentsActiveTab = tab;
+  // Update tab button styles
+  var tabs = document.querySelectorAll('.agents-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.remove('active');
+  }
+  event.target.classList.add('active');
+  renderAgentsList();
+}
+
+function renderAgentsList() {
+  if (!_agentsData) return;
+  var list = document.getElementById('agentsList');
+  // Filter by active tab
+  var filtered = _agentsData.filter(function(a) {
+    return a._type === _agentsActiveTab || (!a._type && true);
+  });
+
+  // If the API returns flat list with _type, filter. If grouped, access directly.
+  // Handle both cases:
+  if (_agentsData.length > 0 && !_agentsData[0]._type) {
+    // Data might be from a type-specific call
+    filtered = _agentsData;
+  }
+
+  var html = '';
+  if (filtered.length === 0) {
+    html = '<div style="padding:12px;color:' + C.textMuted + ';font-size:9px">No agents in this category</div>';
+  }
+
+  for (var i = 0; i < filtered.length; i++) {
+    var a = filtered[i];
+    var scoreColor = (a.avg_score || 0) >= 7 ? '#66ffaa' : (a.avg_score || 0) >= 4 ? '#ffbb44' : '#ff5566';
+    var builtinBadge = a.builtin ? '<span style="color:' + C.textMuted + ';font-size:7px;margin-left:4px">BUILTIN</span>' : '';
+
+    html += '<div class="agent-item" onclick="showAgentRegistryDetail(\'' + escapeHtml(a.name) + '\',\'' + (_agentsActiveTab) + '\')">';
+    html += '<div class="agent-item-header">';
+    html += '<span class="agent-item-name">' + escapeHtml(a.title || a.name) + builtinBadge + '</span>';
+    html += '<span class="agent-item-score" style="color:' + scoreColor + '">';
+    if (a.runs > 0) {
+      html += a.avg_score.toFixed(1) + ' <span style="color:' + C.textMuted + '">(' + a.runs + ' runs)</span>';
+    } else {
+      html += '<span style="color:' + C.textMuted + '">new</span>';
+    }
+    html += '</span></div>';
+    html += '<div class="agent-item-desc">' + escapeHtml((a.description || '').slice(0, 80)) + '</div>';
+    if (a.tags && a.tags.length > 0) {
+      html += '<div class="agent-item-tags">';
+      for (var t = 0; t < Math.min(a.tags.length, 5); t++) {
+        html += '<span class="agent-tag">' + escapeHtml(a.tags[t]) + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  list.innerHTML = html;
+}
+
+function showAgentRegistryDetail(name, agentType) {
+  fetch('/api/agents/' + agentType + '/' + name)
+    .then(function(r) { return r.json(); })
+    .then(function(agent) {
+      var form = document.getElementById('agentFormArea');
+      form.classList.remove('hidden');
+
+      var html = '<div class="agent-edit-form">';
+      html += '<h3 style="color:' + C.textPrimary + ';margin:0 0 8px 0;font-size:11px">' + escapeHtml(agent.title || agent.name) + '</h3>';
+      html += '<label>Description:</label>';
+      html += '<textarea id="agentEditDesc" class="agent-input" rows="3">' + escapeHtml(agent.description || '') + '</textarea>';
+      html += '<label>Tags (comma-separated):</label>';
+      html += '<input id="agentEditTags" class="agent-input" value="' + escapeHtml((agent.tags || []).join(', ')) + '">';
+
+      if (agentType === 'sub_agents') {
+        html += '<label>Tools (comma-separated):</label>';
+        html += '<input id="agentEditTools" class="agent-input" value="' + escapeHtml((agent.tools || []).join(', ')) + '">';
+      }
+
+      html += '<div style="margin-top:8px;display:flex;gap:6px">';
+      html += '<button class="agent-save-btn" onclick="saveAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">SAVE</button>';
+      if (!agent.builtin) {
+        html += '<button class="agent-delete-btn" onclick="deleteAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">DELETE</button>';
+      }
+      html += '<button class="agent-cancel-btn" onclick="document.getElementById(\'agentFormArea\').classList.add(\'hidden\')">CANCEL</button>';
+      html += '</div></div>';
+
+      form.innerHTML = html;
+    });
+}
+
+function saveAgent(agentType, name) {
+  var desc = document.getElementById('agentEditDesc').value;
+  var tags = document.getElementById('agentEditTags').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+  var updates = { description: desc, tags: tags };
+
+  var toolsEl = document.getElementById('agentEditTools');
+  if (toolsEl) {
+    updates.tools = toolsEl.value.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+  }
+
+  fetch('/api/agents/' + agentType + '/' + name, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  }).then(function() {
+    document.getElementById('agentFormArea').classList.add('hidden');
+    loadAgentsData();
+  });
+}
+
+function deleteAgent(agentType, name) {
+  if (!confirm('Delete agent ' + name + '?')) return;
+  fetch('/api/agents/' + agentType + '/' + name, { method: 'DELETE' })
+    .then(function() {
+      document.getElementById('agentFormArea').classList.add('hidden');
+      loadAgentsData();
+    });
+}
+
+function showCreateAgentForm() {
+  var form = document.getElementById('agentFormArea');
+  form.classList.remove('hidden');
+
+  var html = '<div class="agent-edit-form">';
+  html += '<h3 style="color:' + C.textPrimary + ';margin:0 0 8px 0;font-size:11px">CREATE NEW AGENT</h3>';
+  html += '<label>Type:</label>';
+  html += '<select id="newAgentType" class="agent-input"><option value="sub_agents">Sub-Agent</option><option value="managers">Manager</option><option value="reviewers">Reviewer</option></select>';
+  html += '<label>Name (lowercase, underscores):</label>';
+  html += '<input id="newAgentName" class="agent-input" placeholder="e.g. python_expert">';
+  html += '<label>Title:</label>';
+  html += '<input id="newAgentTitle" class="agent-input" placeholder="e.g. Senior Python Developer">';
+  html += '<label>Description:</label>';
+  html += '<textarea id="newAgentDesc" class="agent-input" rows="3" placeholder="What this agent does..."></textarea>';
+  html += '<label>Tags (comma-separated):</label>';
+  html += '<input id="newAgentTags" class="agent-input" placeholder="e.g. python, backend, api">';
+  html += '<label>Tools (comma-separated, for sub-agents):</label>';
+  html += '<input id="newAgentTools" class="agent-input" placeholder="e.g. write_file, execute_code">';
+  html += '<div style="margin-top:8px;display:flex;gap:6px">';
+  html += '<button class="agent-save-btn" onclick="createNewAgent()">CREATE</button>';
+  html += '<button class="agent-cancel-btn" onclick="document.getElementById(\'agentFormArea\').classList.add(\'hidden\')">CANCEL</button>';
+  html += '</div></div>';
+
+  form.innerHTML = html;
+}
+
+function createNewAgent() {
+  var agentType = document.getElementById('newAgentType').value;
+  var spec = {
+    name: document.getElementById('newAgentName').value.trim().toLowerCase().replace(/\s+/g, '_'),
+    title: document.getElementById('newAgentTitle').value.trim(),
+    description: document.getElementById('newAgentDesc').value.trim(),
+    tags: document.getElementById('newAgentTags').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
+    tools: document.getElementById('newAgentTools').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
+  };
+
+  // Add type-specific fields
+  if (agentType === 'managers') {
+    spec.expertise_blend = spec.tags.slice();  // use tags as expertise
+    spec.oversees = [];
+  }
+  if (agentType === 'reviewers') {
+    spec.focus_areas = spec.tags.slice();
+    spec.applies_to = spec.tags.slice();
+  }
+
+  fetch('/api/agents/' + agentType, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(spec)
+  }).then(function(r) { return r.json(); })
+    .then(function() {
+      document.getElementById('agentFormArea').classList.add('hidden');
+      loadAgentsData();
+    })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+// ── Review Tolerance Panel ────────────────────────────────────────────────
+
+function _tolerancePreset(val) {
+  if (val >= 8) return { label: 'LENIENT', color: '#00ff88' };
+  if (val >= 5) return { label: 'NORMAL',  color: '#ffaa00' };
+  return { label: 'STRICT', color: '#ff4444' };
+}
+
+function renderToleranceConfig(data) {
+  var overlay = document.getElementById('toleranceConfigOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+
+  var globalSlider = document.getElementById('globalToleranceSlider');
+  var globalLabel = document.getElementById('globalToleranceValue');
+  var globalPreset = document.getElementById('globalTolerancePreset');
+  var defTol = data.default_tolerance || 6;
+  if (globalSlider) globalSlider.value = defTol;
+  if (globalLabel) globalLabel.textContent = defTol;
+  if (globalPreset) {
+    var gp = _tolerancePreset(defTol);
+    globalPreset.textContent = gp.label;
+    globalPreset.style.color = gp.color;
+  }
+
+  var body = document.getElementById('toleranceConfigBody');
+  if (!body) return;
+
+  var agents = data.agents || [];
+  body.innerHTML = agents.map(function(a) {
+    var eff = a.effective || 6;
+    var p = _tolerancePreset(eff);
+    var isCustom = a.tolerance !== null && a.tolerance !== undefined;
+    return '<div class="tolerance-agent-row">' +
+      '<span class="tolerance-agent-name">' + escapeHtml(a.name) +
+        (isCustom ? '' : ' <span style="color:rgba(150,180,200,0.4);font-size:8px">(default)</span>') +
+      '</span>' +
+      '<input type="range" class="tolerance-slider" min="1" max="10" value="' + eff + '"' +
+        ' data-agent="' + escapeHtml(a.name) + '"' +
+        ' oninput="updateAgentToleranceLabel(this)"' +
+        ' onchange="saveToleranceAgent(\'' + escapeHtml(a.name) + '\', this.value)">' +
+      '<span class="tolerance-value" data-agent-label="' + escapeHtml(a.name) + '">' + eff + '</span>' +
+      '<span class="tolerance-preset" data-agent-preset="' + escapeHtml(a.name) + '" style="color:' + p.color + '">' + p.label + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function updateToleranceLabel(el) {
+  var label = document.getElementById('globalToleranceValue');
+  var preset = document.getElementById('globalTolerancePreset');
+  if (label) label.textContent = el.value;
+  if (preset) {
+    var p = _tolerancePreset(parseInt(el.value));
+    preset.textContent = p.label;
+    preset.style.color = p.color;
+  }
+}
+
+function updateAgentToleranceLabel(el) {
+  var name = el.dataset.agent;
+  var label = document.querySelector('[data-agent-label="' + name + '"]');
+  var preset = document.querySelector('[data-agent-preset="' + name + '"]');
+  if (label) label.textContent = el.value;
+  if (preset) {
+    var p = _tolerancePreset(parseInt(el.value));
+    preset.textContent = p.label;
+    preset.style.color = p.color;
+  }
 }

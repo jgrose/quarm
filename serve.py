@@ -660,6 +660,67 @@ async def save_config(request: Request):
     _save_config(cfg)
     return {"ok": True}
 
+@app.get("/api/tolerance")
+async def get_tolerance():
+    cfg = _load_config()
+    overrides = cfg.get("tolerance_overrides", {})
+    default_tol = cfg.get("default_tolerance", 6)
+
+    builtin = [
+        {"name": "security_engineer", "title": "Senior Security Engineer"},
+        {"name": "ux_designer", "title": "Senior UX/UI Designer"},
+        {"name": "user_tester", "title": "End-User Representative"},
+        {"name": "creative_director", "title": "Creative Director"},
+        {"name": "devils_advocate", "title": "Devil's Advocate"},
+        {"name": "performance_engineer", "title": "Performance Engineer"},
+    ]
+
+    # Also pull any managers/custom reviewers from active sessions
+    seen = {r["name"] for r in builtin}
+    for name, tol in overrides.items():
+        if name not in seen:
+            builtin.append({"name": name, "title": name.replace("_", " ").title()})
+            seen.add(name)
+
+    agents = []
+    for r in builtin:
+        agent_tol = overrides.get(r["name"])
+        agents.append({
+            "name": r["name"],
+            "title": r["title"],
+            "tolerance": agent_tol,
+            "effective": agent_tol if agent_tol is not None else default_tol,
+        })
+
+    return {
+        "default_tolerance": default_tol,
+        "agents": agents,
+        "overrides": overrides,
+    }
+
+@app.post("/api/tolerance")
+async def save_tolerance(request: Request):
+    body = await request.json()
+    cfg = _load_config()
+
+    if "default_tolerance" in body:
+        val = body["default_tolerance"]
+        if val is not None and (not isinstance(val, int) or val < 1 or val > 10):
+            raise HTTPException(status_code=400, detail="default_tolerance must be 1-10 or null")
+        cfg["default_tolerance"] = val
+
+    if "tolerance_overrides" in body:
+        overrides = body["tolerance_overrides"]
+        if not isinstance(overrides, dict):
+            raise HTTPException(status_code=400, detail="tolerance_overrides must be an object")
+        for name, val in overrides.items():
+            if val is not None and (not isinstance(val, int) or val < 1 or val > 10):
+                raise HTTPException(status_code=400, detail=f"Tolerance for '{name}' must be 1-10 or null")
+        cfg["tolerance_overrides"] = overrides
+
+    _save_config(cfg)
+    return {"ok": True}
+
 @app.post("/api/webhook/test")
 async def test_webhook(request: Request):
     """Send a test payload to the configured webhook URL."""
@@ -769,6 +830,57 @@ async def list_artifacts(plan_id: str):
                 "name": f.name,
             })
     return {"files": files}
+
+
+# ── Agent Registry API ──────────────────────────────────────────────────────
+
+@app.get("/api/agents")
+async def api_list_agents(type: str = None):
+    """List all agents, optionally filtered by type (sub_agents, managers, reviewers)."""
+    try:
+        from agent_registry import list_agents
+        agents = list_agents(type)
+        return {"agents": agents}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agents/{agent_type}/{name}")
+async def api_get_agent(agent_type: str, name: str):
+    from agent_registry import get_agent
+    agent = get_agent(agent_type, name)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+@app.post("/api/agents/{agent_type}")
+async def api_create_agent(agent_type: str, request: Request):
+    from agent_registry import create_agent
+    spec = await request.json()
+    try:
+        agent = create_agent(agent_type, spec)
+        return {"ok": True, "agent": agent}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/agents/{agent_type}/{name}")
+async def api_update_agent(agent_type: str, name: str, request: Request):
+    from agent_registry import update_agent
+    updates = await request.json()
+    agent = update_agent(agent_type, name, updates)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"ok": True, "agent": agent}
+
+@app.delete("/api/agents/{agent_type}/{name}")
+async def api_delete_agent(agent_type: str, name: str):
+    from agent_registry import delete_agent
+    try:
+        ok = delete_agent(agent_type, name)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 # ── Static file fallback (must be last) ──────────────────────────────────────

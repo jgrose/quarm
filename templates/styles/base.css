@@ -433,42 +433,213 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-primary);
 }
 
-/* ── 8. Event Log ───────────────────────────────────────────────────────── */
+/* ── 8. Agent Chat (Event Log) ─────────────────────────────────────────── */
 
 #eventLog {
   position: absolute;
-  right: 8px;
+  right: 0;
   top: 8px;
   bottom: 8px;
-  width: 240px;
-  max-height: calc(100% - 16px);
+  width: 392px;
   z-index: 40;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 8px 0 0 8px;
+  padding: 0;
   box-shadow:
     0 0 20px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 var(--glass-highlight);
-  overflow-y: auto;
+  transition: transform 0.3s ease;
+  overflow: visible;
 }
 
-.log-entry {
-  padding: 3px 0;
+#eventLog.collapsed {
+  transform: translateX(100%);
+}
+
+#eventLog .chat-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* Toggle tab on left edge of drawer */
+#chatToggle {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 56px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  color: var(--text-dim);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s, background 0.2s;
+  z-index: 1;
+}
+
+#chatToggle:hover {
+  color: var(--text-primary);
+  background: rgba(100, 200, 255, 0.08);
+}
+
+#eventLog.collapsed #chatToggle {
+  color: var(--text-primary);
+}
+
+#eventLogProgress {
+  flex-shrink: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 8px;
+}
+
+.chat-progress {
   font-size: 9px;
   font-family: 'Courier New', monospace;
-  line-height: 1.6;
+  color: #ffd700;
+  letter-spacing: 0.5px;
+}
+
+#eventLogBody {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Chat message group: avatar + body */
+.chat-group {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.chat-group.continuation {
+  padding-left: 32px;
+}
+
+/* Agent avatar circle */
+.chat-avatar {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  border: 1px solid;
+  margin-top: 2px;
+}
+
+/* Message body column */
+.chat-body {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Agent name label */
+.chat-name {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  opacity: 0.9;
+}
+
+/* Chat bubble */
+.chat-bubble {
+  border-left: 2px solid;
+  border-radius: 0 6px 6px 6px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.5;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  margin-bottom: 2px;
+}
+
+.chat-group.continuation .chat-bubble {
+  border-radius: 6px;
+}
+
+/* System message (MASTER, PARALLEL, etc.) */
+.chat-system {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 3px 8px;
   border-bottom: 1px solid rgba(100, 200, 255, 0.04);
 }
 
-.log-dispatch  { color: #cc88ff; }
-.log-execute   { color: #66ccff; }
-.log-review    { color: #ffbb44; }
-.log-done      { color: #66ffaa; }
-.log-error     { color: #ff5566; }
-.log-master    { color: #ffd700; }
+.chat-system.master {
+  color: #ffd700;
+}
+
+/* Metadata sub-lines (TOOL, MODEL) */
+.chat-meta {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-muted);
+  padding: 1px 0 1px 10px;
+  border-left: 1px solid rgba(100, 200, 255, 0.1);
+  margin-top: 2px;
+  word-wrap: break-word;
+}
+
+/* Reviewer issue sub-items */
+.chat-issue {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  padding: 1px 0 1px 8px;
+  line-height: 1.5;
+}
+
+.chat-issue::before {
+  content: '\21B3 ';
+  color: var(--text-muted);
+}
+
+/* Verdict badge */
+.chat-verdict {
+  display: inline-block;
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.chat-verdict.pass {
+  background: rgba(102, 255, 170, 0.15);
+  color: #66ffaa;
+}
+
+.chat-verdict.fail,
+.chat-verdict.flag {
+  background: rgba(255, 85, 102, 0.15);
+  color: #ff5566;
+}
 
 /* ── 9. Queue Panel ─────────────────────────────────────────────────────── */
 
@@ -1067,6 +1238,102 @@ a:hover { color: var(--holo-bright); }
   text-transform: uppercase;
 }
 
+/* ── 18b. Tolerance Config Overlay ──────────────────────────────────────── */
+
+#toleranceConfigOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#toleranceConfigOverlay.hidden {
+  display: none !important;
+}
+
+.tolerance-config-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.tolerance-section-label {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1.5px;
+  margin: 8px 0 4px 0;
+}
+
+.tolerance-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+.tolerance-agent-name {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tolerance-slider {
+  -webkit-appearance: none;
+  width: 100px;
+  height: 4px;
+  background: rgba(100, 200, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.tolerance-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  cursor: pointer;
+}
+
+.tolerance-value {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--holo-bright);
+  min-width: 16px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.tolerance-preset {
+  font-size: 7px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  min-width: 42px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* ── 19. Plan Viewer ────────────────────────────────────────────────────── */
 
 #planViewer {
@@ -1252,4 +1519,182 @@ a:hover { color: var(--holo-bright); }
   height: 100%;
   border-radius: 1px;
   transition: width 0.3s;
+}
+
+/* ── 23. Agents Panel ──────────────────────────────────────── */
+
+.agents-overlay {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 200;
+  padding: 16px;
+}
+
+.agents-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+  padding-bottom: 8px;
+}
+
+.agents-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #aaeeff;
+}
+
+.agents-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.agents-tab {
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  color: rgba(102, 204, 255, 0.56);
+  padding: 4px 10px;
+  font-size: 8px;
+  font-family: monospace;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agents-tab.active {
+  background: rgba(100, 200, 255, 0.15);
+  color: #aaeeff;
+  border-color: rgba(100, 200, 255, 0.4);
+}
+
+.agent-item {
+  padding: 8px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.agent-item:hover {
+  background: rgba(100, 200, 255, 0.05);
+}
+
+.agent-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agent-item-name {
+  font-size: 10px;
+  color: #aaeeff;
+  font-family: monospace;
+}
+
+.agent-item-score {
+  font-size: 9px;
+  font-family: monospace;
+}
+
+.agent-item-desc {
+  font-size: 8px;
+  color: rgba(102, 204, 255, 0.56);
+  font-family: monospace;
+  margin-top: 2px;
+}
+
+.agent-item-tags {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.agent-tag {
+  font-size: 7px;
+  font-family: monospace;
+  color: rgba(102, 204, 255, 0.7);
+  background: rgba(100, 200, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.agents-create-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(100, 200, 255, 0.08);
+  border: 1px dashed rgba(100, 200, 255, 0.2);
+  color: rgba(102, 204, 255, 0.56);
+  font-size: 9px;
+  font-family: monospace;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agents-create-btn:hover {
+  background: rgba(100, 200, 255, 0.15);
+  color: #aaeeff;
+}
+
+.agent-edit-form {
+  padding: 10px;
+  border-top: 1px solid rgba(100, 200, 255, 0.15);
+  margin-top: 8px;
+}
+
+.agent-edit-form label {
+  display: block;
+  font-size: 8px;
+  color: rgba(102, 204, 255, 0.56);
+  font-family: monospace;
+  margin: 6px 0 2px 0;
+}
+
+.agent-input {
+  width: 100%;
+  background: rgba(10, 15, 30, 0.7);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  color: #aaeeff;
+  padding: 4px 6px;
+  font-size: 9px;
+  font-family: monospace;
+  box-sizing: border-box;
+}
+
+.agent-input:focus {
+  border-color: rgba(100, 200, 255, 0.4);
+  outline: none;
+}
+
+.agent-save-btn, .agent-delete-btn, .agent-cancel-btn {
+  padding: 4px 12px;
+  font-size: 8px;
+  font-family: monospace;
+  cursor: pointer;
+  border: 1px solid;
+}
+
+.agent-save-btn {
+  background: rgba(102, 255, 170, 0.15);
+  border-color: rgba(102, 255, 170, 0.3);
+  color: #66ffaa;
+}
+
+.agent-delete-btn {
+  background: rgba(255, 85, 102, 0.15);
+  border-color: rgba(255, 85, 102, 0.3);
+  color: #ff5566;
+}
+
+.agent-cancel-btn {
+  background: rgba(100, 200, 255, 0.05);
+  border-color: rgba(100, 200, 255, 0.15);
+  color: rgba(102, 204, 255, 0.56);
 }

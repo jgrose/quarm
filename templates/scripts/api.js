@@ -196,3 +196,47 @@ async function pollHeartbeat() {
     if (label) label.textContent = 'OFFLINE';
   }
 }
+
+async function loadTolerance() {
+  try {
+    var res = await fetch('/api/tolerance');
+    if (!res.ok) throw new Error(await res.text());
+    var data = await res.json();
+    renderToleranceConfig(data);
+  } catch (e) {
+    console.error('loadTolerance:', e);
+  }
+}
+
+async function saveToleranceGlobal(value) {
+  try {
+    await fetch('/api/tolerance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_tolerance: value }),
+    });
+  } catch (e) {
+    console.error('saveToleranceGlobal:', e);
+  }
+}
+
+async function saveToleranceAgent(name, value) {
+  try {
+    var res = await fetch('/api/tolerance');
+    var data = await res.json();
+    var overrides = data.overrides || {};
+    var intVal = parseInt(value);
+    if (intVal === data.default_tolerance) {
+      delete overrides[name];
+    } else {
+      overrides[name] = intVal;
+    }
+    await fetch('/api/tolerance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tolerance_overrides: overrides }),
+    });
+  } catch (e) {
+    console.error('saveToleranceAgent:', e);
+  }
+}
