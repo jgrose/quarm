@@ -222,27 +222,32 @@ async function saveToleranceGlobal(value) {
   }
 }
 
-async function saveToleranceAgent(name, value) {
-  try {
-    var res = await fetch('/api/tolerance');
-    var data = await res.json();
-    var overrides = data.overrides || {};
-    var intVal = parseInt(value);
-    if (intVal === data.default_tolerance) {
-      delete overrides[name];
-    } else {
-      overrides[name] = intVal;
+var _saveToleranceAgentTimers = {};
+
+function saveToleranceAgent(name, value) {
+  if (_saveToleranceAgentTimers[name]) clearTimeout(_saveToleranceAgentTimers[name]);
+  _saveToleranceAgentTimers[name] = setTimeout(async function() {
+    delete _saveToleranceAgentTimers[name];
+    try {
+      var res = await fetch('/api/tolerance');
+      var data = await res.json();
+      var overrides = data.overrides || {};
+      var intVal = parseInt(value);
+      if (intVal === data.default_tolerance) {
+        delete overrides[name];
+      } else {
+        overrides[name] = intVal;
+      }
+      await fetch('/api/tolerance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tolerance_overrides: overrides }),
+      });
+      if (typeof highlightActivePreset === 'function') highlightActivePreset('');
+    } catch (e) {
+      console.error('saveToleranceAgent:', e);
     }
-    await fetch('/api/tolerance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tolerance_overrides: overrides }),
-    });
-    // Clear preset highlight on manual change
-    if (typeof highlightActivePreset === 'function') highlightActivePreset('');
-  } catch (e) {
-    console.error('saveToleranceAgent:', e);
-  }
+  }, 300);
 }
 
 async function loadReviewStats() {
@@ -253,6 +258,8 @@ async function loadReviewStats() {
     renderReviewAnalytics(data);
   } catch (e) {
     console.error('loadReviewStats:', e);
+    var body = document.getElementById('reviewAnalyticsBody');
+    if (body) body.innerHTML = '<div style="color:var(--state-error);font-size:11px;text-align:center;padding:20px">Failed to load review data</div>';
   }
 }
 

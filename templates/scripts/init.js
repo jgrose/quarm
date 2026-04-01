@@ -22,9 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
       var ledger = document.getElementById('ledgerOverlay');
       if (ledger) ledger.classList.add('hidden');
       var modelCfg = document.getElementById('modelConfigOverlay');
-      if (modelCfg) modelCfg.classList.add('hidden');
+      if (modelCfg) modelCfg.classList.remove('visible');
       var agentsOvl = document.getElementById('agentsOverlay');
       if (agentsOvl) agentsOvl.classList.add('hidden');
+      var reviewAnalytics = document.getElementById('reviewAnalyticsOverlay');
+      if (reviewAnalytics) reviewAnalytics.classList.add('hidden');
+      var toleranceCfg = document.getElementById('toleranceConfigOverlay');
+      if (toleranceCfg) toleranceCfg.classList.add('hidden');
+      var outputBrowser = document.getElementById('outputBrowserOverlay');
+      if (outputBrowser) outputBrowser.classList.add('hidden');
     }
     if (e.key === 'q' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       toggleQueue();
@@ -64,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var modelOverlay = document.getElementById('modelConfigOverlay');
   if (modelOverlay) {
     modelOverlay.addEventListener('click', function(e) {
-      if (e.target === modelOverlay) modelOverlay.classList.add('hidden');
+      if (e.target === modelOverlay) modelOverlay.classList.remove('visible');
     });
   }
   var ledgerOverlay = document.getElementById('ledgerOverlay');
@@ -77,6 +83,24 @@ document.addEventListener('DOMContentLoaded', function() {
   if (completionOverlay) {
     completionOverlay.addEventListener('click', function(e) {
       if (e.target === completionOverlay) hideCompletion();
+    });
+  }
+  var reviewOverlay = document.getElementById('reviewAnalyticsOverlay');
+  if (reviewOverlay) {
+    reviewOverlay.addEventListener('click', function(e) {
+      if (e.target === reviewOverlay) reviewOverlay.classList.add('hidden');
+    });
+  }
+  var tolCfgOverlay = document.getElementById('toleranceConfigOverlay');
+  if (tolCfgOverlay) {
+    tolCfgOverlay.addEventListener('click', function(e) {
+      if (e.target === tolCfgOverlay) tolCfgOverlay.classList.add('hidden');
+    });
+  }
+  var outputBrowserOvl = document.getElementById('outputBrowserOverlay');
+  if (outputBrowserOvl) {
+    outputBrowserOvl.addEventListener('click', function(e) {
+      if (e.target === outputBrowserOvl) outputBrowserOvl.classList.add('hidden');
     });
   }
 });

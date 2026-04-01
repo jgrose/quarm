@@ -1416,10 +1416,65 @@ a:hover { color: var(--holo-bright); }
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
   padding: 20px;
   box-shadow:
     0 0 40px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 var(--glass-highlight);
+}
+
+.model-filter-input {
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+
+.model-filter-input::placeholder {
+  color: var(--text-muted);
+}
+
+.model-filter-input:focus {
+  border-color: var(--holo-base);
+  box-shadow: 0 0 6px rgba(102, 204, 255, 0.15);
+}
+
+.model-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.model-preset-btn {
+  padding: 3px 8px;
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid rgba(100, 200, 255, 0.12);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.model-preset-btn:hover {
+  background: rgba(100, 200, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.model-preset-btn.active {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: var(--holo-base);
+  color: var(--text-primary);
 }
 
 .model-list-item {
@@ -1520,6 +1575,23 @@ a:hover { color: var(--holo-bright); }
   height: 12px;
   border-radius: 50%;
   background: var(--holo-base);
+  cursor: pointer;
+}
+
+.tolerance-slider::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(100, 200, 255, 0.15);
+  border-radius: 2px;
+  border: none;
+}
+
+.tolerance-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  border: none;
   cursor: pointer;
 }
 
@@ -1947,6 +2019,21 @@ a:hover { color: var(--holo-bright); }
 
 /* ── Output Browser ──────────────────────────────────────────────────────── */
 
+#outputBrowserOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#outputBrowserOverlay.hidden {
+  display: none !important;
+}
+
 .output-browser-card {
   position: fixed;
   top: 50%;
@@ -1995,6 +2082,11 @@ a:hover { color: var(--holo-bright); }
 
 .tree-file:hover {
   background: var(--glass-highlight);
+}
+
+.tree-file.active {
+  background: rgba(100, 200, 255, 0.15);
+  border-left: 2px solid var(--holo-base);
 }
 
 .tree-icon {
@@ -2066,6 +2158,21 @@ a:hover { color: var(--holo-bright); }
 
 /* ── Review Analytics Panel ──────────────────────────────────────────── */
 
+#reviewAnalyticsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#reviewAnalyticsOverlay.hidden {
+  display: none !important;
+}
+
 .review-analytics-card {
   position: fixed;
   top: 50%;
@@ -2090,6 +2197,9 @@ a:hover { color: var(--holo-bright); }
   letter-spacing: 0.5px;
   color: var(--text-primary);
   margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .review-analytics-stats {

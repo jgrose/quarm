@@ -891,16 +891,96 @@ function _barChart(items, maxVal, color) {
 
 var _modelConfigData = [];
 
+var MODEL_PRESETS = [
+  { name: 'recommended', label: 'RECOMMENDED',
+    include: ['opus', 'sonnet', 'gemini', 'nemotron', 'qwen', 'gpt-4o', 'o3-', 'o4-', 'llama-4', 'deepseek'],
+    exclude: ['embed', 'vision', 'tts', 'whisper', 'dall', 'stable-diffusion', 'moderation', 'realtime', 'image'] },
+  { name: 'claude', label: 'CLAUDE', include: ['claude'], exclude: [] },
+  { name: 'openai', label: 'OPENAI', include: ['gpt', 'o1-', 'o3-', 'o4-'], exclude: [] },
+  { name: 'aws', label: 'AWS', include: ['bedrock', 'nova'], exclude: [] },
+  { name: 'google', label: 'GOOGLE', include: ['gemini', 'gemma'], exclude: [] },
+  { name: 'opensource', label: 'OPEN SOURCE',
+    include: ['llama', 'qwen', 'nemotron', 'mistral', 'deepseek', 'phi-'], exclude: [] },
+  { name: 'all', label: 'ALL', include: [], exclude: [] },
+];
+
+function _modelMatchesPreset(modelId, preset) {
+  var lower = modelId.toLowerCase();
+  if (preset.exclude.length > 0) {
+    for (var i = 0; i < preset.exclude.length; i++) {
+      if (lower.indexOf(preset.exclude[i]) !== -1) return false;
+    }
+  }
+  if (preset.include.length === 0) return true;
+  for (var j = 0; j < preset.include.length; j++) {
+    if (lower.indexOf(preset.include[j]) !== -1) return true;
+  }
+  return false;
+}
+
 function renderModelConfig(data) {
   var overlay = document.getElementById('modelConfigOverlay');
-  if (overlay) overlay.classList.remove('hidden');
+  if (overlay) overlay.classList.add('visible');
+  _modelConfigData = data.models || [];
+  var filterInput = document.getElementById('modelFilterInput');
+  if (filterInput) filterInput.value = '';
+  _renderModelPresets();
+  _renderModelList('');
+}
+
+function _renderModelPresets() {
+  var row = document.getElementById('modelPresetRow');
+  if (!row) return;
+  row.innerHTML = MODEL_PRESETS.map(function(p) {
+    return '<button class="model-preset-btn" data-preset="' + p.name + '" onclick="applyModelPreset(\'' + p.name + '\')">' + p.label + '</button>';
+  }).join('');
+}
+
+function applyModelPreset(presetName) {
+  var preset = MODEL_PRESETS.filter(function(p) { return p.name === presetName; })[0];
+  if (!preset) return;
+
+  var enabledIds;
+  if (presetName === 'all') {
+    enabledIds = null;
+    _modelConfigData.forEach(function(m) { m.enabled = true; });
+  } else {
+    enabledIds = [];
+    _modelConfigData.forEach(function(m) {
+      var match = _modelMatchesPreset(m.id, preset);
+      m.enabled = match;
+      if (match) enabledIds.push(m.id);
+    });
+  }
+
+  saveModels(enabledIds);
+
+  // Update toggle UI in place
+  var toggles = document.querySelectorAll('#modelConfigBody .cfg-toggle');
+  toggles.forEach(function(el) {
+    var model = _modelConfigData.filter(function(m) { return m.id === el.dataset.model; })[0];
+    if (model) {
+      if (model.enabled) el.classList.add('on');
+      else el.classList.remove('on');
+    }
+  });
+
+  // Highlight active preset
+  var btns = document.querySelectorAll('.model-preset-btn');
+  btns.forEach(function(btn) {
+    if (btn.dataset.preset === presetName) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+
+function _renderModelList(filter) {
   var body = document.getElementById('modelConfigBody');
   if (!body) return;
-
-  _modelConfigData = data.models || [];
-
-  body.innerHTML = _modelConfigData.map(function(m) {
-    var tierClass = 'tier-' + (m.tier || 'mid');
+  var lowerFilter = filter.toLowerCase();
+  var filtered = _modelConfigData.filter(function(m) {
+    return !lowerFilter || m.id.toLowerCase().indexOf(lowerFilter) !== -1;
+  });
+  body.innerHTML = filtered.map(function(m) {
     return '<div class="config-row">' +
       '<span class="config-label">' + escapeHtml(m.id) + ' <span style="color:' + C.textMuted + '">[' + (m.tier || '?') + ']</span></span>' +
       '<div class="cfg-toggle ' + (m.enabled ? 'on' : '') + '" data-model="' + escapeHtml(m.id) + '" onclick="toggleModel(this)"></div>' +
@@ -908,8 +988,20 @@ function renderModelConfig(data) {
   }).join('');
 }
 
+function filterModels(value) {
+  _renderModelList(value);
+}
+
 function toggleModel(el) {
   el.classList.toggle('on');
+  // Update internal state
+  var modelId = el.dataset.model;
+  var model = _modelConfigData.filter(function(m) { return m.id === modelId; })[0];
+  if (model) model.enabled = el.classList.contains('on');
+  // Clear preset highlight on manual toggle
+  var btns = document.querySelectorAll('.model-preset-btn');
+  btns.forEach(function(btn) { btn.classList.remove('active'); });
+  // Save
   var allToggles = document.querySelectorAll('#modelConfigBody .cfg-toggle');
   var enabledToggles = document.querySelectorAll('#modelConfigBody .cfg-toggle.on');
   var allEnabled = allToggles.length === enabledToggles.length;
@@ -921,7 +1013,7 @@ function toggleModel(el) {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── Agent Registry Panel ───────────────────────────────────────────────────
@@ -1487,6 +1579,8 @@ function showOutputBrowser() {
 
 function loadOutputTree(planId) {
   _outputPlanId = planId;
+  var treeEl = document.getElementById('outputFileTree');
+  if (treeEl) treeEl.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
   fetch('/api/artifacts/' + planId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -1534,7 +1628,7 @@ function _buildTreeHTML(node, depth) {
     if (val && val.file) {
       var icon = _fileIcon(val.ext || '');
       var sizeStr = val.size > 1024 ? (val.size / 1024).toFixed(1) + 'K' : val.size + 'B';
-      html += '<div class="tree-file" style="padding-left:' + indent + 'px" onclick="previewArtifact(\'' + escapeHtml(val.path) + '\')">';
+      html += '<div class="tree-file" style="padding-left:' + indent + 'px" data-path="' + escapeHtml(val.path) + '" onclick="previewArtifact(\'' + escapeHtml(val.path) + '\')">';
       html += '<span class="tree-icon">' + icon + '</span>';
       html += '<span class="tree-name">' + escapeHtml(key) + '</span>';
       html += '<span class="tree-size">' + sizeStr + '</span>';
@@ -1556,6 +1650,10 @@ function previewArtifact(filePath) {
   var relPath = parts.slice(1).join('/');
   var preview = document.getElementById('outputFilePreview');
   if (!preview) return;
+  var treeItems = document.querySelectorAll('.tree-file');
+  for (var ti = 0; ti < treeItems.length; ti++) treeItems[ti].classList.remove('active');
+  var clicked = document.querySelector('.tree-file[data-path="' + filePath.replace(/"/g, '\\"') + '"]');
+  if (clicked) clicked.classList.add('active');
   preview.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
 
   var taskId = parts.length > 1 ? parts[1] : '';
@@ -1608,6 +1706,23 @@ function loadRevisionFile(revision, relPath) {
 
 function syntaxHighlight(code, ext) {
   var escaped = escapeHtml(code);
+  var tokens = [];
+  function stash(match, style) {
+    var idx = tokens.length;
+    tokens.push('<span style="' + style + '">' + match + '</span>');
+    return '\x00T' + idx + 'T\x00';
+  }
+  // 1. Comments first
+  if (ext === 'py') {
+    escaped = escaped.replace(/(#[^\n]*)/g, function(m) { return stash(m, 'color:var(--text-dim)'); });
+  } else if (ext === 'js' || ext === 'ts' || ext === 'jsx' || ext === 'tsx' || ext === 'css') {
+    escaped = escaped.replace(/(\/\/[^\n]*)/g, function(m) { return stash(m, 'color:var(--text-dim)'); });
+  }
+  // 2. Strings
+  if (ext !== 'html' && ext !== 'json') {
+    escaped = escaped.replace(/(&#39;[^&#]*&#39;|&quot;[^&]*&quot;)/g, function(m) { return stash(m, 'color:#66ffaa'); });
+  }
+  // 3. Language-specific
   var keywords = [];
   if (ext === 'py') {
     keywords = ['def ', 'class ', 'import ', 'from ', 'return ', 'if ', 'else:', 'elif ',
@@ -1618,40 +1733,62 @@ function syntaxHighlight(code, ext) {
                 'for ', 'while ', 'class ', 'import ', 'export ', 'from ', 'async ',
                 'await ', 'new ', 'this', 'true', 'false', 'null', 'undefined'];
   } else if (ext === 'html') {
-    keywords = [];
-    // Highlight tags
-    escaped = escaped.replace(/(&lt;\/?[a-zA-Z][a-zA-Z0-9]*)/g, '<span style="color:#cc88ff">$1</span>');
-    escaped = escaped.replace(/(&gt;)/g, '<span style="color:#cc88ff">$1</span>');
+    escaped = escaped.replace(/(&lt;\/?[a-zA-Z][a-zA-Z0-9]*)/g, function(m) { return stash(m, 'color:#cc88ff'); });
+    escaped = escaped.replace(/(&gt;)/g, function(m) { return stash(m, 'color:#cc88ff'); });
   } else if (ext === 'css') {
-    keywords = [];
-    escaped = escaped.replace(/([\w-]+)\s*:/g, '<span style="color:#66ccff">$1</span>:');
+    escaped = escaped.replace(/([\w-]+)\s*:/g, function(m, p1) { return stash(p1, 'color:#66ccff') + ':'; });
   } else if (ext === 'json') {
-    escaped = escaped.replace(/(&quot;[^&]*&quot;)\s*:/g, '<span style="color:#66ccff">$1</span>:');
-    escaped = escaped.replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:#66ffaa">$1</span>');
+    escaped = escaped.replace(/(&quot;[^&]*&quot;)\s*:/g, function(m, p1) { return stash(p1, 'color:#66ccff') + ':'; });
+    escaped = escaped.replace(/:\s*(&quot;[^&]*&quot;)/g, function(m, p1) { return ': ' + stash(p1, 'color:#66ffaa'); });
   }
-  // Apply keyword highlighting
+  // 4. Keywords
   for (var i = 0; i < keywords.length; i++) {
     var kw = keywords[i];
     var re = new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    escaped = escaped.replace(re, '<span style="color:#cc88ff">' + kw + '</span>');
+    escaped = escaped.replace(re, function(m) { return stash(m, 'color:#cc88ff'); });
   }
-  // Highlight strings
-  if (ext !== 'html' && ext !== 'json') {
-    escaped = escaped.replace(/(&#39;[^&#]*&#39;|&quot;[^&]*&quot;)/g, '<span style="color:#66ffaa">$1</span>');
-  }
-  // Highlight comments
-  if (ext === 'py') {
-    escaped = escaped.replace(/(#[^\n]*)/g, '<span style="color:var(--text-dim)">$1</span>');
-  } else if (ext === 'js' || ext === 'ts' || ext === 'css') {
-    escaped = escaped.replace(/(\/\/[^\n]*)/g, '<span style="color:var(--text-dim)">$1</span>');
-  }
+  // Restore tokens
+  escaped = escaped.replace(/\x00T(\d+)T\x00/g, function(m, idx) { return tokens[parseInt(idx)]; });
   return escaped;
 }
 
 function downloadArtifacts() {
   var planId = _outputPlanId || _activeSessionId || '';
   if (!planId) return;
-  window.location.href = '/api/artifacts/' + planId + '/download';
+  var btn = document.getElementById('outputDownloadBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'PREPARING...';
+  }
+  fetch('/api/artifacts/' + planId + '/download')
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (btn) {
+          btn.textContent = 'NO ARTIFACTS';
+          setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000);
+        }
+        return;
+      }
+      return resp.blob().then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        var disp = resp.headers.get('Content-Disposition') || '';
+        var match = disp.match(/filename="?([^"]+)"?/);
+        a.download = match ? match[1] : planId + '_artifacts.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        if (btn) { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }
+      });
+    })
+    .catch(function() {
+      if (btn) {
+        btn.textContent = 'DOWNLOAD FAILED';
+        setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000);
+      }
+    });
 }
 
 // ── Review Analytics Panel ──────────────────────────────────────────────
@@ -1668,8 +1805,6 @@ function renderReviewAnalytics(data) {
     body.innerHTML = '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px">No review data yet</div>';
     return;
   }
-
-  var maxTotal = Math.max.apply(null, reviewers.map(function(r) { return r.total_reviews; }));
 
   body.innerHTML = reviewers.map(function(r) {
     var passRate = r.total_reviews > 0 ? ((r.passes / r.total_reviews) * 100).toFixed(0) : 0;
@@ -1703,7 +1838,6 @@ async function applyTolerancePreset(presetName) {
       body: JSON.stringify({ preset: presetName }),
     });
     loadTolerance();
-    highlightActivePreset(presetName);
   } catch (e) {
     console.error('applyTolerancePreset:', e);
   }

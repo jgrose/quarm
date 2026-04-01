@@ -847,8 +847,13 @@ async def resolve_approval_endpoint(tool_call_id: str, request: Request):
 
 ARTIFACTS_DIR = STATIC_DIR / "artifacts"
 
+def _validate_plan_id(plan_id: str):
+    if not re.match(r'^[a-zA-Z0-9_.\-]+$', plan_id):
+        raise HTTPException(status_code=400, detail="Invalid plan_id")
+
 @app.get("/api/artifacts/{plan_id}")
 async def list_artifacts(plan_id: str):
+    _validate_plan_id(plan_id)
     plan_dir = ARTIFACTS_DIR / plan_id
     if not plan_dir.exists():
         return {"files": [], "tree": {}}
@@ -881,6 +886,7 @@ async def list_artifacts(plan_id: str):
 @app.get("/api/artifacts/{plan_id}/file")
 async def get_artifact_file(plan_id: str, path: str = ""):
     """Return the content of a specific artifact file."""
+    _validate_plan_id(plan_id)
     if not path:
         raise HTTPException(status_code=400, detail="path parameter required")
     # Security: prevent path traversal
@@ -906,6 +912,7 @@ async def get_artifact_file(plan_id: str, path: str = ""):
 @app.get("/api/artifacts/{plan_id}/download")
 async def download_artifacts(plan_id: str):
     """Download all artifacts for a plan as a zip file."""
+    _validate_plan_id(plan_id)
     plan_dir = ARTIFACTS_DIR / plan_id
     if not plan_dir.exists():
         raise HTTPException(status_code=404, detail="No artifacts found")
@@ -915,16 +922,23 @@ async def download_artifacts(plan_id: str):
             if f.is_file():
                 zf.write(f, arcname=str(f.relative_to(plan_dir)))
     buf.seek(0)
+    zip_size = buf.getbuffer().nbytes
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{re.sub(r"[^a-zA-Z0-9_-]", "", plan_id)}_artifacts.zip"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{re.sub(r"[^a-zA-Z0-9_-]", "", plan_id)}_artifacts.zip"',
+            "Content-Length": str(zip_size),
+        },
     )
 
 
 @app.get("/api/artifacts/{plan_id}/revisions/{task_id}")
 async def list_revisions(plan_id: str, task_id: str):
     """List revision snapshots for a task."""
+    _validate_plan_id(plan_id)
+    if not re.match(r'^[a-zA-Z0-9_.\-]+$', task_id):
+        raise HTTPException(status_code=400, detail="Invalid task_id")
     rev_dir = ARTIFACTS_DIR / plan_id / task_id / "revisions"
     if not rev_dir.exists():
         return {"revisions": []}

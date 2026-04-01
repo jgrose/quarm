@@ -29,6 +29,7 @@ from langgraph.graph.message import add_messages
 from status_bridge import (
     write_status, log_event, set_project,
     set_active_reviewer, register_rosters,
+    set_session_id,
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
@@ -359,11 +360,21 @@ def upd(tasks, tid, **kw):
 def find_mgr(agent, mgrs):
     return next((m for m in mgrs if agent in m.get("oversees", [])), None)
 
+_config_cache: dict = {}
+_config_mtime: float = 0.0
+
 def _load_orchestrator_config() -> dict:
-    """Load config.json with safe fallback."""
+    """Load config.json with safe fallback. Caches by mtime to avoid repeated disk reads."""
+    global _config_cache, _config_mtime
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
     try:
-        with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
-            return json.load(f)
+        mt = os.path.getmtime(config_path)
+        if mt == _config_mtime and _config_cache:
+            return _config_cache
+        with open(config_path) as f:
+            _config_cache = json.load(f)
+        _config_mtime = mt
+        return _config_cache
     except Exception:
         return {}
 
@@ -381,10 +392,14 @@ def _resolve_tolerance(agent_name: str, agent_dict: dict, task_tolerance: int = 
     elif task_tolerance and 1 <= task_tolerance <= 10:
         base = task_tolerance
     else:
+        if task_tolerance and not (1 <= task_tolerance <= 10):
+            log_event(f"[TOLERANCE] WARNING: {agent_name} task tolerance {task_tolerance} out of range (1-10), ignoring")
         plan_tol = agent_dict.get("tolerance", 0)
         if plan_tol and 1 <= plan_tol <= 10:
             base = plan_tol
         else:
+            if plan_tol and not (1 <= plan_tol <= 10):
+                log_event(f"[TOLERANCE] WARNING: {agent_name} plan tolerance {plan_tol} out of range (1-10), ignoring")
             global_tol = cfg.get("default_tolerance")
             if global_tol is not None and 1 <= global_tol <= 10:
                 base = global_tol
@@ -721,6 +736,7 @@ def manager_review_node(state):
 
     task_tolerance = task.get("tolerance", 0)
     tolerance = _resolve_tolerance(manager["name"], manager, task_tolerance)
+    log_event(f"[TOLERANCE] {manager['name']} effective tolerance={tolerance} for {tid} (task={task_tolerance}, plan={manager.get('tolerance', 0)})")
     if tolerance >= 8:
         strictness = " Only FAIL for critical blocking issues that would cause real harm."
     elif tolerance >= 5:
@@ -889,6 +905,7 @@ def specialist_review_node(state):
 
         task_tolerance = task.get("tolerance", 0)
         tolerance = _resolve_tolerance(reviewer["name"], reviewer, task_tolerance)
+        log_event(f"[TOLERANCE] {reviewer['name']} effective tolerance={tolerance} for {tid} (task={task_tolerance}, plan={reviewer.get('tolerance', 0)})")
         system = _build_reviewer_prompt(reviewer, tolerance)
         resp = llm(model).invoke([
             SystemMessage(content=system),
@@ -1264,6 +1281,8 @@ def validate_outputs(output_dir: str) -> dict:
 def run(plan_path="plan.md", plan_id: str = ""):
     global _run_id, _plan_id
     _plan_id = plan_id
+    if plan_id:
+        set_session_id(plan_id)
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
@@ -1435,5 +1454,7 @@ def run(plan_path="plan.md", plan_id: str = ""):
 
 
 if __name__ == "__main__":
-    import sys
-    run(sys.argv[1] if len(sys.argv) > 1 else "plan.md")
+    import sys, uuid
+    plan_path = sys.argv[1] if len(sys.argv) > 1 else "plan.md"
+    plan_id = sys.argv[2] if len(sys.argv) > 2 else uuid.uuid4().hex[:12]
+    run(plan_path, plan_id=plan_id)
