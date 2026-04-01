@@ -168,7 +168,8 @@ class ConnectionManager:
         if self._last_queue:
             queue_payload = {"type": "queue", "plans": self._last_queue}
         else:
-            disk_queue = _load_queue()
+            with _queue_lock:
+                disk_queue = _load_queue()
             if disk_queue:
                 queue_payload = {"type": "queue", "plans": disk_queue}
         if queue_payload:
@@ -334,7 +335,8 @@ def _auto_advance():
 
 def _resume_interrupted_runs():
     """On startup, resume plans that were running when server died."""
-    queue = _load_queue()
+    with _queue_lock:
+        queue = _load_queue()
     for entry in queue:
         if entry["status"] == "running":
             plan_id = entry["id"]
@@ -799,15 +801,8 @@ def _watch_incoming():
                 # Extract title from first heading
                 title_match = re.search(r"^#\s+(?:PROJECT PLAN:\s*)?(.+)", content, re.MULTILINE)
                 title = title_match.group(1).strip() if title_match else f.stem
-                # Add to queue
-                plans = json.loads(QUEUE_FILE.read_text()) if QUEUE_FILE.exists() else []
-                plans.append({
-                    "id": plan_id,
-                    "title": title,
-                    "status": "queued",
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                })
-                QUEUE_FILE.write_text(json.dumps(plans, indent=2))
+                # Add to queue (use helper for thread safety)
+                _add_plan(plan_id, title, description="")
                 f.unlink()  # remove from incoming
                 log.info(f"Auto-queued: {title} ({plan_id})")
         except Exception as e:
