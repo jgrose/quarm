@@ -648,6 +648,12 @@ async def analytics_scores():
     return get_score_analytics()
 
 
+@app.get("/api/review-stats")
+async def review_stats():
+    from tracking import get_review_stats
+    return get_review_stats()
+
+
 # ── Webhook config endpoint ─────────────────────────────────────────────────
 
 @app.get("/api/config")
@@ -698,12 +704,28 @@ async def get_tolerance():
         "default_tolerance": default_tol,
         "agents": agents,
         "overrides": overrides,
+        "active_preset": cfg.get("active_preset"),
     }
 
 @app.post("/api/tolerance")
 async def save_tolerance(request: Request):
     body = await request.json()
     cfg = _load_config()
+
+    # Handle preset selection
+    if "preset" in body:
+        preset_name = body["preset"]
+        preset_values = {"prototype": 8, "production": 5, "audit": 3}
+        if preset_name not in preset_values:
+            raise HTTPException(status_code=400, detail=f"Unknown preset: {preset_name}")
+        cfg["default_tolerance"] = preset_values[preset_name]
+        cfg["tolerance_overrides"] = {}
+        cfg["active_preset"] = preset_name
+        _save_config(cfg)
+        return {"ok": True, "preset": preset_name}
+
+    # Clear active preset on manual changes
+    cfg.pop("active_preset", None)
 
     if "default_tolerance" in body:
         val = body["default_tolerance"]
@@ -830,19 +852,22 @@ async def list_artifacts(plan_id: str):
             rel = f.relative_to(plan_dir)
             parts = rel.parts
             task_id = parts[0] if len(parts) > 1 else ""
+            st_size = f.stat().st_size
+            artifact_path = str(f.relative_to(ARTIFACTS_DIR))
+            ext = f.suffix.lstrip(".")
             files.append({
-                "path": str(f.relative_to(ARTIFACTS_DIR)),
+                "path": artifact_path,
                 "rel_path": str(rel),
-                "size": f.stat().st_size,
+                "size": st_size,
                 "name": f.name,
-                "ext": f.suffix.lstrip("."),
+                "ext": ext,
                 "task_id": task_id,
             })
             # Build nested tree
             node = tree
             for part in parts[:-1]:
                 node = node.setdefault(part, {})
-            node[f.name] = {"file": True, "path": str(f.relative_to(ARTIFACTS_DIR)), "size": f.stat().st_size, "ext": f.suffix.lstrip(".")}
+            node[f.name] = {"file": True, "path": artifact_path, "size": st_size, "ext": ext}
     return {"files": files, "tree": tree}
 
 
@@ -852,10 +877,11 @@ async def get_artifact_file(plan_id: str, path: str = ""):
     if not path:
         raise HTTPException(status_code=400, detail="path parameter required")
     # Security: prevent path traversal
-    safe = Path(path).resolve()
     plan_dir = (ARTIFACTS_DIR / plan_id).resolve()
     target = (plan_dir / path).resolve()
-    if not str(target).startswith(str(plan_dir)):
+    try:
+        target.relative_to(plan_dir)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Path traversal not allowed")
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
@@ -885,7 +911,7 @@ async def download_artifacts(plan_id: str):
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{plan_id}_artifacts.zip"'},
+        headers={"Content-Disposition": f'attachment; filename="{re.sub(r"[^a-zA-Z0-9_-]", "", plan_id)}_artifacts.zip"'},
     )
 
 

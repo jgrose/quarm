@@ -327,7 +327,54 @@ def update_agent(agent_type: str, name: str, updates: dict) -> dict | None:
         return None
     updates.pop("name", None)
     updates.pop("builtin", None)
+
+    # Save version before updating
+    versions = agent.get("versions", [])
+    snapshot = {k: v for k, v in agent.items() if k != "versions"}
+    version_num = len(versions) + 1
+    snapshot["version"] = version_num
+    snapshot["timestamp"] = datetime.now(timezone.utc).isoformat()
+    versions.append(snapshot)
+    agent["versions"] = versions
+
     agent.update(updates)
+    agent["updated_at"] = datetime.now(timezone.utc).isoformat()
+    reg[agent_type][name] = agent
+    save_registry(reg)
+    return agent
+
+
+def get_agent_versions(agent_type: str, name: str) -> list[dict]:
+    """Return version history for an agent."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return []
+    return agent.get("versions", [])
+
+
+def rollback_agent(agent_type: str, name: str, version: int) -> dict | None:
+    """Restore an agent to a previous version."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return None
+    versions = agent.get("versions", [])
+    target = next((v for v in versions if v.get("version") == version), None)
+    if not target:
+        return None
+    # Save current state as a version first
+    snapshot = {k: v for k, v in agent.items() if k != "versions"}
+    snapshot["version"] = len(versions) + 1
+    snapshot["timestamp"] = datetime.now(timezone.utc).isoformat()
+    versions.append(snapshot)
+    # Restore fields from target (except version metadata)
+    restore = {k: v for k, v in target.items() if k not in ("version", "timestamp")}
+    for key in list(agent.keys()):
+        if key not in ("name", "versions", "builtin"):
+            agent.pop(key, None)
+    agent.update(restore)
+    agent["versions"] = versions
     agent["updated_at"] = datetime.now(timezone.utc).isoformat()
     reg[agent_type][name] = agent
     save_registry(reg)
@@ -346,6 +393,48 @@ def delete_agent(agent_type: str, name: str) -> bool:
     save_registry(reg)
     log.info("Deleted %s/%s", agent_type, name)
     return True
+
+
+def clone_agent(agent_type: str, name: str, new_name: str = None) -> dict | None:
+    """Clone an existing agent with a new name."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return None
+    new_name = new_name or f"{name}_copy"
+    new_name = new_name.lower().replace(" ", "_")
+    if new_name in reg.get(agent_type, {}):
+        raise ValueError(f"Agent '{new_name}' already exists in {agent_type}")
+    now = datetime.now(timezone.utc).isoformat()
+    clone = {k: v for k, v in agent.items() if k != "versions"}
+    clone["name"] = new_name
+    clone["created_at"] = now
+    clone["updated_at"] = now
+    clone["runs"] = 0
+    clone["avg_score"] = 0
+    clone["total_revisions"] = 0
+    clone["builtin"] = False
+    clone["retired"] = False
+    if "versions" in clone:
+        del clone["versions"]
+    reg[agent_type][new_name] = clone
+    save_registry(reg)
+    log.info("Cloned %s/%s → %s", agent_type, name, new_name)
+    return clone
+
+
+def retire_agent(agent_type: str, name: str, retired: bool = True) -> dict | None:
+    """Set or unset retired status on an agent."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return None
+    agent["retired"] = retired
+    agent["updated_at"] = datetime.now(timezone.utc).isoformat()
+    reg[agent_type][name] = agent
+    save_registry(reg)
+    log.info("%s %s/%s", "Retired" if retired else "Unretired", agent_type, name)
+    return agent
 
 
 # ── Performance tracking ─────────────────────────────────────────────────────
@@ -387,6 +476,8 @@ def suggest_agents_for_description(description: str) -> dict:
     result = {"sub_agents": [], "managers": [], "reviewers": []}
     for agent_type in result:
         for agent in list_agents(agent_type):
+            if agent.get("retired"):
+                continue
             tags = [t.lower() for t in agent.get("tags", [])]
             if any(tag in desc_lower for tag in tags):
                 result[agent_type].append(agent)
@@ -409,6 +500,8 @@ def format_agent_catalog() -> str:
             continue
         lines.append(f"\n### Available {label}:")
         for a in sorted(agents, key=lambda x: (-x.get("avg_score", 0), -x.get("runs", 0))):
+            if a.get("retired"):
+                continue
             score_info = ""
             if a.get("runs", 0) > 0:
                 score_info = f" [score: {a['avg_score']:.1f}, runs: {a['runs']}]"
@@ -422,3 +515,119 @@ def format_agent_catalog() -> str:
                 lines.append(f"  tools: {', '.join(a['tools'])}")
 
     return "\n".join(lines)
+
+
+# ── Team presets ────────────────────────────────────────────────────────────
+
+
+def get_teams() -> list[dict]:
+    """Return all team presets."""
+    reg = load_registry()
+    return list(reg.get("teams", {}).values())
+
+
+def get_team(name: str) -> dict | None:
+    """Get a single team preset."""
+    reg = load_registry()
+    return reg.get("teams", {}).get(name)
+
+
+def create_team(spec: dict) -> dict:
+    """Create or update a team preset."""
+    reg = load_registry()
+    if "teams" not in reg:
+        reg["teams"] = {}
+    name = spec.get("name", "").lower().replace(" ", "_")
+    if not name:
+        raise ValueError("Team must have a name")
+    now = datetime.now(timezone.utc).isoformat()
+    team = {
+        "name": name,
+        "title": spec.get("title", name.replace("_", " ").title()),
+        "description": spec.get("description", ""),
+        "agents": spec.get("agents", []),  # list of {"type": "sub_agents", "name": "agent_name"}
+        "created_at": spec.get("created_at", now),
+        "updated_at": now,
+    }
+    reg["teams"][name] = team
+    save_registry(reg)
+    log.info("Created team: %s", name)
+    return team
+
+
+def delete_team(name: str) -> bool:
+    """Delete a team preset."""
+    reg = load_registry()
+    teams = reg.get("teams", {})
+    if name not in teams:
+        return False
+    del teams[name]
+    save_registry(reg)
+    log.info("Deleted team: %s", name)
+    return True
+
+
+# ── Import / Export ─────────────────────────────────────────────────────────
+
+
+def export_agents() -> dict:
+    """Export the full registry for backup/transfer."""
+    reg = load_registry()
+    # Remove versions from export to keep it clean
+    export = {}
+    for atype in ("sub_agents", "managers", "reviewers"):
+        export[atype] = {}
+        for name, agent in reg.get(atype, {}).items():
+            export[atype][name] = {k: v for k, v in agent.items() if k != "versions"}
+    if "teams" in reg:
+        export["teams"] = reg["teams"]
+    return export
+
+
+def import_agents(data: dict, overwrite: bool = False) -> dict:
+    """Import agents from exported data. Returns summary of what happened."""
+    reg = load_registry()
+    summary = {"created": [], "skipped": [], "overwritten": []}
+    now = datetime.now(timezone.utc).isoformat()
+    for atype in ("sub_agents", "managers", "reviewers"):
+        if atype not in data:
+            continue
+        if atype not in reg:
+            reg[atype] = {}
+        for name, agent in data[atype].items():
+            if name in reg[atype]:
+                if overwrite:
+                    agent["updated_at"] = now
+                    reg[atype][name] = agent
+                    summary["overwritten"].append(f"{atype}/{name}")
+                else:
+                    summary["skipped"].append(f"{atype}/{name}")
+            else:
+                agent["created_at"] = now
+                agent["updated_at"] = now
+                reg[atype][name] = agent
+                summary["created"].append(f"{atype}/{name}")
+    if "teams" in data:
+        if "teams" not in reg:
+            reg["teams"] = {}
+        for name, team in data["teams"].items():
+            if name in reg["teams"] and not overwrite:
+                summary["skipped"].append(f"teams/{name}")
+            else:
+                action = "overwritten" if name in reg["teams"] else "created"
+                reg["teams"][name] = team
+                summary[action].append(f"teams/{name}")
+    save_registry(reg)
+    return summary
+
+
+# ── Earned tolerance ────────────────────────────────────────────────────────
+
+
+def check_earned_tolerance(agent_type: str, name: str) -> bool:
+    """Check if agent qualifies for earned tolerance bonus (avg_score > 8, 5+ runs)."""
+    reg = load_registry()
+    agent = reg.get(agent_type, {}).get(name)
+    if not agent:
+        return False
+    return agent.get("runs", 0) >= 5 and agent.get("avg_score", 0) > 8

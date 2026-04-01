@@ -1801,9 +1801,48 @@ a:hover { color: var(--holo-bright); }
   border-radius: 2px;
 }
 
+.agents-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agents-action-btn {
+  padding: 3px 8px;
+  font-size: 7px;
+  font-family: monospace;
+  letter-spacing: 1px;
+  cursor: pointer;
+  background: rgba(100, 200, 255, 0.08);
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  color: rgba(102, 204, 255, 0.7);
+  transition: all 0.2s;
+}
+
+.agents-action-btn:hover {
+  background: rgba(100, 200, 255, 0.15);
+  color: #aaeeff;
+}
+
+.agents-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 7px;
+  font-family: monospace;
+  color: rgba(102, 204, 255, 0.56);
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.agents-toggle-label input[type="checkbox"] {
+  width: 10px;
+  height: 10px;
+  accent-color: #66ffaa;
+}
+
 .agents-create-btn {
-  width: 100%;
-  margin-top: 8px;
+  flex: 1;
   padding: 6px;
   background: rgba(100, 200, 255, 0.08);
   border: 1px dashed rgba(100, 200, 255, 0.2);

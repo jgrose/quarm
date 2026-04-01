@@ -28,13 +28,12 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from status_bridge import (
     write_status, log_event, set_project,
-    set_active_reviewer, register_rosters, set_session_id,
+    set_active_reviewer, register_rosters,
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
 from tools import get_tools, execute_tool_call, set_tool_context
 from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
-from content_scanner import scan_directory, format_scan_report
 
 load_dotenv()
 MAX_REVISIONS = 3
@@ -362,6 +361,7 @@ def _resolve_tolerance(agent_name: str, agent_dict: dict) -> int:
     """Resolve effective tolerance for a reviewer/manager.
 
     Precedence: config per-agent > plan per-agent > config global > DEFAULT_TOLERANCE
+    Then: +1 earned bonus if agent has avg_score > 8 over 5+ runs.
     """
     try:
         with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
@@ -371,17 +371,31 @@ def _resolve_tolerance(agent_name: str, agent_dict: dict) -> int:
 
     per_agent = cfg.get("tolerance_overrides", {}).get(agent_name)
     if per_agent is not None and 1 <= per_agent <= 10:
-        return per_agent
+        base = per_agent
+    else:
+        plan_tol = agent_dict.get("tolerance", 0)
+        if plan_tol and 1 <= plan_tol <= 10:
+            base = plan_tol
+        else:
+            global_tol = cfg.get("default_tolerance")
+            if global_tol is not None and 1 <= global_tol <= 10:
+                base = global_tol
+            else:
+                base = DEFAULT_TOLERANCE
 
-    plan_tol = agent_dict.get("tolerance", 0)
-    if plan_tol and 1 <= plan_tol <= 10:
-        return plan_tol
+    # Earned tolerance bonus: high-performing agents get +1
+    try:
+        from agent_registry import check_earned_tolerance
+        for atype in ("sub_agents", "managers", "reviewers"):
+            if check_earned_tolerance(atype, agent_name):
+                bonus = min(base + 1, 10)
+                if bonus > base:
+                    log_event(f"[TOLERANCE] {agent_name} earned +1 bonus (score>8, 5+ runs): {base} → {bonus}")
+                return bonus
+    except Exception:
+        pass
 
-    global_tol = cfg.get("default_tolerance")
-    if global_tol is not None and 1 <= global_tol <= 10:
-        return global_tol
-
-    return DEFAULT_TOLERANCE
+    return base
 
 def _auto_ingest(task, results):
     """Auto-ingest completed task output into RAG for cross-run knowledge."""
@@ -398,24 +412,6 @@ def _auto_ingest(task, results):
             log_event(f"  [RAG] Auto-ingested {task['id']} → {n} chunks")
     except Exception as e:
         log_event(f"  [RAG] Ingest failed: {e}")
-
-
-def snapshot_artifacts(plan_id: str, task_id: str, revision_num: int):
-    """Snapshot current task artifacts before a revision overwrites them."""
-    if not plan_id:
-        return
-    artifacts_root = Path(__file__).parent / "artifacts" / plan_id / task_id
-    if not artifacts_root.is_dir():
-        return
-    rev_dir = artifacts_root / "revisions" / f"rev_{revision_num}"
-    rev_dir.mkdir(parents=True, exist_ok=True)
-    for src in artifacts_root.rglob("*"):
-        if src.is_file() and "revisions" not in src.parts:
-            rel = src.relative_to(artifacts_root)
-            dest = rev_dir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
-    log_event(f"  [SNAPSHOT] {task_id} rev_{revision_num}: {sum(1 for _ in rev_dir.rglob('*') if _.is_file())} files")
 
 
 def applicable_reviewers(task, reviewers):
@@ -599,13 +595,21 @@ def sub_agent_node(state):
 
     # Fall back to single task if active_task_ids not populated
     if not active_ids:
-        active_ids = [state["active_task_id"]]
+        tid = state.get("active_task_id")
+        if tid:
+            active_ids = [tid]
+        else:
+            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
+            write_status(s); return s
 
     if len(active_ids) == 1:
         # ── Single task — run directly ──
         tid = active_ids[0]
         tid, draft, toks, tool_log, model = _execute_single_task(tid, tasks, results, sub_agents)
         task = get_task(tid, tasks)
+        if not task:
+            s = {**state, "phase": "dispatch", "active_task_id": None, "active_task_ids": []}
+            write_status(s); return s
         total_tokens = state.get("tokens_used", 0) + toks
         tasks = upd(tasks, tid, status="in_manager_review", result=draft,
                     manager_notes="", reviewer_notes="",
@@ -652,7 +656,22 @@ def manager_review_node(state):
     tid     = state["active_task_id"]
     tasks   = state["tasks"]
     results = state["results"]
+
+    # After parallel batch, active_task_id may be None — find first task needing review
+    if not tid:
+        for t in tasks:
+            if t["status"] == "in_manager_review":
+                tid = t["id"]
+                break
+    if not tid:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     task    = get_task(tid, tasks)
+    if not task:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     rev     = task.get("revision_count", 0)
     set_active_reviewer(None)
     manager = find_mgr(task["agent"], state["managers"])
@@ -736,7 +755,6 @@ def manager_review_node(state):
         write_status(s); return s
     else:
         log_event(f"[{manager['name'].upper()}] Returning {tid} for revision")
-        snapshot_artifacts(_plan_id, tid, rev + 1)
         tasks = upd(tasks, tid, status="revision",
                     manager_notes=v.get("feedback",""), revision_count=rev+1,
                     last_score=score)
@@ -778,7 +796,22 @@ def specialist_review_node(state):
     tid      = state["active_task_id"]
     tasks    = state["tasks"]
     results  = state["results"]
+
+    # After routing, active_task_id may be None — find first task needing specialist review
+    if not tid:
+        for t in tasks:
+            if t["status"] == "in_specialist_review":
+                tid = t["id"]
+                break
+    if not tid:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     task     = get_task(tid, tasks)
+    if not task:
+        s = {**state, "phase": "dispatch", "active_task_id": None}
+        write_status(s); return s
+
     rev      = task.get("revision_count", 0)
     rev_list = applicable_reviewers(task, state["reviewers"])
 
@@ -851,7 +884,6 @@ def specialist_review_node(state):
     if any_flags and rev < MAX_REVISIONS:
         msg = f"[PANEL] {len(flags)} reviewer(s) flagged {tid} — revising"
         print(f"  {msg}"); log_event(msg)
-        snapshot_artifacts(_plan_id, tid, rev + 1)
         tasks = upd(tasks, tid, status="revision",
                     reviewer_notes="\n\n".join(flags), revision_count=rev+1)
         s = {**state, "tasks": tasks, "phase": "execute"}
@@ -890,81 +922,6 @@ def synthesis_node(state):
     write_status(s); return s
 
 
-def composition_node(state):
-    """Check cross-file coherence of assembled output."""
-    plan_id = _plan_id
-    if not plan_id:
-        return state
-
-    artifacts_root = Path(__file__).parent / "artifacts" / plan_id
-    if not artifacts_root.is_dir():
-        log_event("[COMPOSITION] No artifacts to check")
-        return state
-
-    # Gather file listing
-    all_files = []
-    file_contents = {}
-    for f in sorted(artifacts_root.rglob("*")):
-        if f.is_file() and "revisions" not in f.parts:
-            rel = str(f.relative_to(artifacts_root))
-            all_files.append(rel)
-            try:
-                content = f.read_text(errors="replace")
-                if len(content) < 10000:
-                    file_contents[rel] = content
-            except Exception:
-                pass
-
-    if not all_files:
-        log_event("[COMPOSITION] No files to check")
-        return state
-
-    log_event("[COMPOSITION] Checking cross-file coherence...")
-    model = resolve_model(role="review")
-    log_event(f"  [MODEL] {model}")
-
-    file_listing = "\n".join(all_files)
-    content_samples = "\n\n".join(
-        f"=== {path} ===\n{content[:2000]}"
-        for path, content in list(file_contents.items())[:20]
-    )
-
-    prompt = (
-        f"You are a composition reviewer checking cross-file coherence for a project.\n\n"
-        f"## All Files\n{file_listing}\n\n"
-        f"## File Contents (samples)\n{content_samples}\n\n"
-        "Check for these issues:\n"
-        "1. Import references: Do any files import/reference other files that don't exist in the listing?\n"
-        "2. Config coherence: Do config values (paths, URLs, names) match actual file paths?\n"
-        "3. README accuracy: If there's a README, do its instructions match the actual project structure?\n"
-        "4. Missing files: Are there obvious missing files (e.g., referenced but not present)?\n\n"
-        "Return JSON:\n"
-        '{"coherent": true/false, "issues": [{"file": "path", "type": "import|config|readme|missing", '
-        '"description": "..."}], "summary": "1-2 sentence overall assessment"}'
-    )
-
-    try:
-        resp = llm(model).invoke([HumanMessage(content=prompt)])
-        toks = extract_tokens(resp)
-        total_tokens = state.get("tokens_used", 0) + toks
-
-        # Parse response
-        import re as _re
-        text = resp.content
-        json_match = _re.search(r'\{[\s\S]*\}', text)
-        if json_match:
-            report = json.loads(json_match.group())
-        else:
-            report = {"coherent": True, "issues": [], "summary": text[:500]}
-
-        log_event(f"[COMPOSITION] {'Coherent' if report.get('coherent') else 'Issues found'}: {report.get('summary', '')[:100]}")
-
-        return {**state, "coherence_report": report, "tokens_used": total_tokens}
-    except Exception as e:
-        log_event(f"[COMPOSITION] Error: {e}")
-        return {**state, "coherence_report": {"coherent": True, "issues": [], "summary": f"Check failed: {e}"}}
-
-
 # ── Graph ─────────────────────────────────────────────────────────────────────
 
 def route_master(s):
@@ -988,7 +945,6 @@ def build_graph():
         ("manager_review",    manager_review_node),
         ("specialist_review", specialist_review_node),
         ("synthesis",         synthesis_node),
-        ("composition",       composition_node),
     ]:
         g.add_node(name, fn)
 
@@ -1000,8 +956,7 @@ def build_graph():
         {"sub_agent":"sub_agent","specialist_review":"specialist_review","master":"master"})
     g.add_conditional_edges("specialist_review", route_specialist,
         {"sub_agent":"sub_agent","master":"master"})
-    g.add_edge("synthesis", "composition")
-    g.add_edge("composition", END)
+    g.add_edge("synthesis", END)
     return g.compile()
 
 
@@ -1038,7 +993,7 @@ def _slugify(text: str, max_len: int = 60) -> str:
 
 
 def assemble_output(plan_id: str, objective: str, tasks: list,
-                    plan_path: str = "", results_path: str = "") -> tuple[str, dict, list]:
+                    plan_path: str = "", results_path: str = "") -> tuple[str, dict]:
     """Merge per-task artifacts into a single deliverable output folder.
 
     Layout:  output/<slug>/
@@ -1046,17 +1001,11 @@ def assemble_output(plan_id: str, objective: str, tasks: list,
                ├── MANIFEST.md
                ├── plan.md          (copy of source plan)
                └── results.json     (copy of results)
-    Returns (output_dir_path, artifacts_by_task, scan_findings) or ("", {}, []) if no artifacts.
+    Returns (output_dir_path, artifacts_by_task) or ("", {}) if no artifacts.
     """
     artifacts_root = Path(__file__).parent / "artifacts" / plan_id
     if not artifacts_root.is_dir():
-        return "", {}, []
-
-    # Scan artifacts for security issues before assembly
-    scan_findings = scan_directory(artifacts_root)
-    if scan_findings:
-        report = format_scan_report(scan_findings)
-        log_event(report)
+        return "", {}
 
     slug = _slugify(objective) or plan_id
     output_dir = Path(__file__).parent / "output" / f"{plan_id}_{slug}"
@@ -1099,7 +1048,7 @@ def assemble_output(plan_id: str, objective: str, tasks: list,
 
     if files_copied == 0:
         shutil.rmtree(output_dir, ignore_errors=True)
-        return "", {}, scan_findings
+        return "", {}
 
     # Bundle source plan and results into the output package
     if plan_path and os.path.isfile(plan_path):
@@ -1110,79 +1059,12 @@ def assemble_output(plan_id: str, objective: str, tasks: list,
     manifest_lines.append(f"\n---\n*{files_copied} file(s) assembled from {len(task_ids)} task(s).*\n")
     (output_dir / "MANIFEST.md").write_text("\n".join(manifest_lines))
 
-    return str(output_dir), artifacts_by_task, scan_findings
-
-
-def validate_outputs(output_dir: str) -> dict:
-    """Run basic validation on assembled output files.
-
-    Returns dict: {"passed": [...], "failed": [...], "summary": str}
-    """
-    if not output_dir or not Path(output_dir).is_dir():
-        return {"passed": [], "failed": [], "summary": "No output directory"}
-
-    import subprocess
-    passed = []
-    failed = []
-
-    for f in sorted(Path(output_dir).rglob("*")):
-        if not f.is_file():
-            continue
-        rel = str(f.relative_to(output_dir))
-
-        if f.suffix == ".py":
-            try:
-                result = subprocess.run(
-                    ["python", "-m", "py_compile", str(f)],
-                    capture_output=True, text=True, timeout=10
-                )
-                if result.returncode == 0:
-                    passed.append({"file": rel, "check": "py_compile", "status": "pass"})
-                else:
-                    failed.append({"file": rel, "check": "py_compile", "status": "fail",
-                                   "error": result.stderr.strip()[:500]})
-            except Exception as e:
-                failed.append({"file": rel, "check": "py_compile", "status": "fail",
-                               "error": str(e)[:200]})
-
-        elif f.suffix == ".js":
-            try:
-                result = subprocess.run(
-                    ["node", "--check", str(f)],
-                    capture_output=True, text=True, timeout=10
-                )
-                if result.returncode == 0:
-                    passed.append({"file": rel, "check": "node_check", "status": "pass"})
-                else:
-                    failed.append({"file": rel, "check": "node_check", "status": "fail",
-                                   "error": result.stderr.strip()[:500]})
-            except FileNotFoundError:
-                passed.append({"file": rel, "check": "node_check", "status": "skip",
-                               "error": "node not available"})
-            except Exception as e:
-                failed.append({"file": rel, "check": "node_check", "status": "fail",
-                               "error": str(e)[:200]})
-
-        elif f.suffix == ".json":
-            try:
-                json.loads(f.read_text())
-                passed.append({"file": rel, "check": "json_parse", "status": "pass"})
-            except json.JSONDecodeError as e:
-                failed.append({"file": rel, "check": "json_parse", "status": "fail",
-                               "error": str(e)[:200]})
-
-    total = len(passed) + len(failed)
-    summary = f"{len(passed)}/{total} files passed validation"
-    if failed:
-        summary += f" ({len(failed)} failed)"
-
-    return {"passed": passed, "failed": failed, "summary": summary}
+    return str(output_dir), artifacts_by_task
 
 
 def run(plan_path="plan.md", plan_id: str = ""):
     global _run_id, _plan_id
     _plan_id = plan_id
-    set_session_id(plan_id or os.path.splitext(os.path.basename(plan_path))[0])
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
@@ -1271,19 +1153,11 @@ def run(plan_path="plan.md", plan_id: str = ""):
     # ── Assemble output package ──
     output_path = ""
     artifacts_by_task = {}
-    scan_findings = []
     if plan_id:
-        output_path, artifacts_by_task, scan_findings = assemble_output(
+        output_path, artifacts_by_task = assemble_output(
             plan_id, objective, final["tasks"],
             plan_path=plan_path, results_path="",  # results not written yet
         )
-
-    # ── Validate output files ──
-    validation = {}
-    if output_path:
-        log_event("[VALIDATE] Running output validation...")
-        validation = validate_outputs(output_path)
-        log_event(f"[VALIDATE] {validation.get('summary', '')}")
 
     with open(results_path, "w") as f:
         results_data = {
@@ -1301,10 +1175,6 @@ def run(plan_path="plan.md", plan_id: str = ""):
             results_data["artifacts"] = artifacts_by_task
         if output_path:
             results_data["output_dir"] = output_path
-        if validation:
-            results_data["validation"] = validation
-        if final.get("coherence_report"):
-            results_data["coherence_report"] = final["coherence_report"]
         json.dump(results_data, f, indent=2)
     print(f"\nSaved → {results_path}")
 

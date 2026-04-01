@@ -928,6 +928,8 @@ function escapeHtml(str) {
 
 var _agentsActiveTab = 'sub_agents';
 var _agentsData = null;
+var _teamsData = null;
+var _showRetired = false;
 
 function toggleAgentsPanel() {
   var el = document.getElementById('agentsOverlay');
@@ -945,30 +947,49 @@ function loadAgentsData() {
     .catch(function(e) { console.error('Failed to load agents:', e); });
 }
 
-function showAgentTab(tab) {
+function showAgentTab(tab, btn) {
   _agentsActiveTab = tab;
-  // Update tab button styles
   var tabs = document.querySelectorAll('.agents-tab');
-  for (var i = 0; i < tabs.length; i++) {
-    tabs[i].classList.remove('active');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  if (btn) btn.classList.add('active');
+
+  // Toggle create buttons
+  var createAgentBtn = document.querySelector('.agents-create-btn');
+  var createTeamBtn = document.getElementById('createTeamBtn');
+  if (tab === 'teams') {
+    if (createAgentBtn) createAgentBtn.style.display = 'none';
+    if (createTeamBtn) createTeamBtn.style.display = '';
+    loadTeamsData();
+  } else {
+    if (createAgentBtn) createAgentBtn.style.display = '';
+    if (createTeamBtn) createTeamBtn.style.display = 'none';
+    renderAgentsList();
   }
-  event.target.classList.add('active');
+}
+
+function toggleShowRetired() {
+  _showRetired = document.getElementById('showRetiredToggle').checked;
   renderAgentsList();
 }
 
 function renderAgentsList() {
+  if (_agentsActiveTab === 'teams') {
+    loadTeamsData();
+    return;
+  }
   if (!_agentsData) return;
   var list = document.getElementById('agentsList');
-  // Filter by active tab
   var filtered = _agentsData.filter(function(a) {
     return a._type === _agentsActiveTab || (!a._type && true);
   });
 
-  // If the API returns flat list with _type, filter. If grouped, access directly.
-  // Handle both cases:
   if (_agentsData.length > 0 && !_agentsData[0]._type) {
-    // Data might be from a type-specific call
     filtered = _agentsData;
+  }
+
+  // Filter retired
+  if (!_showRetired) {
+    filtered = filtered.filter(function(a) { return !a.retired; });
   }
 
   var html = '';
@@ -980,10 +1001,20 @@ function renderAgentsList() {
     var a = filtered[i];
     var scoreColor = (a.avg_score || 0) >= 7 ? '#66ffaa' : (a.avg_score || 0) >= 4 ? '#ffbb44' : '#ff5566';
     var builtinBadge = a.builtin ? '<span style="color:' + C.textMuted + ';font-size:7px;margin-left:4px">BUILTIN</span>' : '';
+    var retiredBadge = a.retired ? '<span style="color:#ff5566;font-size:7px;margin-left:4px;border:1px solid #ff556644;padding:0 3px;border-radius:2px">RETIRED</span>' : '';
+    var warningBadge = '';
+    if (!a.retired && a.runs >= 5 && (a.avg_score || 0) < 4) {
+      warningBadge = '<span style="color:#ffaa00;font-size:7px;margin-left:4px" title="Low performance: avg score < 4 over 5+ tasks">&#x26A0; LOW PERF</span>';
+    }
+    var trustedBadge = '';
+    if (a.runs >= 5 && (a.avg_score || 0) > 8) {
+      trustedBadge = '<span style="color:#66ffaa;font-size:7px;margin-left:4px;border:1px solid #66ffaa44;padding:0 3px;border-radius:2px">TRUSTED</span>';
+    }
 
-    html += '<div class="agent-item" onclick="showAgentRegistryDetail(\'' + escapeHtml(a.name) + '\',\'' + (_agentsActiveTab) + '\')">';
+    var opacity = a.retired ? 'opacity:0.5;' : '';
+    html += '<div class="agent-item" style="' + opacity + '" onclick="showAgentRegistryDetail(\'' + escapeHtml(a.name) + '\',\'' + (_agentsActiveTab) + '\')">';
     html += '<div class="agent-item-header">';
-    html += '<span class="agent-item-name">' + escapeHtml(a.title || a.name) + builtinBadge + '</span>';
+    html += '<span class="agent-item-name">' + escapeHtml(a.title || a.name) + builtinBadge + retiredBadge + warningBadge + trustedBadge + '</span>';
     html += '<span class="agent-item-score" style="color:' + scoreColor + '">';
     if (a.runs > 0) {
       html += a.avg_score.toFixed(1) + ' <span style="color:' + C.textMuted + '">(' + a.runs + ' runs)</span>';
@@ -1014,6 +1045,24 @@ function showAgentRegistryDetail(name, agentType) {
 
       var html = '<div class="agent-edit-form">';
       html += '<h3 style="color:' + C.textPrimary + ';margin:0 0 8px 0;font-size:11px">' + escapeHtml(agent.title || agent.name) + '</h3>';
+
+      // Version history dropdown
+      var versions = agent.versions || [];
+      if (versions.length > 0) {
+        html += '<div style="margin-bottom:8px">';
+        html += '<label>Version History:</label>';
+        html += '<select id="agentVersionSelect" class="agent-input" style="margin-bottom:4px">';
+        html += '<option value="">Current version</option>';
+        for (var v = versions.length - 1; v >= 0; v--) {
+          var ver = versions[v];
+          var ts = ver.timestamp ? new Date(ver.timestamp).toLocaleString() : '';
+          html += '<option value="' + ver.version + '">v' + ver.version + ' — ' + escapeHtml(ts) + '</option>';
+        }
+        html += '</select>';
+        html += '<button class="agent-save-btn" style="font-size:7px;padding:2px 8px" onclick="doRollbackAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">ROLLBACK</button>';
+        html += '</div>';
+      }
+
       html += '<label>Description:</label>';
       html += '<textarea id="agentEditDesc" class="agent-input" rows="3">' + escapeHtml(agent.description || '') + '</textarea>';
       html += '<label>Tags (comma-separated):</label>';
@@ -1024,8 +1073,16 @@ function showAgentRegistryDetail(name, agentType) {
         html += '<input id="agentEditTools" class="agent-input" value="' + escapeHtml((agent.tools || []).join(', ')) + '">';
       }
 
-      html += '<div style="margin-top:8px;display:flex;gap:6px">';
+      html += '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">';
       html += '<button class="agent-save-btn" onclick="saveAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">SAVE</button>';
+      html += '<button class="agent-save-btn" style="background:rgba(100,200,255,0.15);border-color:rgba(100,200,255,0.3);color:#88ddff" onclick="doCloneAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">CLONE</button>';
+
+      if (agent.retired) {
+        html += '<button class="agent-save-btn" style="background:rgba(102,255,170,0.15);border-color:rgba(102,255,170,0.3)" onclick="doRetireAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\', false)">UNRETIRE</button>';
+      } else {
+        html += '<button class="agent-delete-btn" style="background:rgba(255,170,0,0.15);border-color:rgba(255,170,0,0.3);color:#ffaa00" onclick="doRetireAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\', true)">RETIRE</button>';
+      }
+
       if (!agent.builtin) {
         html += '<button class="agent-delete-btn" onclick="deleteAgent(\'' + agentType + '\',\'' + escapeHtml(agent.name) + '\')">DELETE</button>';
       }
@@ -1065,6 +1122,42 @@ function deleteAgent(agentType, name) {
     });
 }
 
+function doCloneAgent(agentType, name) {
+  var newName = prompt('Clone name (leave blank for ' + name + '_copy):', name + '_copy');
+  if (newName === null) return;
+  cloneAgent(agentType, name, newName || null).then(function(result) {
+    if (result && result.ok) {
+      document.getElementById('agentFormArea').classList.add('hidden');
+      loadAgentsData();
+    } else {
+      alert('Clone failed: ' + (result && result.detail ? result.detail : 'unknown error'));
+    }
+  });
+}
+
+function doRetireAgent(agentType, name, retired) {
+  retireAgent(agentType, name, retired).then(function(result) {
+    if (result && result.ok) {
+      document.getElementById('agentFormArea').classList.add('hidden');
+      loadAgentsData();
+    }
+  });
+}
+
+function doRollbackAgent(agentType, name) {
+  var sel = document.getElementById('agentVersionSelect');
+  if (!sel || !sel.value) { alert('Select a version to rollback to'); return; }
+  if (!confirm('Rollback ' + name + ' to version ' + sel.value + '?')) return;
+  rollbackAgent(agentType, name, parseInt(sel.value)).then(function(result) {
+    if (result && result.ok) {
+      showAgentRegistryDetail(name, agentType);
+      loadAgentsData();
+    } else {
+      alert('Rollback failed');
+    }
+  });
+}
+
 function showCreateAgentForm() {
   var form = document.getElementById('agentFormArea');
   form.classList.remove('hidden');
@@ -1101,9 +1194,8 @@ function createNewAgent() {
     tools: document.getElementById('newAgentTools').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
   };
 
-  // Add type-specific fields
   if (agentType === 'managers') {
-    spec.expertise_blend = spec.tags.slice();  // use tags as expertise
+    spec.expertise_blend = spec.tags.slice();
     spec.oversees = [];
   }
   if (agentType === 'reviewers') {
@@ -1121,6 +1213,182 @@ function createNewAgent() {
       loadAgentsData();
     })
     .catch(function(e) { alert('Error: ' + e); });
+}
+
+// ── Teams Tab ──────────────────────────────────────────────────────────────
+
+function loadTeamsData() {
+  fetchTeams().then(function(teams) {
+    _teamsData = teams;
+    renderTeamsList();
+  });
+}
+
+function renderTeamsList() {
+  var list = document.getElementById('agentsList');
+  if (!_teamsData || _teamsData.length === 0) {
+    list.innerHTML = '<div style="padding:12px;color:' + C.textMuted + ';font-size:9px">No team presets defined</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < _teamsData.length; i++) {
+    var team = _teamsData[i];
+    var agentCount = (team.agents || []).length;
+    html += '<div class="agent-item" onclick="showTeamDetail(\'' + escapeHtml(team.name) + '\')">';
+    html += '<div class="agent-item-header">';
+    html += '<span class="agent-item-name">' + escapeHtml(team.title || team.name) + '</span>';
+    html += '<span class="agent-item-score" style="color:' + C.textMuted + '">' + agentCount + ' agents</span>';
+    html += '</div>';
+    html += '<div class="agent-item-desc">' + escapeHtml((team.description || '').slice(0, 80)) + '</div>';
+    if (team.agents && team.agents.length > 0) {
+      html += '<div class="agent-item-tags">';
+      for (var a = 0; a < Math.min(team.agents.length, 6); a++) {
+        html += '<span class="agent-tag">' + escapeHtml(team.agents[a].name || team.agents[a]) + '</span>';
+      }
+      if (team.agents.length > 6) html += '<span class="agent-tag">+' + (team.agents.length - 6) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function showTeamDetail(name) {
+  var team = _teamsData.find(function(t) { return t.name === name; });
+  if (!team) return;
+  var form = document.getElementById('agentFormArea');
+  form.classList.remove('hidden');
+
+  var html = '<div class="agent-edit-form">';
+  html += '<h3 style="color:' + C.textPrimary + ';margin:0 0 8px 0;font-size:11px">' + escapeHtml(team.title || team.name) + '</h3>';
+  html += '<div style="font-size:8px;color:' + C.textDim + ';margin-bottom:8px">' + escapeHtml(team.description || '') + '</div>';
+  html += '<div style="font-size:8px;color:' + C.textDim + ';letter-spacing:1px;margin-bottom:4px">AGENTS IN TEAM</div>';
+  var agents = team.agents || [];
+  for (var i = 0; i < agents.length; i++) {
+    var ag = agents[i];
+    html += '<div style="font-size:9px;color:#aaeeff;padding:2px 0">' + escapeHtml(ag.name || ag) + ' <span style="color:' + C.textMuted + '">(' + escapeHtml(ag.type || '?') + ')</span></div>';
+  }
+  html += '<div style="margin-top:8px;display:flex;gap:6px">';
+  html += '<button class="agent-delete-btn" onclick="doDeleteTeam(\'' + escapeHtml(team.name) + '\')">DELETE TEAM</button>';
+  html += '<button class="agent-cancel-btn" onclick="document.getElementById(\'agentFormArea\').classList.add(\'hidden\')">CLOSE</button>';
+  html += '</div></div>';
+
+  form.innerHTML = html;
+}
+
+function doDeleteTeam(name) {
+  if (!confirm('Delete team ' + name + '?')) return;
+  deleteTeam(name).then(function() {
+    document.getElementById('agentFormArea').classList.add('hidden');
+    loadTeamsData();
+  });
+}
+
+function showCreateTeamForm() {
+  // Load all agents to build checkboxes
+  fetch('/api/agents')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var allAgents = data.agents || [];
+      var form = document.getElementById('agentFormArea');
+      form.classList.remove('hidden');
+
+      var html = '<div class="agent-edit-form">';
+      html += '<h3 style="color:' + C.textPrimary + ';margin:0 0 8px 0;font-size:11px">CREATE TEAM PRESET</h3>';
+      html += '<label>Name:</label>';
+      html += '<input id="newTeamName" class="agent-input" placeholder="e.g. web_development">';
+      html += '<label>Title:</label>';
+      html += '<input id="newTeamTitle" class="agent-input" placeholder="e.g. Web Development Team">';
+      html += '<label>Description:</label>';
+      html += '<textarea id="newTeamDesc" class="agent-input" rows="2" placeholder="Team purpose..."></textarea>';
+      html += '<label>Select Agents:</label>';
+      html += '<div id="teamAgentCheckboxes" style="max-height:150px;overflow-y:auto;border:1px solid rgba(100,200,255,0.1);border-radius:4px;padding:4px">';
+
+      var types = ['sub_agents', 'managers', 'reviewers'];
+      for (var ti = 0; ti < types.length; ti++) {
+        var typeAgents = allAgents.filter(function(a) { return a._type === types[ti] && !a.retired; });
+        if (typeAgents.length === 0) continue;
+        html += '<div style="font-size:7px;color:' + C.textDim + ';letter-spacing:1px;margin:4px 0 2px">' + types[ti].toUpperCase().replace('_', ' ') + '</div>';
+        for (var ai = 0; ai < typeAgents.length; ai++) {
+          var ag = typeAgents[ai];
+          html += '<label style="display:block;font-size:8px;color:#aaeeff;padding:1px 0;cursor:pointer">';
+          html += '<input type="checkbox" class="team-agent-cb" data-type="' + types[ti] + '" data-name="' + escapeHtml(ag.name) + '"> ';
+          html += escapeHtml(ag.title || ag.name);
+          html += '</label>';
+        }
+      }
+      html += '</div>';
+
+      html += '<div style="margin-top:8px;display:flex;gap:6px">';
+      html += '<button class="agent-save-btn" onclick="createNewTeam()">CREATE</button>';
+      html += '<button class="agent-cancel-btn" onclick="document.getElementById(\'agentFormArea\').classList.add(\'hidden\')">CANCEL</button>';
+      html += '</div></div>';
+
+      form.innerHTML = html;
+    });
+}
+
+function createNewTeam() {
+  var name = document.getElementById('newTeamName').value.trim().toLowerCase().replace(/\s+/g, '_');
+  var title = document.getElementById('newTeamTitle').value.trim();
+  var desc = document.getElementById('newTeamDesc').value.trim();
+  var checkboxes = document.querySelectorAll('.team-agent-cb:checked');
+  var agents = [];
+  for (var i = 0; i < checkboxes.length; i++) {
+    agents.push({ type: checkboxes[i].dataset.type, name: checkboxes[i].dataset.name });
+  }
+  if (!name) { alert('Team name is required'); return; }
+  createTeam({ name: name, title: title || name, description: desc, agents: agents }).then(function(result) {
+    if (result && result.ok) {
+      document.getElementById('agentFormArea').classList.add('hidden');
+      loadTeamsData();
+    } else {
+      alert('Error creating team');
+    }
+  });
+}
+
+// ── Import/Export ──────────────────────────────────────────────────────────
+
+function exportAgents() {
+  exportAgentsData().then(function(data) {
+    if (!data) { alert('Export failed'); return; }
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'nort_agents_export.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function showImportAgents() {
+  var area = document.getElementById('importArea');
+  area.classList.toggle('hidden');
+  document.getElementById('importJson').value = '';
+  document.getElementById('importResult').textContent = '';
+}
+
+function importAgents() {
+  var jsonStr = document.getElementById('importJson').value.trim();
+  var overwrite = document.getElementById('importOverwrite').checked;
+  var resultEl = document.getElementById('importResult');
+  if (!jsonStr) { resultEl.textContent = 'Paste JSON data first'; resultEl.style.color = '#ff5566'; return; }
+  var data;
+  try { data = JSON.parse(jsonStr); } catch (e) { resultEl.textContent = 'Invalid JSON'; resultEl.style.color = '#ff5566'; return; }
+  importAgentsData(data, overwrite).then(function(result) {
+    if (result && result.ok) {
+      var s = result.summary;
+      resultEl.style.color = 'rgba(102,255,170,0.8)';
+      resultEl.textContent = 'Created: ' + (s.created || []).length + ', Skipped: ' + (s.skipped || []).length + ', Overwritten: ' + (s.overwritten || []).length;
+      loadAgentsData();
+    } else {
+      resultEl.style.color = '#ff5566';
+      resultEl.textContent = 'Import failed: ' + (result && result.detail ? result.detail : 'unknown');
+    }
+  });
 }
 
 // ── Review Tolerance Panel ────────────────────────────────────────────────
@@ -1145,6 +1413,14 @@ function renderToleranceConfig(data) {
     var gp = _tolerancePreset(defTol);
     globalPreset.textContent = gp.label;
     globalPreset.style.color = gp.color;
+  }
+
+  // Highlight active preset
+  if (data.active_preset) {
+    highlightActivePreset(data.active_preset);
+  } else {
+    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
+    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
   }
 
   var body = document.getElementById('toleranceConfigBody');
@@ -1190,4 +1466,259 @@ function updateAgentToleranceLabel(el) {
     preset.textContent = p.label;
     preset.style.color = p.color;
   }
+}
+
+// ── Output Browser ──────────────────────────────────────────────────────────
+
+var _outputPlanId = null;
+
+function showOutputBrowser() {
+  var overlay = document.getElementById('outputBrowserOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  // Determine plan_id from active session or queue
+  var planId = _outputPlanId || _activeSessionId || '';
+  if (!planId) {
+    // Try to get from queue
+    var queueItems = document.querySelectorAll('.queue-item[data-id]');
+    if (queueItems.length) planId = queueItems[queueItems.length - 1].dataset.id;
+  }
+  if (planId) loadOutputTree(planId);
+}
+
+function loadOutputTree(planId) {
+  _outputPlanId = planId;
+  fetch('/api/artifacts/' + planId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderFileTree(data.tree || {}, data.files || []);
+    })
+    .catch(function() {
+      document.getElementById('outputFileTree').innerHTML = '<div style="color:var(--text-dim);padding:12px">No artifacts found</div>';
+    });
+}
+
+var _FILE_ICONS = {
+  py: '\u{1F40D}', js: '\u{1F4DC}', html: '\u{1F310}', css: '\u{1F3A8}',
+  json: '\u{1F4CB}', md: '\u{1F4DD}', txt: '\u{1F4C4}', yaml: '\u2699',
+  yml: '\u2699', sh: '\u{1F4DF}', sql: '\u{1F5C3}', xml: '\u{1F4C3}',
+  ts: '\u{1F4DC}', jsx: '\u{1F4DC}', tsx: '\u{1F4DC}', svg: '\u{1F5BC}',
+  png: '\u{1F5BC}', jpg: '\u{1F5BC}', gif: '\u{1F5BC}',
+};
+
+function _fileIcon(ext) {
+  return _FILE_ICONS[ext] || '\u{1F4C4}';
+}
+
+function renderFileTree(tree, files) {
+  var el = document.getElementById('outputFileTree');
+  if (!el) return;
+  if (!files.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);padding:12px">No artifacts</div>';
+    return;
+  }
+  el.innerHTML = _buildTreeHTML(tree, 0);
+}
+
+function _buildTreeHTML(node, depth) {
+  var html = '';
+  var keys = Object.keys(node).sort(function(a, b) {
+    var aIsFile = node[a] && node[a].file;
+    var bIsFile = node[b] && node[b].file;
+    if (aIsFile !== bIsFile) return aIsFile ? 1 : -1;
+    return a.localeCompare(b);
+  });
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var val = node[key];
+    var indent = depth * 16;
+    if (val && val.file) {
+      var icon = _fileIcon(val.ext || '');
+      var sizeStr = val.size > 1024 ? (val.size / 1024).toFixed(1) + 'K' : val.size + 'B';
+      html += '<div class="tree-file" style="padding-left:' + indent + 'px" onclick="previewArtifact(\'' + escapeHtml(val.path) + '\')">';
+      html += '<span class="tree-icon">' + icon + '</span>';
+      html += '<span class="tree-name">' + escapeHtml(key) + '</span>';
+      html += '<span class="tree-size">' + sizeStr + '</span>';
+      html += '</div>';
+    } else {
+      html += '<div class="tree-folder" style="padding-left:' + indent + 'px">';
+      html += '<span class="tree-icon">\u{1F4C1}</span>';
+      html += '<span class="tree-name" style="font-weight:600">' + escapeHtml(key) + '</span>';
+      html += '</div>';
+      html += _buildTreeHTML(val, depth + 1);
+    }
+  }
+  return html;
+}
+
+function previewArtifact(filePath) {
+  var parts = filePath.split('/');
+  var planId = parts[0];
+  var relPath = parts.slice(1).join('/');
+  var preview = document.getElementById('outputFilePreview');
+  if (!preview) return;
+  preview.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
+
+  // Load revision history for the task
+  var taskId = parts.length > 1 ? parts[1] : '';
+  var revDropdown = '';
+
+  fetch('/api/artifacts/' + planId + '/file?path=' + encodeURIComponent(relPath))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.binary) {
+        preview.innerHTML = '<div style="padding:12px;color:var(--text-dim)">Binary file (' + (data.size / 1024).toFixed(1) + ' KB)</div>';
+        return;
+      }
+      var ext = relPath.split('.').pop() || '';
+      var highlighted = syntaxHighlight(data.content || '', ext);
+      var revHtml = '';
+      if (taskId) {
+        revHtml = '<div style="margin-bottom:8px"><select id="revisionSelect" class="revision-select" onchange="loadRevisionFile(this.value, \'' + escapeHtml(relPath) + '\')">' +
+          '<option value="">Current</option></select> ' +
+          '<button class="btn-sm" onclick="loadRevisions(\'' + escapeHtml(planId) + '\', \'' + escapeHtml(taskId) + '\', \'' + escapeHtml(relPath) + '\')" style="font-size:8px;padding:2px 6px">LOAD HISTORY</button></div>';
+      }
+      preview.innerHTML = revHtml +
+        '<div class="preview-header">' + escapeHtml(relPath) + ' <span style="color:var(--text-dim)">(' + (data.size / 1024).toFixed(1) + ' KB)</span></div>' +
+        '<pre class="syntax-pre">' + highlighted + '</pre>';
+    })
+    .catch(function() {
+      preview.innerHTML = '<div style="color:var(--state-error);padding:12px">Failed to load file</div>';
+    });
+}
+
+function loadRevisions(planId, taskId, currentPath) {
+  fetch('/api/artifacts/' + planId + '/revisions/' + taskId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var sel = document.getElementById('revisionSelect');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Current</option>';
+      (data.revisions || []).forEach(function(rev) {
+        sel.innerHTML += '<option value="' + rev.revision + '">' + rev.revision + ' (' + rev.file_count + ' files)</option>';
+      });
+    });
+}
+
+function loadRevisionFile(revision, relPath) {
+  if (!revision || !_outputPlanId) return;
+  var parts = relPath.split('/');
+  var taskId = parts[0];
+  var filePart = parts.slice(1).join('/');
+  var revPath = taskId + '/revisions/' + revision + '/' + filePart;
+  previewArtifact(_outputPlanId + '/' + revPath);
+}
+
+function syntaxHighlight(code, ext) {
+  var escaped = escapeHtml(code);
+  var keywords = [];
+  if (ext === 'py') {
+    keywords = ['def ', 'class ', 'import ', 'from ', 'return ', 'if ', 'else:', 'elif ',
+                'for ', 'while ', 'try:', 'except ', 'finally:', 'with ', 'as ', 'raise ',
+                'yield ', 'async ', 'await ', 'True', 'False', 'None', 'self'];
+  } else if (ext === 'js' || ext === 'ts' || ext === 'jsx' || ext === 'tsx') {
+    keywords = ['function ', 'const ', 'let ', 'var ', 'return ', 'if ', 'else ',
+                'for ', 'while ', 'class ', 'import ', 'export ', 'from ', 'async ',
+                'await ', 'new ', 'this', 'true', 'false', 'null', 'undefined'];
+  } else if (ext === 'html') {
+    keywords = [];
+    // Highlight tags
+    escaped = escaped.replace(/(&lt;\/?[a-zA-Z][a-zA-Z0-9]*)/g, '<span style="color:#cc88ff">$1</span>');
+    escaped = escaped.replace(/(&gt;)/g, '<span style="color:#cc88ff">$1</span>');
+  } else if (ext === 'css') {
+    keywords = [];
+    escaped = escaped.replace(/([\w-]+)\s*:/g, '<span style="color:#66ccff">$1</span>:');
+  } else if (ext === 'json') {
+    escaped = escaped.replace(/(&quot;[^&]*&quot;)\s*:/g, '<span style="color:#66ccff">$1</span>:');
+    escaped = escaped.replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:#66ffaa">$1</span>');
+  }
+  // Apply keyword highlighting
+  for (var i = 0; i < keywords.length; i++) {
+    var kw = keywords[i];
+    var re = new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    escaped = escaped.replace(re, '<span style="color:#cc88ff">' + kw + '</span>');
+  }
+  // Highlight strings
+  if (ext !== 'html' && ext !== 'json') {
+    escaped = escaped.replace(/(&#39;[^&#]*&#39;|&quot;[^&]*&quot;)/g, '<span style="color:#66ffaa">$1</span>');
+  }
+  // Highlight comments
+  if (ext === 'py') {
+    escaped = escaped.replace(/(#[^\n]*)/g, '<span style="color:var(--text-dim)">$1</span>');
+  } else if (ext === 'js' || ext === 'ts' || ext === 'css') {
+    escaped = escaped.replace(/(\/\/[^\n]*)/g, '<span style="color:var(--text-dim)">$1</span>');
+  }
+  return escaped;
+}
+
+function downloadArtifacts() {
+  var planId = _outputPlanId || _activeSessionId || '';
+  if (!planId) return;
+  window.location.href = '/api/artifacts/' + planId + '/download';
+}
+
+// ── Review Analytics Panel ──────────────────────────────────────────────
+
+function renderReviewAnalytics(data) {
+  var overlay = document.getElementById('reviewAnalyticsOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+
+  var body = document.getElementById('reviewAnalyticsBody');
+  if (!body) return;
+
+  var reviewers = data.by_reviewer || [];
+  if (reviewers.length === 0) {
+    body.innerHTML = '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px">No review data yet</div>';
+    return;
+  }
+
+  var maxTotal = Math.max.apply(null, reviewers.map(function(r) { return r.total_reviews; }));
+
+  body.innerHTML = reviewers.map(function(r) {
+    var passRate = r.total_reviews > 0 ? ((r.passes / r.total_reviews) * 100).toFixed(0) : 0;
+    var failRate = r.total_reviews > 0 ? ((r.failures / r.total_reviews) * 100).toFixed(0) : 0;
+    var avgScore = (r.avg_score || 0).toFixed(1);
+    var overrides = r.override_count || 0;
+
+    return '<div class="review-analytics-row">' +
+      '<div class="review-analytics-name">' + escapeHtml(r.reviewer) + '</div>' +
+      '<div class="review-analytics-stats">' +
+        '<span class="review-stat pass">' + passRate + '% pass</span>' +
+        '<span class="review-stat fail">' + failRate + '% fail</span>' +
+        '<span class="review-stat avg">avg ' + avgScore + '</span>' +
+        (overrides > 0 ? '<span class="review-stat override">' + overrides + ' overrides</span>' : '') +
+      '</div>' +
+      '<div class="review-analytics-bar-container">' +
+        '<div class="review-analytics-bar pass-bar" style="width:' + passRate + '%"></div>' +
+        '<div class="review-analytics-bar fail-bar" style="width:' + failRate + '%"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Tolerance Presets ────────────────────────────────────────────────
+
+async function applyTolerancePreset(presetName) {
+  try {
+    await fetch('/api/tolerance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset: presetName }),
+    });
+    loadTolerance();
+    highlightActivePreset(presetName);
+  } catch (e) {
+    console.error('applyTolerancePreset:', e);
+  }
+}
+
+function highlightActivePreset(presetName) {
+  var buttons = document.querySelectorAll('.tolerance-preset-btn');
+  buttons.forEach(function(btn) {
+    if (btn.dataset.preset === presetName) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }

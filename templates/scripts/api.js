@@ -215,6 +215,9 @@ async function saveToleranceGlobal(value) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ default_tolerance: value }),
     });
+    // Clear preset highlight on manual change
+    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
+    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
   } catch (e) {
     console.error('saveToleranceGlobal:', e);
   }
@@ -236,8 +239,22 @@ async function saveToleranceAgent(name, value) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tolerance_overrides: overrides }),
     });
+    // Clear preset highlight on manual change
+    var presetBtns = document.querySelectorAll('.tolerance-preset-btn');
+    presetBtns.forEach(function(btn) { btn.classList.remove('active'); });
   } catch (e) {
     console.error('saveToleranceAgent:', e);
+  }
+}
+
+async function loadReviewStats() {
+  try {
+    var res = await fetch('/api/review-stats');
+    if (!res.ok) throw new Error(await res.text());
+    var data = await res.json();
+    renderReviewAnalytics(data);
+  } catch (e) {
+    console.error('loadReviewStats:', e);
   }
 }
 
