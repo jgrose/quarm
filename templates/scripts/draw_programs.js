@@ -1030,6 +1030,14 @@ function updateAmbientPrograms(W, H, dt) {
 function drawAmbientPrograms(ctx, time) {
   if (!ambientPrograms.length) return;
 
+  // Viewport culling — get visible rect for off-screen skip
+  var _progCanvas = document.getElementById('canvas');
+  var _progDpr = window.devicePixelRatio || 1;
+  var _progW = _progCanvas ? _progCanvas.width / _progDpr : 800;
+  var _progH = _progCanvas ? _progCanvas.height / _progDpr : 600;
+  var progView = (typeof getVisibleRect === 'function') ? getVisibleRect(_progW, _progH) : { x: 0, y: 0, w: _progW, h: _progH };
+  var progMargin = 80;
+
   // Depth sort — draw programs with lower y first (further from camera)
   var sorted = ambientPrograms.slice().sort(function(a, b) { return a.y - b.y; });
 
@@ -1041,6 +1049,10 @@ function drawAmbientPrograms(ctx, time) {
 
     // Skip invisible programs (inside bunker)
     if (p.visible === false) continue;
+
+    // Skip off-screen programs (viewport culling)
+    if (p.x < progView.x - progMargin || p.x > progView.x + progView.w + progMargin ||
+        p.y < progView.y - progMargin || p.y > progView.y + progView.h + progMargin) continue;
 
     // Calculate bunker entry/exit scale and alpha modifiers
     var bunkerScale = 1.0;

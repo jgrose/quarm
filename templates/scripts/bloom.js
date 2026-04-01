@@ -10,6 +10,10 @@ function BloomRenderer() {
 }
 
 BloomRenderer.prototype.apply = function(sourceCanvas) {
+  // Skip if bloom disabled via config or intensity is zero
+  if (typeof config !== 'undefined' && !config.bloom) return;
+  if (this.intensity <= 0) return;
+
   var w = Math.floor(sourceCanvas.width / 2);
   var h = Math.floor(sourceCanvas.height / 2);
   if (w === 0 || h === 0) return;
