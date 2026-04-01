@@ -1559,9 +1559,7 @@ function previewArtifact(filePath) {
   if (!preview) return;
   preview.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
 
-  // Load revision history for the task
   var taskId = parts.length > 1 ? parts[1] : '';
-  var revDropdown = '';
 
   fetch('/api/artifacts/' + planId + '/file?path=' + encodeURIComponent(relPath))
     .then(function(r) { return r.json(); })

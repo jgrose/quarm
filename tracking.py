@@ -44,6 +44,17 @@ def _init_db():
                 created_at TEXT,
                 FOREIGN KEY (run_id) REFERENCES runs(id)
             );
+            CREATE TABLE IF NOT EXISTS tolerance_overrides (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                task_id TEXT,
+                reviewer TEXT,
+                original_verdict TEXT,
+                score INTEGER,
+                tolerance INTEGER,
+                created_at TEXT,
+                FOREIGN KEY (run_id) REFERENCES runs(id)
+            );
         """)
 
 
@@ -69,6 +80,18 @@ def track_score(run_id: str, task_id: str, agent: str, score: int,
             "INSERT INTO task_scores (run_id, task_id, agent, score, verdict, reviewer, model, tokens, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (run_id, task_id, agent, score, verdict, reviewer, model, tokens,
+             datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def track_tolerance_override(run_id: str, task_id: str, reviewer: str,
+                              original_verdict: str, score: int, tolerance: int):
+    """Record when a tolerance override changes a verdict."""
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO tolerance_overrides (run_id, task_id, reviewer, original_verdict, score, tolerance, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (run_id, task_id, reviewer, original_verdict, score, tolerance,
              datetime.now(timezone.utc).isoformat()),
         )
 
@@ -106,6 +129,45 @@ def get_cost_analytics() -> dict:
         "by_agent": [dict(r) for r in by_agent],
         "by_model": [dict(r) for r in by_model],
     }
+
+
+def get_review_stats() -> dict:
+    """Per-reviewer analytics: pass/fail rates, avg scores, override frequency."""
+    with _conn() as c:
+        by_reviewer = c.execute(
+            "SELECT reviewer, "
+            "COUNT(*) as total_reviews, "
+            "AVG(score) as avg_score, "
+            "SUM(CASE WHEN verdict = 'PASS' THEN 1 ELSE 0 END) as passes, "
+            "SUM(CASE WHEN verdict IN ('FAIL','FLAG') THEN 1 ELSE 0 END) as failures "
+            "FROM task_scores WHERE reviewer != '' GROUP BY reviewer ORDER BY total_reviews DESC"
+        ).fetchall()
+
+        overrides = c.execute(
+            "SELECT reviewer, COUNT(*) as override_count "
+            "FROM tolerance_overrides GROUP BY reviewer ORDER BY override_count DESC"
+        ).fetchall()
+
+    override_map = {r["reviewer"]: r["override_count"] for r in overrides}
+
+    return {
+        "by_reviewer": [
+            {**dict(r), "override_count": override_map.get(r["reviewer"], 0)}
+            for r in by_reviewer
+        ],
+    }
+
+
+def get_override_stats(run_id: str) -> list[dict]:
+    """Get tolerance override counts per reviewer for a specific run."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT reviewer, COUNT(*) as count, "
+            "AVG(score) as avg_score, AVG(tolerance) as avg_tolerance "
+            "FROM tolerance_overrides WHERE run_id = ? GROUP BY reviewer ORDER BY count DESC",
+            (run_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_score_analytics() -> dict:

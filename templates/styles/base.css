@@ -998,6 +998,37 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-primary);
 }
 
+.cfg-toggle {
+  width: 36px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(100, 200, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  flex-shrink: 0;
+}
+
+.cfg-toggle.on {
+  background: rgba(102, 204, 255, 0.3);
+}
+
+.cfg-toggle::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+}
+
+.cfg-toggle.on::after {
+  transform: translateX(18px);
+}
+
 .toggle-switch {
   width: 36px;
   height: 18px;
@@ -2032,3 +2063,126 @@ a:hover { color: var(--holo-bright); }
 
 .validation-pass { color: var(--state-done); }
 .validation-fail { color: var(--state-error); }
+
+/* ── Review Analytics Panel ──────────────────────────────────────────── */
+
+.review-analytics-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.review-analytics-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.1);
+}
+
+.review-analytics-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.review-analytics-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.review-stat {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.review-stat.pass {
+  color: var(--state-done);
+  background: rgba(102, 255, 170, 0.1);
+}
+
+.review-stat.fail {
+  color: var(--state-error);
+  background: rgba(255, 85, 102, 0.1);
+}
+
+.review-stat.avg {
+  color: var(--holo-base);
+  background: rgba(102, 204, 255, 0.1);
+}
+
+.review-stat.override {
+  color: var(--state-review);
+  background: rgba(255, 187, 68, 0.1);
+}
+
+.review-analytics-bar-container {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(100, 200, 255, 0.05);
+}
+
+.review-analytics-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.review-analytics-bar.pass-bar {
+  background: var(--state-done);
+  opacity: 0.7;
+}
+
+.review-analytics-bar.fail-bar {
+  background: var(--state-error);
+  opacity: 0.7;
+}
+
+/* ── Tolerance Preset Buttons ───────────────────────────────────────── */
+
+.tolerance-preset-btn {
+  flex: 1;
+  padding: 8px 6px;
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.tolerance-preset-btn:hover {
+  background: rgba(100, 200, 255, 0.12);
+  border-color: rgba(100, 200, 255, 0.3);
+}
+
+.tolerance-preset-btn.active {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: var(--holo-base);
+  box-shadow: 0 0 8px rgba(102, 204, 255, 0.2);
+}
+
+.preset-icon {
+  font-size: 14px;
+}
+
+.preset-value {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-weight: 400;
+}

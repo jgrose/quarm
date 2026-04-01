@@ -55,6 +55,7 @@ PORT = int(os.environ.get("NORT_PORT", os.environ.get("QUARM_PORT", 8000)))
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 PLANS_DIR = STATIC_DIR / "plans"
 QUEUE_FILE = PLANS_DIR / "queue.json"
+_queue_lock = threading.Lock()
 
 
 # ── Plan storage helpers ─────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ def _ensure_plans_dir():
 
 
 def _load_queue() -> list[dict]:
+    """Read queue from disk. Caller MUST hold _queue_lock for read-modify-write."""
     _ensure_plans_dir()
     try:
         return json.loads(QUEUE_FILE.read_text())
@@ -74,6 +76,7 @@ def _load_queue() -> list[dict]:
 
 
 def _save_queue(queue: list[dict]):
+    """Write queue to disk. Caller MUST hold _queue_lock for read-modify-write."""
     _ensure_plans_dir()
     QUEUE_FILE.write_text(json.dumps(queue, indent=2))
 
@@ -112,32 +115,35 @@ def _extract_title(plan_text: str) -> str:
 
 
 def _add_plan(plan_id: str, title: str, description: str, status: str = "queued"):
-    queue = _load_queue()
-    queue.append({
-        "id": plan_id,
-        "title": title,
-        "description": description,
-        "status": status,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    _save_queue(queue)
+    with _queue_lock:
+        queue = _load_queue()
+        queue.append({
+            "id": plan_id,
+            "title": title,
+            "description": description,
+            "status": status,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        _save_queue(queue)
 
 
 def _update_plan_status(plan_id: str, status: str, title: str | None = None):
-    queue = _load_queue()
-    for entry in queue:
-        if entry["id"] == plan_id:
-            entry["status"] = status
-            if title:
-                entry["title"] = title
-            break
-    _save_queue(queue)
+    with _queue_lock:
+        queue = _load_queue()
+        for entry in queue:
+            if entry["id"] == plan_id:
+                entry["status"] = status
+                if title:
+                    entry["title"] = title
+                break
+        _save_queue(queue)
 
 
 def _remove_plan(plan_id: str):
-    queue = _load_queue()
-    queue = [e for e in queue if e["id"] != plan_id]
-    _save_queue(queue)
+    with _queue_lock:
+        queue = _load_queue()
+        queue = [e for e in queue if e["id"] != plan_id]
+        _save_queue(queue)
     plan_file = PLANS_DIR / f"{plan_id}.md"
     if plan_file.exists():
         plan_file.unlink()
@@ -216,7 +222,8 @@ _stop_flags: set[str] = set()  # plan IDs that should be stopped
 
 def _broadcast_queue():
     """Broadcast current queue state to all WS clients (callable from any thread)."""
-    queue = _load_queue()
+    with _queue_lock:
+        queue = _load_queue()
     payload = {"type": "queue", "plans": queue}
     if _loop:
         asyncio.run_coroutine_threadsafe(manager.broadcast(payload), _loop)
@@ -309,7 +316,8 @@ def _run_orchestrator_worker(plan_id: str):
 def _auto_advance():
     """Start any queued plans that aren't already running."""
     with _running_lock:
-        queue = _load_queue()
+        with _queue_lock:
+            queue = _load_queue()
         to_start = []
         for entry in queue:
             if entry["status"] == "queued" and entry["id"] not in _running_plan_ids:
@@ -430,13 +438,15 @@ async def api_generate(request: Request):
 @app.get("/api/plans")
 async def api_list_plans():
     """Return the ordered plan queue."""
-    return _load_queue()
+    with _queue_lock:
+        return _load_queue()
 
 
 @app.get("/api/plans/{plan_id}")
 async def api_get_plan(plan_id: str):
     """Return a single plan's metadata and content."""
-    queue = _load_queue()
+    with _queue_lock:
+        queue = _load_queue()
     entry = next((e for e in queue if e["id"] == plan_id), None)
     if not entry:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -453,15 +463,16 @@ async def api_reorder(request: Request):
     if not new_order:
         raise HTTPException(status_code=400, detail="order is required")
 
-    queue = _load_queue()
-    by_id = {e["id"]: e for e in queue}
-    reordered = [by_id[pid] for pid in new_order if pid in by_id]
-    # Append any plans not in the order list (shouldn't happen, but safe)
-    seen = set(new_order)
-    for e in queue:
-        if e["id"] not in seen:
-            reordered.append(e)
-    _save_queue(reordered)
+    with _queue_lock:
+        queue = _load_queue()
+        by_id = {e["id"]: e for e in queue}
+        reordered = [by_id[pid] for pid in new_order if pid in by_id]
+        # Append any plans not in the order list (shouldn't happen, but safe)
+        seen = set(new_order)
+        for e in queue:
+            if e["id"] not in seen:
+                reordered.append(e)
+        _save_queue(reordered)
     _broadcast_queue()
     return {"ok": True}
 
@@ -469,7 +480,8 @@ async def api_reorder(request: Request):
 @app.post("/api/plans/{plan_id}/run")
 async def api_run_plan(plan_id: str):
     """Start the orchestrator for a specific plan."""
-    queue = _load_queue()
+    with _queue_lock:
+        queue = _load_queue()
     entry = next((e for e in queue if e["id"] == plan_id), None)
     if not entry:
         raise HTTPException(status_code=404, detail="Plan not found")

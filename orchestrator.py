@@ -357,21 +357,27 @@ def upd(tasks, tid, **kw):
 def find_mgr(agent, mgrs):
     return next((m for m in mgrs if agent in m.get("oversees", [])), None)
 
-def _resolve_tolerance(agent_name: str, agent_dict: dict) -> int:
-    """Resolve effective tolerance for a reviewer/manager.
-
-    Precedence: config per-agent > plan per-agent > config global > DEFAULT_TOLERANCE
-    Then: +1 earned bonus if agent has avg_score > 8 over 5+ runs.
-    """
+def _load_orchestrator_config() -> dict:
+    """Load config.json with safe fallback."""
     try:
         with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
-            cfg = json.load(f)
+            return json.load(f)
     except Exception:
-        cfg = {}
+        return {}
+
+def _resolve_tolerance(agent_name: str, agent_dict: dict, task_tolerance: int = 0) -> int:
+    """Resolve effective tolerance for a reviewer/manager.
+
+    Precedence: config per-agent > task-level > plan per-agent > config global > DEFAULT_TOLERANCE
+    Then: +1 earned bonus if agent has avg_score > 8 over 5+ runs.
+    """
+    cfg = _load_orchestrator_config()
 
     per_agent = cfg.get("tolerance_overrides", {}).get(agent_name)
     if per_agent is not None and 1 <= per_agent <= 10:
         base = per_agent
+    elif task_tolerance and 1 <= task_tolerance <= 10:
+        base = task_tolerance
     else:
         plan_tol = agent_dict.get("tolerance", 0)
         if plan_tol and 1 <= plan_tol <= 10:
@@ -711,7 +717,8 @@ def manager_review_node(state):
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
 
-    tolerance = _resolve_tolerance(manager["name"], manager)
+    task_tolerance = task.get("tolerance", 0)
+    tolerance = _resolve_tolerance(manager["name"], manager, task_tolerance)
     if tolerance >= 8:
         strictness = " Only FAIL for critical blocking issues that would cause real harm."
     elif tolerance >= 5:
@@ -767,6 +774,22 @@ def manager_review_node(state):
         pass
 
     if verdict == "PASS":
+        # Check for conditional specialist review skipping
+        skip_specialist = False
+        if score >= 9:
+            skip_specialist = _load_orchestrator_config().get("skip_specialist_on_high_score", False)
+
+        if skip_specialist:
+            skip_msg = f"[{manager['name'].upper()}] Score {score} >= 9 with skip_specialist enabled — skipping specialist review"
+            print(f"  {skip_msg}"); log_event(skip_msg)
+            results = {**results, tid: task["result"]}
+            tasks = upd(tasks, tid, status="done", manager_notes="", last_score=score)
+            _auto_ingest(task, results)
+            s = {**state, "tasks": tasks, "results": results,
+                 "phase": "dispatch", "active_task_id": None,
+                 "tokens_used": total_tokens, "last_verdict": last_v}
+            write_status(s); return s
+
         log_event(f"[{manager['name'].upper()}] Approved → panel")
         tasks = upd(tasks, tid, status="in_specialist_review", manager_notes="",
                     last_score=score)
@@ -1160,6 +1183,75 @@ def assemble_output(plan_id: str, objective: str, tasks: list,
     return str(output_dir), artifacts_by_task
 
 
+def validate_outputs(output_dir: str) -> dict:
+    """Run basic validation on assembled output files.
+
+    Returns dict: {"passed": [...], "failed": [...], "summary": str}
+    """
+    if not output_dir or not Path(output_dir).is_dir():
+        return {"passed": [], "failed": [], "summary": "No output directory"}
+
+    import subprocess
+    passed = []
+    failed = []
+
+    for f in sorted(Path(output_dir).rglob("*")):
+        if not f.is_file():
+            continue
+        rel = str(f.relative_to(output_dir))
+
+        if f.suffix == ".py":
+            try:
+                result = subprocess.run(
+                    ["python3", "-m", "py_compile", str(f)],
+                    capture_output=True, text=True, timeout=10
+                )
+                if result.returncode == 0:
+                    passed.append({"file": rel, "check": "py_compile", "status": "pass"})
+                else:
+                    failed.append({"file": rel, "check": "py_compile", "status": "fail",
+                                   "error": result.stderr.strip()[:500]})
+            except FileNotFoundError:
+                passed.append({"file": rel, "check": "py_compile", "status": "skip",
+                               "error": "python3 not available"})
+            except Exception as e:
+                failed.append({"file": rel, "check": "py_compile", "status": "fail",
+                               "error": str(e)[:200]})
+
+        elif f.suffix == ".js":
+            try:
+                result = subprocess.run(
+                    ["node", "--check", str(f)],
+                    capture_output=True, text=True, timeout=10
+                )
+                if result.returncode == 0:
+                    passed.append({"file": rel, "check": "node_check", "status": "pass"})
+                else:
+                    failed.append({"file": rel, "check": "node_check", "status": "fail",
+                                   "error": result.stderr.strip()[:500]})
+            except FileNotFoundError:
+                passed.append({"file": rel, "check": "node_check", "status": "skip",
+                               "error": "node not available"})
+            except Exception as e:
+                failed.append({"file": rel, "check": "node_check", "status": "fail",
+                               "error": str(e)[:200]})
+
+        elif f.suffix == ".json":
+            try:
+                json.loads(f.read_text())
+                passed.append({"file": rel, "check": "json_parse", "status": "pass"})
+            except json.JSONDecodeError as e:
+                failed.append({"file": rel, "check": "json_parse", "status": "fail",
+                               "error": str(e)[:200]})
+
+    total = len(passed) + len(failed)
+    summary = f"{len(passed)}/{total} files passed validation"
+    if failed:
+        summary += f" ({len(failed)} failed)"
+
+    return {"passed": passed, "failed": failed, "summary": summary}
+
+
 def run(plan_path="plan.md", plan_id: str = ""):
     global _run_id, _plan_id
     _plan_id = plan_id
@@ -1257,6 +1349,13 @@ def run(plan_path="plan.md", plan_id: str = ""):
             plan_path=plan_path, results_path="",  # results not written yet
         )
 
+    # ── Validate output files ──
+    validation = {}
+    if output_path:
+        log_event("[VALIDATE] Running output validation...")
+        validation = validate_outputs(output_path)
+        log_event(f"[VALIDATE] {validation.get('summary', '')}")
+
     with open(results_path, "w") as f:
         results_data = {
             "task_results": final["results"],
@@ -1273,6 +1372,10 @@ def run(plan_path="plan.md", plan_id: str = ""):
             results_data["artifacts"] = artifacts_by_task
         if output_path:
             results_data["output_dir"] = output_path
+        if validation:
+            results_data["validation"] = validation
+        if final.get("coherence_report"):
+            results_data["coherence_report"] = final["coherence_report"]
         json.dump(results_data, f, indent=2)
     print(f"\nSaved → {results_path}")
 

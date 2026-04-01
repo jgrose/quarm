@@ -4,6 +4,17 @@
       <div class="config-title" style="margin:0">REVIEW TOLERANCE</div>
       <button class="close-btn" onclick="document.getElementById('toleranceConfigOverlay').classList.add('hidden')">&times;</button>
     </div>
+    <div class="tolerance-presets" style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="tolerance-preset-btn" data-preset="prototype" onclick="applyTolerancePreset('prototype')">
+        <span class="preset-icon">⚡</span> Prototype<br><span class="preset-value">tol=8</span>
+      </button>
+      <button class="tolerance-preset-btn" data-preset="production" onclick="applyTolerancePreset('production')">
+        <span class="preset-icon">🏭</span> Production<br><span class="preset-value">tol=5</span>
+      </button>
+      <button class="tolerance-preset-btn" data-preset="audit" onclick="applyTolerancePreset('audit')">
+        <span class="preset-icon">🔍</span> Audit<br><span class="preset-value">tol=3</span>
+      </button>
+    </div>
     <div class="tolerance-section-label">GLOBAL DEFAULT</div>
     <div class="tolerance-agent-row" style="border-bottom:1px solid rgba(100,200,255,0.15);padding-bottom:10px;margin-bottom:8px">
       <span class="tolerance-agent-name">All reviewers</span>
