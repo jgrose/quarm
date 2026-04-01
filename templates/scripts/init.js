@@ -1,15 +1,69 @@
 // ═══ NORT INITIALIZATION ═══
 
+// ── City State Persistence Helpers ──────────────────────────────────────────
+
+function _loadPersistedCityState() {
+  try {
+    var raw = localStorage.getItem('nort_city_state');
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    // Check expiry (24 hours)
+    if (saved.savedAt) {
+      var age = Date.now() - new Date(saved.savedAt).getTime();
+      if (age > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('nort_city_state');
+        return;
+      }
+    }
+    // Restore building state (locations are initialized before this runs)
+    if (saved.buildings && typeof deserializeBuildingState === 'function') {
+      deserializeBuildingState(saved);
+    }
+    // Restore node positions (nodes may not exist yet at boot, handled by websocket _restorePersistedState)
+    if (saved.nodes && typeof deserializeCityState === 'function') {
+      deserializeCityState(saved);
+    }
+  } catch(e) {
+    console.warn('[Init] Failed to load persisted city state:', e.message);
+  }
+}
+
+var _saveCityStateTimer = null;
+
+function _saveCityState() {
+  // Debounce: clear any pending save
+  if (_saveCityStateTimer) { clearTimeout(_saveCityStateTimer); _saveCityStateTimer = null; }
+  try {
+    var cityData = (typeof serializeCityState === 'function') ? serializeCityState() : { nodes: {} };
+    var buildingData = (typeof serializeBuildingState === 'function') ? serializeBuildingState() : { buildings: {} };
+    var merged = {
+      nodes: cityData.nodes || {},
+      buildings: buildingData.buildings || {},
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem('nort_city_state', JSON.stringify(merged));
+  } catch(e) {
+    console.warn('[Init] Failed to save city state:', e.message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   initCanvas();
   if (typeof initAudio === 'function') initAudio();
   if (typeof initRoster === 'function') initRoster();
   if (typeof initWeather === 'function') initWeather();
+
+  // ── Load persisted city state from localStorage ──
+  _loadPersistedCityState();
+
   connectWS();
   refreshQueue();
   checkPendingApprovals();
   pollHeartbeat();
   setInterval(pollHeartbeat, 3000);
+
+  // ── Periodic city state save (every 30 seconds) ──
+  setInterval(_saveCityState, 30000);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {

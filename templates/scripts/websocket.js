@@ -10,27 +10,111 @@ var liveStartedAt = null;
 var _sessions = {};           // session_id → { data }
 var _activeSessionId = null;  // which session drives the canvas + chat
 
+// ── Reconnect backoff ───────────────────────────────────────────────────────
+var _reconnectAttempts = 0;
+var _reconnectDelay = 1000;       // base delay ms
+var _maxReconnectDelay = 30000;   // cap at 30s
+
+// ── Heartbeat ping/pong ─────────────────────────────────────────────────────
+var _lastPong = Date.now();
+var _pingInterval = null;
+
+// ── Connection status ────────────────────────────────────────────────────────
+var _connectionStatus = 'disconnected'; // 'connected' | 'connecting' | 'disconnected'
+
+function getConnectionStatus() {
+  return { status: _connectionStatus, attempts: _reconnectAttempts };
+}
+
 function connectWS() {
+  _connectionStatus = 'connecting';
   ws = new WebSocket(WS_URL);
   ws.onopen = function() {
     wsConnected = true;
+    _connectionStatus = 'connected';
+    _reconnectAttempts = 0;
     _isReplay = true;  // suppress spawn effects for replayed state
     updateConnectionStatus(true);
     // Clear replay flag after a short delay (server sends replay immediately)
     setTimeout(function() { _isReplay = false; }, 500);
+
+    // Start heartbeat ping interval
+    _lastPong = Date.now();
+    if (_pingInterval) clearInterval(_pingInterval);
+    _pingInterval = setInterval(function() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      // Check for stale connection (no pong in 10s)
+      if (Date.now() - _lastPong > 10000) {
+        console.warn('[WS] No pong received in 10s, reconnecting');
+        ws.close();
+        return;
+      }
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }, 30000);
+
+    // Restore persisted city state after server replay
+    _restorePersistedState();
   };
   ws.onclose = function() {
     wsConnected = false;
+    _connectionStatus = 'disconnected';
     updateConnectionStatus(false);
-    setTimeout(connectWS, 2000);
+
+    // Clear heartbeat interval
+    if (_pingInterval) { clearInterval(_pingInterval); _pingInterval = null; }
+
+    // Exponential backoff with jitter
+    var delay = Math.min(_reconnectDelay * Math.pow(2, _reconnectAttempts), _maxReconnectDelay);
+    delay += Math.random() * 1000;
+    _reconnectAttempts++;
+    console.warn('[WS] Connection closed. Reconnecting in ' + Math.round(delay) + 'ms (attempt ' + _reconnectAttempts + ')');
+    setTimeout(connectWS, delay);
   };
-  ws.onerror = function() { ws.close(); };
+  ws.onerror = function(e) {
+    console.error('[WS] Error:', e);
+    ws.close();
+  };
   ws.onmessage = function(evt) {
+    var rawData = evt.data;
     try {
-      var data = JSON.parse(evt.data);
+      var data = JSON.parse(rawData);
+      // Handle pong messages for heartbeat
+      if (data.type === 'pong') {
+        _lastPong = Date.now();
+        return;
+      }
       handleMessage(data);
-    } catch(e) { /* ignore parse errors */ }
+    } catch(e) { console.warn('[WS] Parse error:', e.message, rawData.substring(0, 200)); }
   };
+}
+
+// ── Persisted State Recovery ────────────────────────────────────────────────
+
+function _restorePersistedState() {
+  try {
+    var raw = localStorage.getItem('nort_city_state');
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    // Check expiry (24 hours)
+    if (saved.savedAt) {
+      var age = Date.now() - new Date(saved.savedAt).getTime();
+      if (age > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('nort_city_state');
+        return;
+      }
+    }
+    // Restore visual state after a delay to let server replay populate nodes
+    setTimeout(function() {
+      if (saved.nodes && typeof deserializeCityState === 'function') {
+        deserializeCityState(saved);
+      }
+      if (saved.buildings && typeof deserializeBuildingState === 'function') {
+        deserializeBuildingState(saved);
+      }
+    }, 600);
+  } catch(e) {
+    console.warn('[WS] Failed to restore persisted state:', e.message);
+  }
 }
 
 // ── Message Router ──────────────────────────────────────────────────────────
