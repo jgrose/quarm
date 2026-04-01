@@ -2,7 +2,10 @@
   <div class="ledger-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="config-title" style="margin:0">LEDGER</div>
-      <button class="close-btn" onclick="toggleLedger()">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="toggleLedger()">&times;</button>
+      </div>
     </div>
     <div class="ledger-tabs">
       <button class="ledger-tab active" onclick="switchLedgerTab('costs', this)">COSTS</button>

@@ -1,6 +1,12 @@
 <div id="configOverlay">
   <div class="config-card glass-card" onclick="event.stopPropagation()">
-    <div class="config-title">SETTINGS</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="config-title" style="margin:0">SETTINGS</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="document.getElementById('configOverlay').classList.remove('visible')">&times;</button>
+      </div>
+    </div>
     <div class="config-row">
       <span class="config-label">BLOOM</span>
       <div class="cfg-toggle on" data-key="bloom" onclick="toggleConfig('bloom')"></div>

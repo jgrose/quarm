@@ -1,9 +1,14 @@
-<div id="modelConfigOverlay" class="hidden">
+<div id="modelConfigOverlay">
   <div class="model-config-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="config-title" style="margin:0">MODELS</div>
-      <button class="close-btn" onclick="document.getElementById('modelConfigOverlay').classList.add('hidden')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="document.getElementById('modelConfigOverlay').classList.remove('visible')">&times;</button>
+      </div>
     </div>
+    <div class="model-preset-row" id="modelPresetRow"></div>
+    <input type="text" id="modelFilterInput" class="model-filter-input" placeholder="Filter models..." oninput="filterModels(this.value)">
     <div id="modelConfigBody"></div>
   </div>
 </div>

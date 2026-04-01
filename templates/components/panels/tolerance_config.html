@@ -2,7 +2,10 @@
   <div class="tolerance-config-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="config-title" style="margin:0">REVIEW TOLERANCE</div>
-      <button class="close-btn" onclick="document.getElementById('toleranceConfigOverlay').classList.add('hidden')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="document.getElementById('toleranceConfigOverlay').classList.add('hidden')">&times;</button>
+      </div>
     </div>
     <div class="tolerance-presets" style="display:flex;gap:8px;margin-bottom:12px">
       <button class="tolerance-preset-btn" data-preset="prototype" onclick="applyTolerancePreset('prototype')">

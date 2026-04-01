@@ -2,7 +2,10 @@
   <div class="review-analytics-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="config-title" style="margin:0">REVIEW ANALYTICS</div>
-      <button class="close-btn" onclick="document.getElementById('reviewAnalyticsOverlay').classList.add('hidden')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="document.getElementById('reviewAnalyticsOverlay').classList.add('hidden')">&times;</button>
+      </div>
     </div>
     <div id="reviewAnalyticsBody">
       <div style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px">Loading...</div>
