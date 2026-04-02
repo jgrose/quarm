@@ -8,11 +8,25 @@ Usage:
     python validate_plan.py plans/*.md
 """
 
+import json
 import re
 import sys
+from pathlib import Path
 
 
-BUILTIN_REVIEWERS = {"security_engineer", "ux_designer", "user_tester"}
+def _load_builtin_reviewers() -> set:
+    """Load reviewer names from agents/registry.json, falling back to hardcoded defaults."""
+    defaults = {"security_engineer", "ux_designer", "user_tester"}
+    registry_path = Path(__file__).parent / "agents" / "registry.json"
+    try:
+        data = json.loads(registry_path.read_text())
+        names = set(data.get("reviewers", {}).keys())
+        return names | defaults if names else defaults
+    except Exception:
+        return defaults
+
+
+BUILTIN_REVIEWERS = _load_builtin_reviewers()
 
 
 def validate(path: str) -> list[str]:
