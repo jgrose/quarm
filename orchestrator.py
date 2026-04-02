@@ -551,6 +551,7 @@ def master_node(state):
         for t in ready:
             msg = f"[MASTER] Dispatching → {t['id']}: {t['title']}"
             print(f"\n{msg}"); log_event(msg)
+            _log_specialization_suggestion(t)
             tasks = upd(tasks, t["id"], status="in_progress")
             ready_ids.append(t["id"])
 
