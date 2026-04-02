@@ -1097,6 +1097,33 @@ async def api_import_agents(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/agents/import-single")
+async def api_import_single_agent(request: Request):
+    """Import a single agent from an exported JSON payload."""
+    body = await request.json()
+    if not body.get("nort_agent_export"):
+        raise HTTPException(status_code=400, detail="Missing nort_agent_export marker")
+    agent_type = body.get("agent_type")
+    agent_data = body.get("agent")
+    overwrite = body.get("overwrite", False)
+    if not agent_type or not agent_data:
+        raise HTTPException(status_code=400, detail="agent_type and agent required")
+    from agent_registry import get_agent, create_agent, merge_agent_from_plan
+    name = agent_data.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="agent.name is required")
+    existing = get_agent(agent_type, name)
+    if existing and not overwrite:
+        raise HTTPException(status_code=409, detail=f"Agent {name} already exists. Set overwrite=true to replace.")
+    try:
+        if existing:
+            merge_agent_from_plan(agent_type, agent_data)
+        else:
+            create_agent(agent_type, agent_data)
+        return {"ok": True, "created": not existing, "name": name}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/api/agents")
 async def api_list_agents(type: str = None):
@@ -1195,6 +1222,30 @@ async def api_retire_agent(agent_type: str, name: str, request: Request):
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     return {"ok": True, "agent": agent}
+
+
+# ── Single Agent Export/Import ────────────────────────────────────────────
+
+@app.get("/api/agents/{agent_type}/{name}/export")
+async def api_export_single_agent(agent_type: str, name: str, format: str = "json"):
+    """Export a single agent as JSON or claude-code markdown."""
+    if format == "claude":
+        from agent_registry import export_agent_as_claude_code
+        md = export_agent_as_claude_code(agent_type, name)
+        if md is None:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        from fastapi.responses import Response
+        return Response(
+            content=md,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename={name}.md"},
+        )
+    else:
+        from agent_registry import export_single_agent
+        data = export_single_agent(agent_type, name)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        return data
 
 
 # ── Team Presets ───────────────────────────────────────────────────────────
