@@ -83,7 +83,7 @@ class TestMasterNodeDispatch:
         assert orchestrator.route_master({"phase": "done"}) == "synthesis"
         assert orchestrator.route_master({"phase": "execute"}) == "sub_agent"
         assert orchestrator.route_master({"phase": "dispatch"}) == "master"
-        assert orchestrator.route_master({"phase": "manager_review"}) == "master"
+        assert orchestrator.route_master({"phase": "manager_review"}) == "manager_review"
 
 
 class TestManagerReviewRouting:
