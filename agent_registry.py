@@ -1,7 +1,7 @@
 """NORT Agent Registry — persistent agent definitions with performance tracking."""
 from pathlib import Path
 from datetime import datetime, timezone
-import json, logging
+import json, logging, os, shutil, tempfile
 
 log = logging.getLogger("nort.registry")
 REGISTRY_FILE = Path(__file__).parent / "agents" / "registry.json"
@@ -23,10 +23,39 @@ def load_registry() -> dict:
 
 
 def save_registry(data: dict):
-    """Write registry to disk."""
+    """Write registry to disk atomically.
+
+    1. Backup existing file to .json.bak if > 100 bytes.
+    2. Write to a temp file in the same directory.
+    3. Flush + fsync for durability.
+    4. os.replace for atomic rename.
+    5. Clean up temp file on failure.
+    """
     try:
         REGISTRY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        REGISTRY_FILE.write_text(json.dumps(data, indent=2))
+
+        # Backup existing file if it's non-trivial
+        if REGISTRY_FILE.exists() and REGISTRY_FILE.stat().st_size > 100:
+            backup_path = REGISTRY_FILE.with_suffix(".json.bak")
+            shutil.copy2(str(REGISTRY_FILE), str(backup_path))
+
+        # Write to temp file in same directory (same filesystem for atomic rename)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(REGISTRY_FILE.parent), suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, str(REGISTRY_FILE))
+        except BaseException:
+            # Clean up temp file on any failure
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     except OSError as exc:
         log.error("Failed to save registry: %s", exc)
         raise

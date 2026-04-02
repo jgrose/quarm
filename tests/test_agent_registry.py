@@ -345,5 +345,72 @@ class TestRecordAgentPerformance(_RegistryTestCase):
         self.assertAlmostEqual(agent["avg_score"], 7.0)
 
 
+import pytest
+
+
+@pytest.fixture(autouse=False)
+def isolate_registry(tmp_path, monkeypatch):
+    """Point REGISTRY_FILE at a temp directory so tests don't touch real data."""
+    reg_file = tmp_path / "agents" / "registry.json"
+    monkeypatch.setattr(agent_registry, "REGISTRY_FILE", reg_file)
+    yield reg_file
+
+
+class TestAtomicSave:
+    """save_registry uses atomic write pattern."""
+
+    def test_creates_file_from_scratch(self, isolate_registry):
+        data = {"sub_agents": {}, "managers": {}, "reviewers": {}}
+        agent_registry.save_registry(data)
+        assert isolate_registry.exists()
+        assert json.loads(isolate_registry.read_text()) == data
+
+    def test_backup_created_when_file_over_100_bytes(self, isolate_registry):
+        big_data = {"sub_agents": {"a": {"name": "a", "data": "x" * 200}},
+                    "managers": {}, "reviewers": {}}
+        isolate_registry.parent.mkdir(parents=True, exist_ok=True)
+        isolate_registry.write_text(json.dumps(big_data, indent=2))
+        new_data = {"sub_agents": {}, "managers": {}, "reviewers": {}}
+        agent_registry.save_registry(new_data)
+        backup = isolate_registry.with_suffix(".json.bak")
+        assert backup.exists()
+        assert json.loads(backup.read_text()) == big_data
+
+    def test_no_backup_for_small_file(self, isolate_registry):
+        isolate_registry.parent.mkdir(parents=True, exist_ok=True)
+        isolate_registry.write_text("{}")
+        agent_registry.save_registry({"sub_agents": {}, "managers": {}, "reviewers": {}})
+        assert not isolate_registry.with_suffix(".json.bak").exists()
+
+    def test_no_temp_file_left_on_success(self, isolate_registry):
+        agent_registry.save_registry({"sub_agents": {}, "managers": {}, "reviewers": {}})
+        assert list(isolate_registry.parent.glob("*.tmp")) == []
+
+    def test_temp_file_cleaned_on_failure(self, isolate_registry):
+        isolate_registry.parent.mkdir(parents=True, exist_ok=True)
+        class BadObj:
+            pass
+        with pytest.raises((TypeError, ValueError)):
+            agent_registry.save_registry({"bad": BadObj()})
+        assert list(isolate_registry.parent.glob("*.tmp")) == []
+
+    def test_original_unchanged_on_failure(self, isolate_registry):
+        original = {"sub_agents": {"ok": True}, "managers": {}, "reviewers": {}}
+        isolate_registry.parent.mkdir(parents=True, exist_ok=True)
+        isolate_registry.write_text(json.dumps(original))
+        class BadObj:
+            pass
+        with pytest.raises((TypeError, ValueError)):
+            agent_registry.save_registry({"bad": BadObj()})
+        assert json.loads(isolate_registry.read_text()) == original
+
+    def test_atomic_replace_overwrites_content(self, isolate_registry):
+        v1 = {"sub_agents": {"a": {}}, "managers": {}, "reviewers": {}}
+        v2 = {"sub_agents": {"b": {}}, "managers": {}, "reviewers": {}}
+        agent_registry.save_registry(v1)
+        agent_registry.save_registry(v2)
+        assert json.loads(isolate_registry.read_text()) == v2
+
+
 if __name__ == "__main__":
     unittest.main()
