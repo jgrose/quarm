@@ -163,6 +163,28 @@ function drawMinimap(ctx, W, H, time) {
   ctx.rect(drawX, drawY, drawW, drawH);
   ctx.clip();
 
+  // ─── Tron diagonal grid (simplified, matching iso slope) ───
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = C.hexGrid;
+  ctx.lineWidth = 0.4;
+  var gridStep = 8;   // perpendicular spacing between lines
+  var isoSlope = 0.5; // TILE_H / TILE_W — matches main canvas grid angle
+  var spanX = drawW + drawH / isoSlope;  // horizontal extent to cover full rect
+  var numLines = Math.ceil(spanX / gridStep) + 2;
+  for (var gi = -numLines; gi <= numLines; gi++) {
+    var gx = drawX + drawW / 2 + gi * gridStep;
+    // Set 1: descending (slope +0.5, like main canvas col-axis lines)
+    ctx.beginPath();
+    ctx.moveTo(gx - drawW, drawY + drawH / 2 - drawW * isoSlope);
+    ctx.lineTo(gx + drawW, drawY + drawH / 2 + drawW * isoSlope);
+    ctx.stroke();
+    // Set 2: ascending (slope -0.5, like main canvas row-axis lines)
+    ctx.beginPath();
+    ctx.moveTo(gx - drawW, drawY + drawH / 2 + drawW * isoSlope);
+    ctx.lineTo(gx + drawW, drawY + drawH / 2 - drawW * isoSlope);
+    ctx.stroke();
+  }
+
   // ─── Road lines (faint) ───
   if (_roadTiles && _roadTiles.length > 0) {
     ctx.globalAlpha = 0.25;
@@ -171,6 +193,17 @@ function drawMinimap(ctx, W, H, time) {
       var rt = _roadTiles[r];
       var rp = worldToMinimap(rt.x, rt.y, drawX, drawY, drawW, drawH);
       ctx.fillRect(rp.x - 0.5, rp.y - 0.5, 1, 1);
+    }
+  }
+
+  // ─── Tree dots (geometric markers) ───
+  if (typeof _treeObjects !== 'undefined' && _treeObjects.length > 0) {
+    ctx.globalAlpha = 0.5;
+    for (var ti = 0; ti < _treeObjects.length; ti++) {
+      var tree = _treeObjects[ti];
+      var tp = worldToMinimap(tree.x, tree.y, drawX, drawY, drawW, drawH);
+      ctx.fillStyle = tree.glow || C.holoBase;
+      ctx.fillRect(tp.x - 0.5, tp.y - 0.5, 1.5, 1.5);
     }
   }
 
