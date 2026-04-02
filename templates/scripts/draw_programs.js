@@ -381,6 +381,9 @@ function updateAmbientPrograms(W, H, dt) {
       // Drain trail when zoomed out so memory is reclaimed
       p.trail.length = 0;
     }
+
+    // Update emotion state for thought bubbles
+    if (typeof updateEmotionState === 'function') updateEmotionState(p, dt);
   }
 }
 
@@ -557,7 +560,6 @@ function drawAmbientPrograms(ctx, time) {
     }
 
     // Thought bubble emotion indicator
-    if (typeof updateEmotionState === 'function') updateEmotionState(p, dt);
     if (typeof drawThoughtBubble === 'function') drawThoughtBubble(ctx, p, drawY, time, bunkerAlpha);
   }
 
