@@ -131,6 +131,41 @@ def get_cost_analytics() -> dict:
     }
 
 
+def get_run_cost_breakdown(run_id: str) -> dict:
+    """Per-agent and per-model token breakdown for a single run."""
+    with _conn() as c:
+        run_row = c.execute(
+            "SELECT id, plan_name, total_tokens, task_count, started_at, finished_at, status "
+            "FROM runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        run_meta = dict(run_row) if run_row else {}
+
+        by_agent = c.execute(
+            "SELECT agent, SUM(tokens) as total_tokens, COUNT(*) as count "
+            "FROM task_scores WHERE run_id = ? GROUP BY agent ORDER BY total_tokens DESC",
+            (run_id,)
+        ).fetchall()
+
+        by_model = c.execute(
+            "SELECT model, SUM(tokens) as total_tokens, COUNT(*) as count "
+            "FROM task_scores WHERE run_id = ? AND model != '' GROUP BY model ORDER BY total_tokens DESC",
+            (run_id,)
+        ).fetchall()
+
+        by_task = c.execute(
+            "SELECT task_id, agent, model, tokens, score, verdict, reviewer "
+            "FROM task_scores WHERE run_id = ? ORDER BY task_id",
+            (run_id,)
+        ).fetchall()
+
+    return {
+        "run": run_meta,
+        "by_agent": [dict(r) for r in by_agent],
+        "by_model": [dict(r) for r in by_model],
+        "by_task": [dict(r) for r in by_task],
+    }
+
+
 def get_review_stats() -> dict:
     """Per-reviewer analytics: pass/fail rates, avg scores, override frequency."""
     with _conn() as c:

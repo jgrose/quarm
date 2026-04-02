@@ -657,6 +657,12 @@ async def health():
 
 # ── Analytics endpoints ─────────────────────────────────────────────────────
 
+@app.get("/api/analytics/costs/{run_id}")
+async def analytics_costs_by_run(run_id: str):
+    from tracking import get_run_cost_breakdown
+    return get_run_cost_breakdown(run_id)
+
+
 @app.get("/api/analytics/costs")
 async def analytics_costs():
     from tracking import get_cost_analytics

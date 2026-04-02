@@ -1,0 +1,535 @@
+<!-- Cost Tracker Overlay Panel — toggled via '$' key or COSTS button -->
+<div id="costPanelOverlay" class="hidden">
+  <div class="cost-panel-card glass-card" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="config-title" style="margin:0">COST TRACKER</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">$ / ESC</span>
+        <button class="close-btn" onclick="toggleCostPanel()">&times;</button>
+      </div>
+    </div>
+    <div class="cost-panel-tabs">
+      <button class="cost-panel-tab active" onclick="_switchCostTab('live', this)">LIVE</button>
+      <button class="cost-panel-tab" onclick="_switchCostTab('history', this)">HISTORY</button>
+    </div>
+    <div id="costPanelBody">
+      <div style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px">Select a tab</div>
+    </div>
+  </div>
+</div>
+
+<style>
+#costPanelOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#costPanelOverlay.hidden {
+  display: none !important;
+}
+
+.cost-panel-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.cost-panel-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.cost-panel-tab {
+  padding: 6px 16px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  transition: all 0.2s ease;
+}
+
+.cost-panel-tab.active {
+  border-bottom-color: var(--holo-base);
+  color: var(--holo-bright);
+}
+
+.cost-panel-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+/* stat blocks used by cost panel */
+.cost-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.cost-stat-block {
+  background: rgba(10, 15, 30, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.cost-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--state-done);
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-stat-lbl {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* bar chart rows */
+.cost-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+
+.cost-bar-label {
+  font-size: 9px;
+  color: var(--text-primary);
+  width: 110px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+}
+
+.cost-bar-fill {
+  height: 8px;
+  min-width: 2px;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.cost-bar-val {
+  font-size: 9px;
+  color: var(--text-dim);
+  min-width: 60px;
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-section-hdr {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+}
+
+.cost-run-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+
+.cost-run-table th {
+  color: var(--text-dim);
+  text-align: left;
+  padding: 4px;
+  border-bottom: 1px solid var(--glass-border);
+  font-weight: 500;
+}
+
+.cost-run-table td {
+  padding: 4px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+}
+
+.cost-run-table tr.cost-run-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cost-run-table tr.cost-run-clickable:hover {
+  background: rgba(100, 200, 255, 0.06);
+}
+
+.cost-back-btn {
+  background: none;
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  transition: background 0.15s;
+}
+
+.cost-back-btn:hover {
+  background: rgba(100, 200, 255, 0.1);
+}
+
+.cost-no-data {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+  padding: 20px;
+}
+</style>
+
+<script>
+(function() {
+  var _costActiveTab = 'live';
+  var _costRefreshTimer = null;
+  var _costPanelVisible = false;
+  var _costDrillRunId = null;
+
+  function _estimateCost(tokens) {
+    var rate = (typeof COST_RATE_PER_M !== 'undefined') ? COST_RATE_PER_M : 6;
+    return (tokens / 1000000) * rate;
+  }
+
+  function _formatCost(dollars) {
+    return '$' + dollars.toFixed(4);
+  }
+
+  function _costBarChart(items, maxVal, color) {
+    if (!maxVal) maxVal = 1;
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var w = Math.max(2, (it.val / maxVal) * 200);
+      html += '<div class="cost-bar-row">' +
+        '<span class="cost-bar-label">' + escapeHtml(String(it.label)) + '</span>' +
+        '<div class="cost-bar-fill" style="width:' + w + 'px;background:' + color + '"></div>' +
+        '<span class="cost-bar-val">' + it.val.toLocaleString() + ' (' + _formatCost(_estimateCost(it.val)) + ')</span>' +
+        '</div>';
+    }
+    return html;
+  }
+
+  function _switchCostTab(tab, btn) {
+    _costActiveTab = tab;
+    _costDrillRunId = null;
+    var tabs = document.querySelectorAll('.cost-panel-tab');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    if (btn) btn.classList.add('active');
+    _refreshCostPanel();
+  }
+
+  function _refreshCostPanel() {
+    if (_costActiveTab === 'live') {
+      _renderLiveCosts();
+    } else {
+      if (_costDrillRunId) {
+        _loadRunCosts(_costDrillRunId);
+      } else {
+        _renderHistoryCosts();
+      }
+    }
+  }
+
+  // ── LIVE tab ──────────────────────────────────────────────────────────
+  function _renderLiveCosts() {
+    var body = document.getElementById('costPanelBody');
+    if (!body) return;
+
+    if (typeof _activeSessionId === 'undefined' || !_activeSessionId ||
+        typeof _sessions === 'undefined' || !_sessions[_activeSessionId]) {
+      body.innerHTML = '<div class="cost-no-data">No active session</div>';
+      return;
+    }
+
+    var data = _sessions[_activeSessionId].data;
+    if (!data) {
+      body.innerHTML = '<div class="cost-no-data">No session data available</div>';
+      return;
+    }
+
+    var totalTokens = data.tokens_used || 0;
+    var tasks = data.tasks || [];
+    var taskCount = tasks.length;
+    var estCost = _estimateCost(totalTokens);
+
+    var html = '';
+
+    // Summary stats
+    html += '<div class="cost-stats-grid">';
+    html += '<div class="cost-stat-block"><div class="cost-stat-val">' + totalTokens.toLocaleString() + '</div><div class="cost-stat-lbl">TOKENS</div></div>';
+    html += '<div class="cost-stat-block"><div class="cost-stat-val">' + _formatCost(estCost) + '</div><div class="cost-stat-lbl">EST. COST</div></div>';
+    html += '<div class="cost-stat-block"><div class="cost-stat-val">' + taskCount + '</div><div class="cost-stat-lbl">TASKS</div></div>';
+    html += '</div>';
+
+    // Per-agent breakdown
+    var agentMap = {};
+    for (var i = 0; i < tasks.length; i++) {
+      var t = tasks[i];
+      var agent = t.agent || 'unknown';
+      var tokens = t.task_tokens || 0;
+      if (!agentMap[agent]) agentMap[agent] = 0;
+      agentMap[agent] += tokens;
+    }
+
+    var agentItems = [];
+    for (var a in agentMap) {
+      if (agentMap.hasOwnProperty(a)) {
+        agentItems.push({ label: a, val: agentMap[a] });
+      }
+    }
+    agentItems.sort(function(x, y) { return y.val - x.val; });
+
+    if (agentItems.length > 0) {
+      var maxAgent = agentItems[0].val;
+      html += '<div class="cost-section-hdr">TOKENS BY AGENT</div>';
+      html += _costBarChart(agentItems, maxAgent, '#00ccff');
+    } else {
+      html += '<div class="cost-no-data" style="padding:10px">No agent token data yet</div>';
+    }
+
+    body.innerHTML = html;
+  }
+
+  // ── HISTORY tab ───────────────────────────────────────────────────────
+  function _renderHistoryCosts() {
+    var body = document.getElementById('costPanelBody');
+    if (!body) return;
+    body.innerHTML = '<div class="cost-no-data">Loading...</div>';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/analytics/costs', true);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status !== 200) {
+        body.innerHTML = '<div class="cost-no-data">Failed to load cost data</div>';
+        return;
+      }
+      var costs;
+      try { costs = JSON.parse(xhr.responseText); } catch(e) {
+        body.innerHTML = '<div class="cost-no-data">Invalid response</div>';
+        return;
+      }
+
+      var total = costs.total_tokens || 0;
+      var runs = costs.recent_runs || [];
+      var byAgent = costs.by_agent || [];
+      var byModel = costs.by_model || [];
+
+      var html = '';
+
+      // All-time stats
+      html += '<div class="cost-stats-grid">';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + total.toLocaleString() + '</div><div class="cost-stat-lbl">ALL-TIME TOKENS</div></div>';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + _formatCost(_estimateCost(total)) + '</div><div class="cost-stat-lbl">EST. TOTAL COST</div></div>';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + runs.length + '</div><div class="cost-stat-lbl">RECENT RUNS</div></div>';
+      html += '</div>';
+
+      // By agent bars
+      if (byAgent.length > 0) {
+        var agentItems = [];
+        var maxA = 0;
+        for (var i = 0; i < byAgent.length; i++) {
+          agentItems.push({ label: byAgent[i].agent, val: byAgent[i].total_tokens });
+          if (byAgent[i].total_tokens > maxA) maxA = byAgent[i].total_tokens;
+        }
+        html += '<div class="cost-section-hdr">ALL-TIME BY AGENT</div>';
+        html += _costBarChart(agentItems, maxA, '#00ccff');
+      }
+
+      // By model bars
+      if (byModel.length > 0) {
+        var modelItems = [];
+        var maxM = 0;
+        for (var j = 0; j < byModel.length; j++) {
+          modelItems.push({ label: byModel[j].model, val: byModel[j].total_tokens });
+          if (byModel[j].total_tokens > maxM) maxM = byModel[j].total_tokens;
+        }
+        html += '<div class="cost-section-hdr">ALL-TIME BY MODEL</div>';
+        html += _costBarChart(modelItems, maxM, '#aa66ff');
+      }
+
+      // Recent runs table
+      if (runs.length > 0) {
+        html += '<div class="cost-section-hdr">RECENT RUNS</div>';
+        html += '<table class="cost-run-table"><thead><tr><th>PLAN</th><th>TOKENS</th><th>COST</th><th>TASKS</th><th>STATUS</th></tr></thead><tbody>';
+        for (var k = 0; k < runs.length; k++) {
+          var r = runs[k];
+          var rTokens = r.total_tokens || 0;
+          var statusColor = r.status === 'done' ? '#00ff88' : (r.status === 'running' ? '#ffaa00' : '#ff5566');
+          html += '<tr class="cost-run-clickable" onclick="_drillCostRun(\'' + escapeHtml(r.id) + '\')">';
+          html += '<td>' + escapeHtml(r.plan_name || r.id) + '</td>';
+          html += '<td>' + rTokens.toLocaleString() + '</td>';
+          html += '<td>' + _formatCost(_estimateCost(rTokens)) + '</td>';
+          html += '<td>' + (r.task_count || 0) + '</td>';
+          html += '<td style="color:' + statusColor + '">' + escapeHtml(r.status || 'unknown') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+      }
+
+      body.innerHTML = html;
+    };
+    xhr.send();
+  }
+
+  // ── Drill-down for a single run ───────────────────────────────────────
+  function _loadRunCosts(runId) {
+    var body = document.getElementById('costPanelBody');
+    if (!body) return;
+    body.innerHTML = '<div class="cost-no-data">Loading run details...</div>';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/analytics/costs/' + encodeURIComponent(runId), true);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status !== 200) {
+        body.innerHTML = '<div class="cost-no-data">Failed to load run data</div>';
+        return;
+      }
+      var data;
+      try { data = JSON.parse(xhr.responseText); } catch(e) {
+        body.innerHTML = '<div class="cost-no-data">Invalid response</div>';
+        return;
+      }
+
+      var run = data.run || {};
+      var byAgent = data.by_agent || [];
+      var byModel = data.by_model || [];
+      var byTask = data.by_task || [];
+
+      var html = '';
+      html += '<button class="cost-back-btn" onclick="_costBackToHistory()">&larr; BACK TO HISTORY</button>';
+
+      // Run header
+      var runTokens = run.total_tokens || 0;
+      html += '<div class="cost-stats-grid">';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + runTokens.toLocaleString() + '</div><div class="cost-stat-lbl">RUN TOKENS</div></div>';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + _formatCost(_estimateCost(runTokens)) + '</div><div class="cost-stat-lbl">RUN COST</div></div>';
+      html += '<div class="cost-stat-block"><div class="cost-stat-val">' + (run.task_count || 0) + '</div><div class="cost-stat-lbl">TASKS</div></div>';
+      html += '</div>';
+
+      // By agent
+      if (byAgent.length > 0) {
+        var agentItems = [];
+        var maxA = 0;
+        for (var i = 0; i < byAgent.length; i++) {
+          agentItems.push({ label: byAgent[i].agent, val: byAgent[i].total_tokens });
+          if (byAgent[i].total_tokens > maxA) maxA = byAgent[i].total_tokens;
+        }
+        html += '<div class="cost-section-hdr">BY AGENT</div>';
+        html += _costBarChart(agentItems, maxA, '#00ccff');
+      }
+
+      // By model
+      if (byModel.length > 0) {
+        var modelItems = [];
+        var maxM = 0;
+        for (var j = 0; j < byModel.length; j++) {
+          modelItems.push({ label: byModel[j].model, val: byModel[j].total_tokens });
+          if (byModel[j].total_tokens > maxM) maxM = byModel[j].total_tokens;
+        }
+        html += '<div class="cost-section-hdr">BY MODEL</div>';
+        html += _costBarChart(modelItems, maxM, '#aa66ff');
+      }
+
+      // Task detail table
+      if (byTask.length > 0) {
+        html += '<div class="cost-section-hdr">TASK DETAILS</div>';
+        html += '<table class="cost-run-table"><thead><tr><th>TASK</th><th>AGENT</th><th>MODEL</th><th>TOKENS</th><th>SCORE</th><th>VERDICT</th></tr></thead><tbody>';
+        for (var k = 0; k < byTask.length; k++) {
+          var t = byTask[k];
+          var vColor = t.verdict === 'PASS' ? '#00ff88' : '#ff4444';
+          html += '<tr>';
+          html += '<td>' + escapeHtml(t.task_id || '') + '</td>';
+          html += '<td>' + escapeHtml(t.agent || '') + '</td>';
+          html += '<td>' + escapeHtml(t.model || '') + '</td>';
+          html += '<td>' + (t.tokens || 0).toLocaleString() + '</td>';
+          html += '<td>' + (t.score || 0) + '/10</td>';
+          html += '<td style="color:' + vColor + '">' + escapeHtml(t.verdict || '') + '</td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+      }
+
+      body.innerHTML = html;
+    };
+    xhr.send();
+  }
+
+  // ── Panel toggle & auto-refresh ───────────────────────────────────────
+  window.toggleCostPanel = function() {
+    var overlay = document.getElementById('costPanelOverlay');
+    if (!overlay) return;
+    _costPanelVisible = !_costPanelVisible;
+    if (_costPanelVisible) {
+      overlay.classList.remove('hidden');
+      _refreshCostPanel();
+      _startCostRefresh();
+    } else {
+      overlay.classList.add('hidden');
+      _stopCostRefresh();
+    }
+  };
+
+  function _startCostRefresh() {
+    _stopCostRefresh();
+    _costRefreshTimer = setInterval(function() {
+      if (_costPanelVisible) _refreshCostPanel();
+    }, 2000);
+  }
+
+  function _stopCostRefresh() {
+    if (_costRefreshTimer) {
+      clearInterval(_costRefreshTimer);
+      _costRefreshTimer = null;
+    }
+  }
+
+  // Globals needed by onclick handlers in rendered HTML
+  window._drillCostRun = function(runId) {
+    _costDrillRunId = runId;
+    _loadRunCosts(runId);
+  };
+
+  window._costBackToHistory = function() {
+    _costDrillRunId = null;
+    _renderHistoryCosts();
+  };
+
+  window._switchCostTab = _switchCostTab;
+
+  // Register '$' keyboard shortcut
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '$' && !e.ctrlKey && !e.metaKey &&
+        document.activeElement.tagName !== 'INPUT' &&
+        document.activeElement.tagName !== 'TEXTAREA') {
+      toggleCostPanel();
+    }
+  });
+})();
+</script>
