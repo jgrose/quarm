@@ -53,6 +53,7 @@ var config = {
   bloomQuality: 'low',
   maxParticles: 50,
   maxEffects: 30,
+  maxTrailLength: 30,
   edgeDetail: 16,
   lodEnabled: true,
   idlePause: true,
