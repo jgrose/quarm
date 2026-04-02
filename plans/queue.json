@@ -1,16 +1,9 @@
 [
   {
-    "id": "a035568b0c57",
-    "title": "Hello World Static Page",
-    "description": "hello world static page",
-    "status": "failed",
-    "created_at": "2026-03-26T07:47:19.861127+00:00"
-  },
-  {
-    "id": "7ea03bed1e99",
-    "title": "nginx_hello_world",
-    "description": "a quick hello world nginx project",
-    "status": "failed",
-    "created_at": "2026-04-01T20:19:01.450033+00:00"
+    "id": "34da0a472a13",
+    "title": "hello_world_html",
+    "description": "generate a hellow world simple html page. use no css, no js. JUST the html file that say says hello world in bold.",
+    "status": "done",
+    "created_at": "2026-04-01T22:12:49.521653+00:00"
   }
 ]

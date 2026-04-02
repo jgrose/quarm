@@ -91,6 +91,28 @@
         "read_file",
         "web_search"
       ]
+    },
+    "security_auditor": {
+      "name": "security_auditor",
+      "description": "Security specialist that performs systematic code audits of existing tool functions. Reads source code, identifies vulnerabilities by category (injection, traversal, disclosure, exhaustion), and produces detailed markdown findings reports with severity ratings and specific remediation code snippets.",
+      "tools": [
+        "read_file",
+        "write_file",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "read_file",
+        "web_search",
+        "security",
+        "write_file"
+      ],
+      "created_at": "2026-04-01T22:17:55.612941+00:00",
+      "updated_at": "2026-04-01T22:17:55.612941+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "managers": {
@@ -156,6 +178,78 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "security_architecture_lead": {
+      "name": "security_architecture_lead",
+      "title": "Security Architecture Director",
+      "description": "Owns the overall security posture of the hardening layer. Reviews all outputs for completeness of threat coverage, correctness of sandboxing boundaries, adherence to least-privilege principles, and absence of bypass vectors. Ensures no security feature introduces regressions or usability barriers. Judges whether vulnerability findings are accurately rated and whether mitigations are sufficient.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "security"
+      ],
+      "created_at": "2026-04-01T22:17:55.613348+00:00",
+      "updated_at": "2026-04-01T22:17:55.613348+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "security_lead": {
+      "name": "security_lead",
+      "title": "security_lead",
+      "description": "",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [],
+      "created_at": "2026-04-01T22:17:55.613857+00:00",
+      "updated_at": "2026-04-01T22:17:55.613857+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "product_delivery_lead": {
+      "name": "product_delivery_lead",
+      "title": "Product & UX Delivery Lead",
+      "description": "Owns the dashboard experience and documentation quality. Ensures all new UI components are consistent with the existing agents panel style, that user workflows are intuitive (clone, retire, rollback, import/export, team management), and that documentation accurately reflects the implemented features. Judges quality by usability, visual consistency, and completeness.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "documentation",
+        "ui"
+      ],
+      "created_at": "2026-04-01T22:17:55.619724+00:00",
+      "updated_at": "2026-04-01T22:17:55.619724+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "dashboard_lead": {
+      "name": "dashboard_lead",
+      "title": "Dashboard & Visualization Delivery Lead",
+      "description": "Owns all frontend deliverables including the DAG visualization, preview cards, template UI, cost display, and real-time WebSocket updates. Judges visual clarity, interaction quality, responsiveness, and consistency with the existing dashboard design language (canvas-based city visualization, existing panel structure).",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "design",
+        "frontend"
+      ],
+      "created_at": "2026-04-01T22:17:55.660204+00:00",
+      "updated_at": "2026-04-01T22:17:55.660204+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "reviewers": {
@@ -168,9 +262,9 @@
         "infrastructure"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
-      "runs": 0,
-      "avg_score": 0,
+      "updated_at": "2026-04-01T23:18:16.665090+00:00",
+      "runs": 43,
+      "avg_score": 6.32,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior Security Engineer",
@@ -203,9 +297,9 @@
         "frontend"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
-      "runs": 0,
-      "avg_score": 0,
+      "updated_at": "2026-04-01T23:18:23.679407+00:00",
+      "runs": 10,
+      "avg_score": 6.69,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior UX/UI Designer",
@@ -237,9 +331,9 @@
         "documentation"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
-      "runs": 0,
-      "avg_score": 0,
+      "updated_at": "2026-04-01T23:35:27.323832+00:00",
+      "runs": 13,
+      "avg_score": 5.99,
       "total_revisions": 0,
       "builtin": true,
       "title": "End-User Representative",
@@ -269,9 +363,9 @@
         "elegance"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
-      "runs": 0,
-      "avg_score": 0,
+      "updated_at": "2026-04-01T23:35:37.659193+00:00",
+      "runs": 22,
+      "avg_score": 5.85,
       "total_revisions": 0,
       "builtin": true,
       "title": "Creative Director",
@@ -306,9 +400,9 @@
         "review"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:23:28.099901+00:00",
-      "runs": 1,
-      "avg_score": 6.0,
+      "updated_at": "2026-04-01T23:35:53.120732+00:00",
+      "runs": 50,
+      "avg_score": 6.03,
       "total_revisions": 0,
       "builtin": true,
       "title": "Devil's Advocate",
@@ -344,9 +438,9 @@
         "optimization"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:23:46.616567+00:00",
-      "runs": 1,
-      "avg_score": 6.0,
+      "updated_at": "2026-04-01T23:22:05.240180+00:00",
+      "runs": 40,
+      "avg_score": 5.92,
       "total_revisions": 0,
       "builtin": true,
       "title": "Performance Engineer",
@@ -368,6 +462,22 @@
         "infrastructure",
         "config"
       ]
+    },
+    "code_reviewer": {
+      "name": "code_reviewer",
+      "title": "code_reviewer",
+      "description": "",
+      "focus_areas": [],
+      "applies_to": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [],
+      "created_at": "2026-04-01T22:17:55.614118+00:00",
+      "updated_at": "2026-04-01T22:17:55.614118+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   }
 }
