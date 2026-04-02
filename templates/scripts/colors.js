@@ -34,8 +34,8 @@ var C = {
 
   // Text
   textPrimary: '#aaeeff',
-  textDim: 'rgba(102, 204, 255, 0.56)',
-  textMuted: 'rgba(102, 204, 255, 0.31)',
+  textDim: 'rgba(102, 204, 255, 0.7)',
+  textMuted: 'rgba(102, 204, 255, 0.5)',
 
   // Glass (for canvas-drawn panels)
   glassBg: 'rgba(10, 15, 30, 0.7)',

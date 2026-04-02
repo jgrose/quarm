@@ -19,8 +19,8 @@
   --glass-border: rgba(100, 200, 255, 0.15);
   --glass-highlight: rgba(100, 200, 255, 0.08);
   --text-primary: #aaeeff;
-  --text-dim: rgba(102, 204, 255, 0.56);
-  --text-muted: rgba(102, 204, 255, 0.31);
+  --text-dim: rgba(102, 204, 255, 0.7);
+  --text-muted: rgba(102, 204, 255, 0.5);
   --state-idle: #66ccff;
   --state-working: #66ccff;
   --state-review: #ffbb44;
@@ -89,7 +89,7 @@ a:hover { color: var(--holo-bright); }
 .glass-card input,
 .glass-card textarea,
 .glass-card select {
-  background: rgba(100, 200, 255, 0.05);
+  background: rgba(100, 200, 255, 0.1);
   border: 1px solid var(--glass-border);
   color: var(--text-primary);
   font-family: 'Courier New', monospace;
@@ -256,7 +256,7 @@ a:hover { color: var(--holo-bright); }
 
 #planInput {
   flex: 1;
-  background: rgba(100, 200, 255, 0.05);
+  background: rgba(100, 200, 255, 0.1);
   border: 1px solid var(--glass-border);
   color: var(--text-primary);
   padding: 6px 12px;
@@ -1621,7 +1621,7 @@ a:hover { color: var(--holo-bright); }
   width: 100%;
   padding: 6px 10px;
   margin-bottom: 10px;
-  background: rgba(100, 200, 255, 0.05);
+  background: rgba(100, 200, 255, 0.1);
   border: 1px solid var(--glass-border);
   border-radius: 4px;
   color: var(--text-primary);
@@ -1882,6 +1882,97 @@ a:hover { color: var(--holo-bright); }
   display: none !important;
 }
 
+/* ── 20b. Focus-Visible States (Accessibility) ─────────────────────────── */
+
+/* Shared focus-visible outline — holographic cyan ring */
+.cfg-btn:focus-visible,
+.cfg-tab:focus-visible,
+.cost-panel-tab:focus-visible,
+.ledger-tab:focus-visible,
+.chat-tab:focus-visible,
+.session-tab:focus-visible,
+.agents-tab:focus-visible,
+.model-preset-btn:focus-visible,
+.tolerance-preset-btn:focus-visible,
+.agents-action-btn:focus-visible,
+.agents-create-btn:focus-visible,
+.agent-save-btn:focus-visible,
+.agent-delete-btn:focus-visible,
+.agent-cancel-btn:focus-visible,
+.btn-sm:focus-visible,
+.queue-actions button:focus-visible,
+#topBar button:focus-visible,
+.glass-card button:focus-visible,
+#btnGenerate:focus-visible,
+#approvalBanner .btn-approve:focus-visible,
+#approvalBanner .btn-reject:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Close buttons */
+.close-btn:focus-visible,
+.agent-detail-card .close-btn:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Toggle switches */
+.cfg-toggle:focus-visible,
+.toggle-switch:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+  border-radius: 9px;
+}
+
+/* Range/slider inputs */
+.cfg-range:focus-visible,
+.tolerance-slider:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Text inputs, textareas, selects */
+.glass-card input:focus-visible,
+.glass-card textarea:focus-visible,
+.glass-card select:focus-visible,
+.model-filter-input:focus-visible,
+.agent-input:focus-visible,
+#planInput:focus-visible,
+.revision-select:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Drawer toggle buttons */
+#chatToggle:focus-visible,
+#agentListToggle:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Clickable list items */
+.al-session-header:focus-visible,
+.roster-item:focus-visible,
+.agent-item:focus-visible,
+.queue-item:focus-visible,
+.tree-file:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: -2px;
+}
+
+/* Links */
+a:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Checkbox inputs in the agents panel */
+.agents-toggle-label input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(102, 204, 255, 0.6);
+  outline-offset: 2px;
+}
+
 /* ── 21. Global Scrollbar ───────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
@@ -1964,7 +2055,7 @@ a:hover { color: var(--holo-bright); }
 
 .roster-status {
   font-size: 8px;
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   font-family: monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -2031,7 +2122,7 @@ a:hover { color: var(--holo-bright); }
 .agents-tab {
   background: rgba(100, 200, 255, 0.05);
   border: 1px solid rgba(100, 200, 255, 0.15);
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   padding: 4px 10px;
   font-size: 8px;
   font-family: monospace;
@@ -2076,7 +2167,7 @@ a:hover { color: var(--holo-bright); }
 
 .agent-item-desc {
   font-size: 8px;
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   font-family: monospace;
   margin-top: 2px;
 }
@@ -2126,7 +2217,7 @@ a:hover { color: var(--holo-bright); }
   gap: 3px;
   font-size: 7px;
   font-family: monospace;
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   letter-spacing: 0.5px;
   cursor: pointer;
 }
@@ -2142,7 +2233,7 @@ a:hover { color: var(--holo-bright); }
   padding: 6px;
   background: rgba(100, 200, 255, 0.08);
   border: 1px dashed rgba(100, 200, 255, 0.2);
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   font-size: 9px;
   font-family: monospace;
   cursor: pointer;
@@ -2163,7 +2254,7 @@ a:hover { color: var(--holo-bright); }
 .agent-edit-form label {
   display: block;
   font-size: 8px;
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
   font-family: monospace;
   margin: 6px 0 2px 0;
 }
@@ -2207,7 +2298,7 @@ a:hover { color: var(--holo-bright); }
 .agent-cancel-btn {
   background: rgba(100, 200, 255, 0.05);
   border-color: rgba(100, 200, 255, 0.15);
-  color: rgba(102, 204, 255, 0.56);
+  color: var(--text-dim);
 }
 
 /* ── Output Browser ──────────────────────────────────────────────────────── */
