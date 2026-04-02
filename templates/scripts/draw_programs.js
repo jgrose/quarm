@@ -980,7 +980,9 @@ function updateAmbientPrograms(W, H, dt) {
       p.trail = [];
     }
 
-    var maxTrail = p.cycleMode ? 40 : 25;
+    var maxTrail = p.cycleMode
+      ? Math.floor((config.maxTrailLength || 30) * 1.3)
+      : (config.maxTrailLength || 30);
 
     if (dist < 5) {
       // ─── Arrived at target: enter bunker if location ───
@@ -1011,16 +1013,22 @@ function updateAmbientPrograms(W, H, dt) {
 
     p.walkCycle += dt * 7;
 
-    p._trailCounter += dt;
-    if (p._trailCounter > 0.08) {
-      // Add slight wobble so trails curve instead of being laser-straight
-      var wobble = p.cycleMode ? 1.5 : 3.0;
-      p.trail.push({
-        x: p.x + (Math.random() - 0.5) * wobble,
-        y: p.y + (Math.random() - 0.5) * wobble * 0.5,
-      });
-      if (p.trail.length > maxTrail) p.trail.shift();
-      p._trailCounter = 0;
+    // Skip trail recording at low zoom — trails invisible below 0.4 anyway
+    if (!config.lodEnabled || camera.zoom >= 0.4) {
+      p._trailCounter += dt;
+      if (p._trailCounter > 0.08) {
+        // Add slight wobble so trails curve instead of being laser-straight
+        var wobble = p.cycleMode ? 1.5 : 3.0;
+        p.trail.push({
+          x: p.x + (Math.random() - 0.5) * wobble,
+          y: p.y + (Math.random() - 0.5) * wobble * 0.5,
+        });
+        if (p.trail.length > maxTrail) p.trail.shift();
+        p._trailCounter = 0;
+      }
+    } else if (p.trail.length > 0) {
+      // Drain trail when zoomed out so memory is reclaimed
+      p.trail.length = 0;
     }
   }
 }

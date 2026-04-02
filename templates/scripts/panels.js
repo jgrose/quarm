@@ -38,10 +38,10 @@ function switchConfigTab(tab, btn) {
 }
 
 var _qualityPresets = {
-  low:    { shadowQuality: 'off', bloomQuality: 'off', particles: false, maxParticles: 10, maxEffects: 5, edgeDetail: 4, weather: false, hexGrid: false, completionFx: false, lodEnabled: true, viewportCulling: true },
-  medium: { shadowQuality: 'low', bloomQuality: 'off', particles: true, maxParticles: 25, maxEffects: 15, edgeDetail: 8, weather: false, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
-  high:   { shadowQuality: 'high', bloomQuality: 'low', particles: true, maxParticles: 50, maxEffects: 30, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
-  ultra:  { shadowQuality: 'high', bloomQuality: 'high', particles: true, maxParticles: 100, maxEffects: 50, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: false, viewportCulling: true },
+  low:    { shadowQuality: 'off', bloomQuality: 'off', particles: false, maxParticles: 10, maxEffects: 5, maxTrailLength: 10, edgeDetail: 4, weather: false, hexGrid: false, completionFx: false, lodEnabled: true, viewportCulling: true },
+  medium: { shadowQuality: 'low', bloomQuality: 'off', particles: true, maxParticles: 25, maxEffects: 15, maxTrailLength: 20, edgeDetail: 8, weather: false, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
+  high:   { shadowQuality: 'high', bloomQuality: 'low', particles: true, maxParticles: 50, maxEffects: 30, maxTrailLength: 30, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
+  ultra:  { shadowQuality: 'high', bloomQuality: 'high', particles: true, maxParticles: 100, maxEffects: 50, maxTrailLength: 50, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: false, viewportCulling: true },
 };
 
 function applyQualityPreset(preset) {
