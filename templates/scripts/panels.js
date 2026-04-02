@@ -1014,6 +1014,11 @@ function toggleLedger() {
   loadLedgerData();
 }
 
+function toggleHelp() {
+  var overlay = document.getElementById('helpOverlay');
+  if (overlay) overlay.classList.toggle('visible');
+}
+
 function toggleConfigOverlay() {
   var overlay = document.getElementById('configOverlay');
   if (overlay) overlay.classList.toggle('visible');

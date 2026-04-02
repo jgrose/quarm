@@ -1,0 +1,33 @@
+<div id="helpOverlay">
+  <div class="help-card glass-card" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="config-title" style="margin:0">KEYBOARD SHORTCUTS</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
+        <button class="close-btn" onclick="toggleHelp()">&times;</button>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-label">PANELS</div>
+      <div class="help-row"><kbd>C</kbd><span>Toggle agent chat</span></div>
+      <div class="help-row"><kbd>L</kbd><span>Toggle agent list</span></div>
+      <div class="help-row"><kbd>P</kbd><span>Toggle plans list</span></div>
+      <div class="help-row"><kbd>Q</kbd><span>Toggle queue</span></div>
+      <div class="help-row"><kbd>R</kbd><span>Toggle roster</span></div>
+      <div class="help-row"><kbd>A</kbd><span>Toggle agents panel</span></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-label">DISPLAY</div>
+      <div class="help-row"><kbd>M</kbd><span>Toggle minimap</span></div>
+      <div class="help-row"><kbd>D</kbd><span>Toggle dependency edges</span></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-label">NAVIGATION</div>
+      <div class="help-row"><kbd>Esc</kbd><span>Close topmost panel</span></div>
+      <div class="help-row"><kbd>?</kbd><span>Toggle this help screen</span></div>
+    </div>
+  </div>
+</div>

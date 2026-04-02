@@ -89,6 +89,12 @@ document.addEventListener('DOMContentLoaded', function() {
         hidePlanViewer(); return;
       }
 
+      // z:150 — Help overlay
+      var helpOvl = document.getElementById('helpOverlay');
+      if (helpOvl && helpOvl.classList.contains('visible')) {
+        helpOvl.classList.remove('visible'); return;
+      }
+
       // z:150 — Config overlays (config, model config, ledger, cost, agents, tolerance, review analytics, output browser)
       var cfgOverlay = document.getElementById('configOverlay');
       if (cfgOverlay && cfgOverlay.classList.contains('visible')) {
@@ -215,6 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       config.dependencies = !config.dependencies;
     }
+    if (e.key === '?' && document.activeElement.tagName !== 'INPUT') {
+      if (typeof toggleHelp === 'function') toggleHelp();
+    }
   });
 
   // Enter key on plan input
@@ -226,6 +235,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Click-outside dismissal for overlays
+  var helpOverlay = document.getElementById('helpOverlay');
+  if (helpOverlay) {
+    helpOverlay.addEventListener('click', function(e) {
+      if (e.target === helpOverlay) helpOverlay.classList.remove('visible');
+    });
+  }
   var planViewer = document.getElementById('planViewer');
   if (planViewer) {
     planViewer.addEventListener('click', function(e) {
