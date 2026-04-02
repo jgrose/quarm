@@ -329,7 +329,7 @@ function applyStatus(data) {
   }
 
   // 8. Handle synthesis/completion
-  if (data.synthesis_report && data.phase === 'done') {
+  if (data.synthesis_report && data.phase === 'done' && !_isReplay) {
     showCompletion(data);
     if (typeof revertToIdlePrograms === 'function') {
       revertToIdlePrograms();
