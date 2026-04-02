@@ -865,12 +865,6 @@ def manager_review_node(state):
     except Exception as e:
         log_event(f"[ERROR] Failed to record agent performance for {task['agent']}: {e}")
 
-    try:
-        from agent_registry import record_agent_performance
-        record_agent_performance("managers", manager["name"], score, 0, verdict)
-    except Exception as e:
-        log_event(f"[ERROR] Failed to record manager performance for {manager['name']}: {e}")
-
     if verdict == "PASS":
         # Check for conditional specialist review skipping
         skip_specialist = False
@@ -972,6 +966,13 @@ def specialist_review_node(state):
                 verdict="PASS")
         except Exception:
             pass
+        mgr = find_mgr(task["agent"], state.get("managers", []))
+        if mgr:
+            try:
+                from agent_registry import record_agent_performance
+                record_agent_performance("managers", mgr["name"], 9, 0, "PASS")
+            except Exception:
+                pass
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
@@ -1056,6 +1057,15 @@ def specialist_review_node(state):
     tasks   = upd(tasks, tid, status="done", reviewer_notes="")
     _record_specialization(task)
     _auto_ingest(task, results)
+    mgr = find_mgr(task["agent"], state.get("managers", []))
+    if mgr:
+        try:
+            from agent_registry import record_agent_performance
+            mgr_score = 7 if task.get("revision_count", 0) > 0 else (4 if any_flags else 9)
+            mgr_verdict = "FAIL" if (any_flags and task.get("revision_count", 0) == 0) else "PASS"
+            record_agent_performance("managers", mgr["name"], mgr_score, 0, mgr_verdict)
+        except Exception:
+            pass
     s = {**state, "tasks": tasks, "results": results,
          "phase": "dispatch", "active_task_id": None}
     write_status(s); return s
