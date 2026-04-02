@@ -446,6 +446,175 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-primary);
 }
 
+/* ── 7b. Building Detail Card ──────────────────────────────────────────── */
+
+.building-detail-card {
+  position: absolute;
+  z-index: 100;
+  width: 280px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.building-detail-card .bld-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.building-detail-card .bld-category {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+}
+
+.building-detail-card .bld-upgrade {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+.building-detail-card .bld-name {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.building-detail-card .bld-occupancy {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.building-detail-card .bld-occ-count {
+  color: var(--text-primary);
+}
+
+.building-detail-card .bld-occ-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.building-detail-card .bld-occ-slot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.building-detail-card .bld-section-label {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  margin: 8px 0 4px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 8px;
+}
+
+.building-detail-card .bld-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.building-detail-card .bld-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+
+.building-detail-card .bld-stat-row .stat-label { color: var(--text-muted); }
+.building-detail-card .bld-stat-row .stat-value { color: var(--text-primary); }
+
+.building-detail-card .bld-empty {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.building-detail-card .bld-occupant {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.06);
+}
+
+.building-detail-card .bld-occ-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.building-detail-card .bld-occ-icon { font-size: 12px; }
+
+.building-detail-card .bld-occ-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--holo-bright);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.building-detail-card .bld-occ-tier {
+  font-size: 7px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.building-detail-card .bld-occ-task {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  margin-top: 2px;
+  padding-left: 18px;
+}
+
+.building-detail-card .bld-occ-task.idle { color: var(--text-muted); }
+
+.building-detail-card .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.building-detail-card .close-btn:hover { color: var(--text-primary); }
+
 /* ── 8. Agent Chat (Event Log) ─────────────────────────────────────────── */
 
 #eventLog {

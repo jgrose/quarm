@@ -1,90 +1,48 @@
 // ═══ NORT API CALLS ═══
 
+// Helpers to reduce boilerplate
+async function _apiGet(url, name) {
+  try { var r = await fetch(url); if (!r.ok) return null; return await r.json(); }
+  catch (e) { console.error(name + ':', e); return null; }
+}
+async function _apiPost(url, body, name) {
+  try { var opts = { method: 'POST' }; if (body !== undefined) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body); } await fetch(url, opts); }
+  catch (e) { console.error(name + ':', e); }
+}
+async function _apiPostJson(url, body, name) {
+  try { var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return await r.json(); }
+  catch (e) { console.error(name + ':', e); return null; }
+}
+async function _apiDelete(url, name) {
+  try { await fetch(url, { method: 'DELETE' }); } catch (e) { console.error(name + ':', e); }
+}
+
 async function generatePlan() {
   var input = document.getElementById('planInput');
   var btn = document.getElementById('btnGenerate');
   var desc = input.value.trim();
   if (!desc) return;
-
   if (btn) { btn.textContent = 'GENERATING...'; btn.disabled = true; }
-
   try {
-    var res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: desc }),
-    });
+    var res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: desc }) });
     if (!res.ok) throw new Error(await res.text());
     input.value = '';
     var panel = document.getElementById('queuePanel');
     if (panel && panel.classList.contains('hidden')) toggleQueue();
     else refreshQueue();
-  } catch (e) {
-    console.error('generatePlan:', e);
-  } finally {
-    if (btn) { btn.textContent = 'GENERATE'; btn.disabled = false; }
-  }
+  } catch (e) { console.error('generatePlan:', e); }
+  finally { if (btn) { btn.textContent = 'GENERATE'; btn.disabled = false; } }
 }
 
-async function refreshQueue() {
-  try {
-    var res = await fetch('/api/plans');
-    if (!res.ok) return;
-    var plans = await res.json();
-    renderQueue(plans);
-  } catch (e) {
-    console.error('refreshQueue:', e);
-  }
-}
-
-async function runPlan(id) {
-  try {
-    await fetch('/api/plans/' + id + '/run', { method: 'POST' });
-    refreshQueue();
-  } catch (e) {
-    console.error('runPlan:', e);
-  }
-}
-
-async function deletePlan(id) {
-  try {
-    await fetch('/api/plans/' + id, { method: 'DELETE' });
-    refreshQueue();
-  } catch (e) {
-    console.error('deletePlan:', e);
-  }
-}
-
-async function stopPlan(id) {
-  try {
-    await fetch('/api/plans/' + id + '/stop', { method: 'POST' });
-    refreshQueue();
-  } catch (e) {
-    console.error('stopPlan:', e);
-  }
-}
-
-async function reorderQueue(orderedIds) {
-  try {
-    await fetch('/api/plans/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: orderedIds }),
-    });
-  } catch (e) {
-    console.error('reorderQueue:', e);
-  }
-}
+async function refreshQueue() { var plans = await _apiGet('/api/plans', 'refreshQueue'); if (plans) renderQueue(plans); }
+async function runPlan(id) { await _apiPost('/api/plans/' + id + '/run', undefined, 'runPlan'); refreshQueue(); }
+async function deletePlan(id) { await _apiDelete('/api/plans/' + id, 'deletePlan'); refreshQueue(); }
+async function stopPlan(id) { await _apiPost('/api/plans/' + id + '/stop', undefined, 'stopPlan'); refreshQueue(); }
+async function reorderQueue(orderedIds) { await _apiPost('/api/plans/reorder', { order: orderedIds }, 'reorderQueue'); }
 
 async function viewPlan(id) {
-  try {
-    var res = await fetch('/api/plans/' + id);
-    if (!res.ok) return;
-    var plan = await res.json();
-    showPlanViewer(plan.content || '(empty)', plan.title || 'PLAN');
-  } catch (e) {
-    console.error('viewPlan:', e);
-  }
+  var plan = await _apiGet('/api/plans/' + id, 'viewPlan');
+  if (plan) showPlanViewer(plan.content || '(empty)', plan.title || 'PLAN');
 }
 
 async function loadLedgerData() {
@@ -94,78 +52,26 @@ async function loadLedgerData() {
       fetch('/api/analytics/scores').then(function(r) { return r.json(); }),
     ]);
     renderLedger(results[0], results[1]);
-  } catch (e) {
-    console.error('loadLedgerData:', e);
-  }
+  } catch (e) { console.error('loadLedgerData:', e); }
 }
 
-async function loadModels() {
-  try {
-    var res = await fetch('/api/models');
-    if (!res.ok) throw new Error(await res.text());
-    var data = await res.json();
-    renderModelConfig(data);
-  } catch (e) {
-    console.error('loadModels:', e);
-  }
-}
-
-async function saveModels(allowedModels) {
-  try {
-    await fetch('/api/models', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ allowed_models: allowedModels }),
-    });
-  } catch (e) {
-    console.error('saveModels:', e);
-  }
-}
-
-async function saveWebhook(url) {
-  try {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhook_url: url }),
-    });
-  } catch (e) {
-    console.error('saveWebhook:', e);
-  }
-}
+async function loadModels() { var data = await _apiGet('/api/models', 'loadModels'); if (data) renderModelConfig(data); }
+async function saveModels(allowedModels) { await _apiPost('/api/models', { allowed_models: allowedModels }, 'saveModels'); }
+async function saveWebhook(url) { await _apiPost('/api/config', { webhook_url: url }, 'saveWebhook'); }
 
 async function testWebhook() {
-  try {
-    var resp = await fetch('/api/webhook/test', { method: 'POST' });
-    var data = await resp.json();
-    return !!data.ok;
-  } catch (e) {
-    return false;
-  }
+  try { var resp = await fetch('/api/webhook/test', { method: 'POST' }); var data = await resp.json(); return !!data.ok; }
+  catch (e) { return false; }
 }
 
 async function approveToolCall(toolCallId, approved) {
-  try {
-    await fetch('/api/approvals/' + toolCallId, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approved: approved }),
-    });
-    hideApproval();
-  } catch (e) {
-    console.error('approveToolCall:', e);
-  }
+  await _apiPost('/api/approvals/' + toolCallId, { approved: approved }, 'approveToolCall');
+  hideApproval();
 }
 
 async function checkPendingApprovals() {
-  try {
-    var res = await fetch('/api/approvals');
-    if (!res.ok) return;
-    var data = await res.json();
-    if (data.pending && data.pending.length > 0) {
-      showApproval(data.pending[0]);
-    }
-  } catch (e) { /* ignore */ }
+  var data = await _apiGet('/api/approvals', 'checkPendingApprovals');
+  if (data && data.pending && data.pending.length > 0) showApproval(data.pending[0]);
 }
 
 async function pollHeartbeat() {
@@ -197,29 +103,11 @@ async function pollHeartbeat() {
   }
 }
 
-async function loadTolerance() {
-  try {
-    var res = await fetch('/api/tolerance');
-    if (!res.ok) throw new Error(await res.text());
-    var data = await res.json();
-    renderToleranceConfig(data);
-  } catch (e) {
-    console.error('loadTolerance:', e);
-  }
-}
+async function loadTolerance() { var data = await _apiGet('/api/tolerance', 'loadTolerance'); if (data) renderToleranceConfig(data); }
 
 async function saveToleranceGlobal(value) {
-  try {
-    await fetch('/api/tolerance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ default_tolerance: value }),
-    });
-    // Clear preset highlight on manual change
-    if (typeof highlightActivePreset === 'function') highlightActivePreset('');
-  } catch (e) {
-    console.error('saveToleranceGlobal:', e);
-  }
+  await _apiPost('/api/tolerance', { default_tolerance: value }, 'saveToleranceGlobal');
+  if (typeof highlightActivePreset === 'function') highlightActivePreset('');
 }
 
 var _saveToleranceAgentTimers = {};
