@@ -328,22 +328,28 @@ def parse_plan(path: str):
 
     # ── Auto-register new agents into the persistent registry ──────────────
     try:
-        from agent_registry import get_agent, create_agent
+        from agent_registry import get_agent, create_agent, merge_agent_from_plan
         for agent in sub_agents:
             d = agent.__dict__
+            tags = _infer_tags(d.get("description", ""), d.get("tools", []))
             if not get_agent("sub_agents", d["name"]):
-                tags = _infer_tags(d.get("description", ""), d.get("tools", []))
                 create_agent("sub_agents", {**d, "tags": tags})
+            else:
+                merge_agent_from_plan("sub_agents", {**d, "tags": tags})
         for mgr in managers:
             d = mgr.__dict__
+            tags = _infer_tags(d.get("description", ""), d.get("expertise_blend", []))
             if not get_agent("managers", d["name"]):
-                tags = _infer_tags(d.get("description", ""), d.get("expertise_blend", []))
                 create_agent("managers", {**d, "tags": tags})
+            else:
+                merge_agent_from_plan("managers", {**d, "tags": tags})
         for rev in custom:  # custom reviewers only, not builtins
             d = rev.__dict__
+            tags = d.get("applies_to", []) + d.get("focus_areas", [])[:3]
             if not get_agent("reviewers", d["name"]):
-                tags = d.get("applies_to", []) + d.get("focus_areas", [])[:3]
                 create_agent("reviewers", {**d, "tags": tags})
+            else:
+                merge_agent_from_plan("reviewers", {**d, "tags": tags})
     except Exception as e:
         print(f"[DEBUG] Registry auto-save: {e}")
 
@@ -784,6 +790,15 @@ def manager_review_node(state):
         tasks   = upd(tasks, tid, status="done")
         _record_specialization(task)
         _auto_ingest(task, results)
+        try:
+            from agent_registry import record_agent_performance
+            record_agent_performance("sub_agents", task["agent"],
+                score=task.get("last_score", 5), revisions=rev,
+                verdict="FAIL", force_accepted=True)
+            record_agent_performance("managers", manager["name"],
+                score=task.get("last_score", 5), revisions=0, verdict="PASS", force_accepted=True)
+        except Exception:
+            pass
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
@@ -845,9 +860,16 @@ def manager_review_node(state):
 
     try:
         from agent_registry import record_agent_performance
-        record_agent_performance("sub_agents", task["agent"], score, task.get("revision_count", 0))
+        record_agent_performance("sub_agents", task["agent"], score,
+            revisions=task.get("revision_count", 0), verdict=verdict)
     except Exception as e:
         log_event(f"[ERROR] Failed to record agent performance for {task['agent']}: {e}")
+
+    try:
+        from agent_registry import record_agent_performance
+        record_agent_performance("managers", manager["name"], score, 0, verdict)
+    except Exception as e:
+        log_event(f"[ERROR] Failed to record manager performance for {manager['name']}: {e}")
 
     if verdict == "PASS":
         # Check for conditional specialist review skipping
@@ -943,6 +965,13 @@ def specialist_review_node(state):
         tasks   = upd(tasks, tid, status="done")
         _record_specialization(task)
         _auto_ingest(task, results)
+        try:
+            from agent_registry import record_agent_performance
+            record_agent_performance("sub_agents", task["agent"],
+                score=task.get("last_score", 7), revisions=task.get("revision_count", 0),
+                verdict="PASS")
+        except Exception:
+            pass
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
         write_status(s); return s
@@ -997,7 +1026,9 @@ def specialist_review_node(state):
             track_score(_run_id, tid, task["agent"], score, verdict, reviewer["name"], model, toks)
         try:
             from agent_registry import record_agent_performance
-            record_agent_performance("reviewers", reviewer["name"], score, 0)
+            record_agent_performance("reviewers", reviewer["name"], score,
+                revisions=task.get("revision_count", 0),
+                verdict="PASS" if verdict == "PASS" else "FAIL")
         except Exception as e:
             log_event(f"[ERROR] Failed to record reviewer performance for {reviewer['name']}: {e}")
         if verdict == "FLAG" and v.get("feedback"):
