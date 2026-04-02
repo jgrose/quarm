@@ -501,6 +501,73 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-primary);
 }
 
+/* ── Chat Tab Strip ─────────────────────────────────────────────────────── */
+
+.chat-tab-strip {
+  display: none;
+  gap: 2px;
+  padding: 0 0 6px 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 6px;
+}
+
+.chat-tab-strip::-webkit-scrollbar { display: none; }
+
+.chat-tab-strip.visible { display: flex; }
+
+.chat-tab {
+  position: relative;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-tab:hover {
+  background: rgba(100, 200, 255, 0.06);
+  color: var(--text-dim);
+}
+
+.chat-tab.active {
+  background: rgba(100, 200, 255, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(100, 200, 255, 0.2);
+}
+
+.chat-tab-phase {
+  font-size: 7px;
+  opacity: 0.5;
+}
+
+.chat-tab.active .chat-tab-phase { opacity: 0.7; }
+
+.chat-tab.unread::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ff5566;
+  box-shadow: 0 0 4px rgba(255, 85, 102, 0.6);
+}
+
 #eventLogProgress {
   flex-shrink: 0;
   padding-bottom: 8px;

@@ -8,7 +8,10 @@ var liveStartedAt = null;
 
 // ── Multi-session tracking ──────────────────────────────────────────────────
 var _sessions = {};           // session_id → { data }
-var _activeSessionId = null;  // which session drives the canvas + chat
+var _activeSessionId = null;  // which session drives the canvas
+var _chatFilterId = 'all';        // chat filter: 'all' or a session_id
+var _chatUnread = {};             // session_id → true when unseen messages arrive
+var _chatLastSeenCount = {};      // session_id → last known log line count
 
 // ── Reconnect backoff ───────────────────────────────────────────────────────
 var _reconnectAttempts = 0;
@@ -153,10 +156,27 @@ function applyStatus(data) {
     _activeSessionId = sid;
   }
 
+  // Track unread chat: mark if this session isn't the current chat view
+  if (data.log) {
+    var prevCount = _chatLastSeenCount[sid] || 0;
+    if (data.log.length > prevCount) {
+      if (_chatFilterId !== 'all' && _chatFilterId !== sid) {
+        _chatUnread[sid] = true;
+      }
+      _chatLastSeenCount[sid] = data.log.length;
+    }
+  }
+
   // Always update the agent list panel (shows all sessions)
   if (typeof renderAgentList === 'function') renderAgentList();
 
-  // Only update canvas/chat/effects for the active session
+  // Always update chat tabs and filtered chat (decoupled from canvas)
+  if (typeof renderChatTabs === 'function') renderChatTabs();
+  if (data.log && (_chatFilterId === 'all' || _chatFilterId === sid)) {
+    if (typeof _renderFilteredChat === 'function') _renderFilteredChat();
+  }
+
+  // Only update canvas/effects for the active session
   if (sid !== _activeSessionId) return;
 
   // 1. Build node graph from rosters (first time or on roster change)
@@ -182,7 +202,7 @@ function applyStatus(data) {
     node.taskTitle = task.title;
     node.model = task.current_model || '';
     node.tokens = task.task_tokens || 0;
-    node.toolCalls = task.tool_calls || [];
+    node.toolCalls = (task.status === 'done' || task.status === 'failed') ? [] : (task.tool_calls || []);
     node.resultPreview = task.result_preview || '';
     node.revisionCount = task.revision_count || 0;
     node.lastScore = task.last_score || 0;
@@ -274,8 +294,7 @@ function applyStatus(data) {
   // 5. Update session stats
   updateSessionStats(data.tokens_used || 0, data.results_count || 0, data.total_tasks || 0);
 
-  // 6. Render event log
-  if (data.log) renderEventLog(data.log, data.project || 'NORT', data.results_count || 0, data.total_tasks || 0);
+  // 6. Event log rendering is now handled above (chat tab filter)
 
   // 7. Handle verdict popup + bubble
   if (data.last_verdict && config.completionFx && !_isReplay) {
@@ -342,7 +361,7 @@ function switchSession(sessionId) {
     node.taskTitle = task.title;
     node.model = task.current_model || '';
     node.tokens = task.task_tokens || 0;
-    node.toolCalls = task.tool_calls || [];
+    node.toolCalls = (task.status === 'done' || task.status === 'failed') ? [] : (task.tool_calls || []);
     node.resultPreview = task.result_preview || '';
     node.revisionCount = task.revision_count || 0;
     node.lastScore = task.last_score || 0;
@@ -351,8 +370,8 @@ function switchSession(sessionId) {
 
   rebuildEdges(d);
 
-  // Update chat + stats
-  if (d.log) renderEventLog(d.log, d.project || 'NORT', d.results_count || 0, d.total_tasks || 0);
+  // Update chat + stats (chat follows its own filter, not canvas session)
+  if (typeof _renderFilteredChat === 'function') _renderFilteredChat();
   updateSessionStats(d.tokens_used || 0, d.results_count || 0, d.total_tasks || 0);
   updateHeartbeat(d.phase || 'idle');
 

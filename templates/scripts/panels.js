@@ -197,6 +197,125 @@ function toggleChat() {
   if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
 }
 
+// ── Chat Plan Tabs ─────────────────────────────────────────────────────────
+
+function renderChatTabs() {
+  var strip = document.getElementById('chatTabStrip');
+  if (!strip) return;
+  if (typeof _sessions === 'undefined') return;
+
+  var sessionIds = Object.keys(_sessions);
+
+  // Hide tab strip when 0 or 1 sessions
+  if (sessionIds.length <= 1) {
+    strip.classList.remove('visible');
+    return;
+  }
+  strip.classList.add('visible');
+
+  // Reset filter if filtered session disappeared
+  if (_chatFilterId !== 'all' && !_sessions[_chatFilterId]) {
+    _chatFilterId = 'all';
+  }
+
+  var html = '';
+  // "ALL" tab
+  var allActive = (_chatFilterId === 'all');
+  html += '<button class="chat-tab' + (allActive ? ' active' : '') +
+          '" onclick="setChatFilter(\'all\')">ALL</button>';
+
+  // Per-session tabs
+  for (var i = 0; i < sessionIds.length; i++) {
+    var sid = sessionIds[i];
+    var sess = _sessions[sid];
+    var d = sess.data;
+    if (!d) continue;
+    var project = d.project || sid;
+    var phase = d.phase || 'idle';
+    var isActive = (_chatFilterId === sid);
+    var hasUnread = !!_chatUnread[sid];
+
+    var truncName = project.length > 18 ? project.slice(0, 18) + '..' : project;
+    var phaseLabel = phase.toUpperCase();
+    if (phaseLabel.length > 5) phaseLabel = phaseLabel.slice(0, 5);
+
+    html += '<button class="chat-tab' + (isActive ? ' active' : '') +
+            (hasUnread ? ' unread' : '') +
+            '" onclick="setChatFilter(\'' + sid + '\')">' +
+            escapeHtml(truncName) +
+            '<span class="chat-tab-phase">' + phaseLabel + '</span>' +
+            '</button>';
+  }
+  strip.innerHTML = html;
+}
+
+function setChatFilter(filterId) {
+  _chatFilterId = filterId;
+  if (filterId === 'all') {
+    _chatUnread = {};
+  } else {
+    delete _chatUnread[filterId];
+  }
+  renderChatTabs();
+  _renderFilteredChat();
+}
+
+function _renderFilteredChat() {
+  if (_chatFilterId === 'all') {
+    _renderAllChat();
+  } else {
+    var sess = (typeof _sessions !== 'undefined') ? _sessions[_chatFilterId] : null;
+    if (sess && sess.data && sess.data.log) {
+      renderEventLog(sess.data.log, sess.data.project || 'NORT',
+                     sess.data.results_count || 0, sess.data.total_tasks || 0);
+    }
+  }
+}
+
+function _renderAllChat() {
+  var progressEl = document.getElementById('eventLogProgress');
+  var bodyEl = document.getElementById('eventLogBody');
+  if (!bodyEl) return;
+  if (typeof _sessions === 'undefined') return;
+
+  var totalDone = 0, totalAll = 0;
+  var projectNames = [];
+  var allLines = [];
+
+  for (var sid in _sessions) {
+    var d = _sessions[sid].data;
+    if (!d) continue;
+    totalDone += (d.results_count || 0);
+    totalAll += (d.total_tasks || 0);
+    projectNames.push(d.project || sid);
+
+    var lines = d.log || [];
+    var recent = lines.slice(-40);
+    for (var i = 0; i < recent.length; i++) {
+      allLines.push(recent[i]);
+    }
+  }
+
+  // Aggregate progress bar
+  if (progressEl) {
+    var pct = totalAll ? Math.round(totalDone / totalAll * 100) : 0;
+    var bar = '\u2588'.repeat(Math.floor(pct / 5)) + '\u2591'.repeat(20 - Math.floor(pct / 5));
+    progressEl.innerHTML = '<div class="chat-progress">' +
+      escapeHtml(projectNames.join(' + ')) + ' ' + bar + ' ' + pct + '% ' +
+      totalDone + '/' + totalAll + '</div>';
+  }
+
+  // Render combined lines through existing pipeline
+  var combined = allLines.slice(-60);
+  var parsed = combined.map(parseLogLine);
+  var groups = groupChatMessages(parsed);
+  var html = buildChatHTML(groups);
+
+  var isAtBottom = bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight < 40;
+  bodyEl.innerHTML = html;
+  if (isAtBottom) bodyEl.scrollTop = bodyEl.scrollHeight;
+}
+
 var _agentColorMap = {};
 var _CHAT_PALETTE = [
   '#66ccff', '#cc88ff', '#ffbb44', '#66ffaa', '#ff8866',
