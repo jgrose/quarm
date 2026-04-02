@@ -35,6 +35,7 @@ from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
 from tools import get_tools, execute_tool_call, set_tool_context
 from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
+from validate_plan import validate as validate_plan_file
 
 load_dotenv()
 MAX_REVISIONS = 3
@@ -1316,6 +1317,21 @@ def run(plan_path="plan.md", plan_id: str = ""):
     import time as _time
     _start_time = _time.time()
     print(f"\nLoading: {plan_path}\n{'='*60}")
+
+    # ── Validate plan file before proceeding ──
+    validation_errors = validate_plan_file(plan_path)
+    if validation_errors:
+        print(f"\n[ERROR] Plan validation failed for: {plan_path}")
+        for err in validation_errors:
+            print(f"  - {err}")
+            log_event(f"[VALIDATE] {err}")
+        raise ValueError(
+            f"Plan validation failed with {len(validation_errors)} error(s). "
+            f"Fix the plan file and retry. Errors:\n"
+            + "\n".join(f"  - {e}" for e in validation_errors)
+        )
+    print(f"Plan validation OK: {plan_path}")
+
     fetch_available_models()
 
     # ── Check for existing checkpoint ──

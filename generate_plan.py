@@ -9,12 +9,14 @@ Usage:
 
 import sys
 import os
+import tempfile
 import threading
 import time
 import json
 import openai
 from dotenv import load_dotenv
 from model_config import load_allowed_models
+from validate_plan import validate as validate_plan_file
 
 try:
     from agent_registry import format_agent_catalog
@@ -232,8 +234,28 @@ def generate_plan_streaming(description: str, output_path: str = "plan.md"):
     if plan.endswith("```"):
         plan = "\n".join(plan.split("\n")[:-1])
 
-    with open(output_path, "w") as f:
-        f.write(plan)
+    # Write to temp file first, validate, then move to final path
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".md", prefix="plan_")
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            f.write(plan)
+
+        validation_errors = validate_plan_file(tmp_path)
+        if validation_errors:
+            yield {"event": "validation_warning",
+                   "errors": validation_errors,
+                   "message": f"Generated plan has {len(validation_errors)} validation issue(s)"}
+            for err in validation_errors:
+                print(f"  [WARN] {err}")
+
+        # Always save — user might want to fix manually
+        import shutil
+        shutil.move(tmp_path, output_path)
+    except Exception:
+        # Clean up temp file on unexpected error, re-raise
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
     yield {"event": "done", "plan_text": plan,
            "usage": usage_info or {"input_tokens": est_input, "output_tokens": len(plan) // 4}}
@@ -296,8 +318,25 @@ def generate_plan(description: str, output_path: str = "plan.md") -> str:
     if plan.endswith("```"):
         plan = "\n".join(plan.split("\n")[:-1])
 
-    with open(output_path, "w") as f:
-        f.write(plan)
+    # Write to temp file first, validate, then move to final path
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".md", prefix="plan_")
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            f.write(plan)
+
+        validation_errors = validate_plan_file(tmp_path)
+        if validation_errors:
+            print(f"\n[WARN] Generated plan has {len(validation_errors)} validation issue(s):")
+            for err in validation_errors:
+                print(f"  - {err}")
+            print("  Plan saved anyway — fix issues before running orchestrator.\n")
+
+        import shutil
+        shutil.move(tmp_path, output_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
     print(f"Plan written → {output_path}\n{'='*60}")
     print(plan)
