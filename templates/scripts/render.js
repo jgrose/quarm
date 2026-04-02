@@ -164,19 +164,17 @@ function render(timestamp) {
   // Roster level badges above programs
   if (config.roster && typeof drawRosterBadges === 'function') drawRosterBadges(ctx);
 
-  // Force simulation
+  // Force simulation + animate node fade-in (single pass)
   var _t3 = _timeStart();
   _nodeArr.length = 0;
-  for (var _ne of nodes) _nodeArr.push(_ne[1]);
-  tickForce(_nodeArr, edges, W, H, dt);
-  _timeEnd('force', _t3);
-
-  // Animate node fade-in
-  for (var entry of nodes) {
-    var n = entry[1];
+  for (var _ne of nodes) {
+    var n = _ne[1];
+    _nodeArr.push(n);
     if (n.opacity < 1) n.opacity = Math.min(1, n.opacity + ANIM.agentFadeIn * dt);
     if (n.scale < 1) n.scale = Math.min(1, n.scale + ANIM.agentScaleIn * dt);
   }
+  tickForce(_nodeArr, edges, W, H, dt);
+  _timeEnd('force', _t3);
 
   // Draw layers (back to front)
   if (config.hexNodes) {

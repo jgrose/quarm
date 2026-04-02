@@ -28,16 +28,19 @@ function truncateText(text, maxChars) {
   return text.slice(0, maxChars - 1) + '\u2026';
 }
 
-// ─── Glow intensity by state ───
+// ─── State visual config: [glowIntensity, breathFreq, breathAmp] ───
+var _STATE_VIS = {
+  pending:               [0.1, 0.7, 0.015],
+  done:                  [0.1, 0.7, 0.015],
+  in_progress:           [0.2, 2,   0.03],
+  revision:              [0.1, 2.5, 0.04],
+  in_manager_review:     [0.3, 1.2, 0.08],
+  in_specialist_review:  [0.3, 1.2, 0.08],
+  failed:                [0.1, 0,   0],
+};
+var _STATE_VIS_DEFAULT = [0.1, 0, 0];
 
-function _glowIntensity(state) {
-  switch (state) {
-    case 'in_progress': return 0.2;
-    case 'in_manager_review':
-    case 'in_specialist_review': return 0.3;
-    default: return 0.1;
-  }
-}
+function _glowIntensity(state) { return (_STATE_VIS[state] || _STATE_VIS_DEFAULT)[0]; }
 
 // ─── Depth shadow ───
 
@@ -111,23 +114,9 @@ function _drawHexBody(ctx, node, r, color, state, time) {
   }
 }
 
-// ─── Enhanced breathing ───
-
 function getBreathScale(state, time) {
-  switch (state) {
-    case 'pending':
-    case 'done':
-      return 1 + Math.sin(time * 0.7) * 0.015;
-    case 'in_progress':
-      return 1 + Math.sin(time * 2) * 0.03;
-    case 'revision':
-      return 1 + Math.sin(time * 2.5) * 0.04;
-    case 'in_manager_review':
-    case 'in_specialist_review':
-      return 1 + Math.sin(time * 1.2) * 0.08;
-    default:
-      return 1;
-  }
+  var v = _STATE_VIS[state] || _STATE_VIS_DEFAULT;
+  return v[1] ? 1 + Math.sin(time * v[1]) * v[2] : 1;
 }
 
 // ─── Enhanced scanline (clipped to hex) ───

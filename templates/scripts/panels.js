@@ -668,57 +668,46 @@ function groupChatMessages(parsed) {
 
 function buildChatHTML(groups) {
   var html = '';
-  var prevAgent = null;
 
   for (var i = 0; i < groups.length; i++) {
     var g = groups[i];
 
-    // System / master: centered text
+    // System / master: card style
     if (g.type === 'system' || g.type === 'master') {
-      var sysCls = g.type === 'master' ? 'chat-system master' : 'chat-system';
-      html += '<div class="' + sysCls + '">' + escapeHtml(g.messages.join(' ')) + '</div>';
-      prevAgent = null;
+      var cardCls = g.type === 'master' ? 'chat-card master' : 'chat-card system';
+      html += '<div class="' + cardCls + '">';
+      html += '<div class="chat-card-body">' + escapeHtml(g.messages.join(' ')) + '</div>';
+      html += '</div>';
       continue;
     }
 
-    // Agent message bubble
+    // Agent message card
     var agentKey = g.agent;
     var color = getChatColor(agentKey);
     var tier = getAgentTier(agentKey);
     var tierInfo = tier ? TIERS[tier] : null;
     var icon = tierInfo ? tierInfo.icon : '\u25CF';
     var displayName = getAgentTitle(agentKey);
-    var isCont = (prevAgent === agentKey);
 
-    if (isCont) {
-      html += '<div class="chat-group continuation">';
-    } else {
-      html += '<div class="chat-group">';
-      html += '<div class="chat-avatar" style="border-color:' + color +
-              ';background:' + hexToRgba(color, 0.12) + ';color:' + color + '">' +
-              icon + '</div>';
-    }
+    html += '<div class="chat-card" style="background:' + hexToRgba(color, 0.08) +
+            ';border-color:' + hexToRgba(color, 0.2) + '">';
 
-    html += '<div class="chat-body">';
+    // Header with icon and name
+    html += '<div class="chat-card-header" style="color:' + color + '">' +
+            '<span class="chat-card-icon">' + icon + '</span> ' +
+            escapeHtml(displayName) + '</div>';
 
-    if (!isCont) {
-      html += '<div class="chat-name" style="color:' + color + '">' +
-              escapeHtml(displayName) + '</div>';
-    }
-
-    // Bubble(s)
+    // Message body/bodies
     for (var j = 0; j < g.messages.length; j++) {
       var msg = g.messages[j];
       var verdictMatch = msg.match(/^(\S+):\s*(PASS|FAIL|FLAG)\s*\((\d+)\/10\)/);
 
-      html += '<div class="chat-bubble" style="border-left-color:' + color +
-              ';background:' + hexToRgba(color, 0.06) + '">';
+      html += '<div class="chat-card-body">';
       if (verdictMatch) {
         var vCls = verdictMatch[2].toLowerCase();
         html += '<span class="chat-verdict ' + vCls + '">' + verdictMatch[2] +
                 '</span> ' + escapeHtml(verdictMatch[1]) +
                 ' <span style="color:' + C.textDim + '">(' + verdictMatch[3] + '/10)</span>';
-        // Render remaining text after the verdict prefix
         var remainder = msg.slice(verdictMatch[0].length).trim();
         if (remainder) html += '<br>' + escapeHtml(remainder);
       } else {
@@ -731,14 +720,13 @@ function buildChatHTML(groups) {
     for (var k = 0; k < g.meta.length; k++) {
       var meta = g.meta[k];
       if (meta.type === 'issue') {
-        html += '<div class="chat-issue">' + escapeHtml(meta.content) + '</div>';
+        html += '<div class="chat-card-issue">' + escapeHtml(meta.content) + '</div>';
       } else {
-        html += '<div class="chat-meta">' + escapeHtml((meta.agent ? '[' + meta.agent + '] ' : '') + meta.content) + '</div>';
+        html += '<div class="chat-card-meta">' + escapeHtml((meta.agent ? '[' + meta.agent + '] ' : '') + meta.content) + '</div>';
       }
     }
 
-    html += '</div></div>'; // .chat-body, .chat-group
-    prevAgent = agentKey;
+    html += '</div>'; // .chat-card
   }
 
   return html;
@@ -1400,6 +1388,9 @@ function toggleModel(el) {
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
+function _slugify(s) { return s.trim().toLowerCase().replace(/\s+/g, '_'); }
+function _csvTags(s) { return s.split(',').map(function(t) { return t.trim(); }).filter(Boolean); }
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -1576,12 +1567,12 @@ function showAgentRegistryDetail(name, agentType) {
 
 function saveAgent(agentType, name) {
   var desc = document.getElementById('agentEditDesc').value;
-  var tags = document.getElementById('agentEditTags').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+  var tags = _csvTags(document.getElementById('agentEditTags').value);
   var updates = { description: desc, tags: tags };
 
   var toolsEl = document.getElementById('agentEditTools');
   if (toolsEl) {
-    updates.tools = toolsEl.value.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+    updates.tools = _csvTags(toolsEl.value);
   }
 
   fetch('/api/agents/' + agentType + '/' + name, {
@@ -1668,11 +1659,11 @@ function showCreateAgentForm() {
 function createNewAgent() {
   var agentType = document.getElementById('newAgentType').value;
   var spec = {
-    name: document.getElementById('newAgentName').value.trim().toLowerCase().replace(/\s+/g, '_'),
+    name: _slugify(document.getElementById('newAgentName').value),
     title: document.getElementById('newAgentTitle').value.trim(),
     description: document.getElementById('newAgentDesc').value.trim(),
-    tags: document.getElementById('newAgentTags').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
-    tools: document.getElementById('newAgentTools').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
+    tags: _csvTags(document.getElementById('newAgentTags').value),
+    tools: _csvTags(document.getElementById('newAgentTools').value),
   };
 
   if (agentType === 'managers') {
@@ -1770,7 +1761,7 @@ function renderTeamsList() {
 function promptApplyPreset(presetName) {
   var teamName = prompt('Team name for this preset:', presetName + '-team');
   if (!teamName) return;
-  teamName = teamName.trim().toLowerCase().replace(/\s+/g, '_');
+  teamName = _slugify(teamName);
   applyTeamPreset(presetName, teamName).then(function(result) {
     if (result && result.ok) {
       loadTeamsData();
@@ -1856,7 +1847,7 @@ function showCreateTeamForm() {
 }
 
 function createNewTeam() {
-  var name = document.getElementById('newTeamName').value.trim().toLowerCase().replace(/\s+/g, '_');
+  var name = _slugify(document.getElementById('newTeamName').value);
   var title = document.getElementById('newTeamTitle').value.trim();
   var desc = document.getElementById('newTeamDesc').value.trim();
   var checkboxes = document.querySelectorAll('.team-agent-cb:checked');
