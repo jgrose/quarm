@@ -103,7 +103,7 @@ a:hover { color: var(--holo-bright); }
   border: 1px solid var(--glass-border);
   color: var(--text-primary);
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 11px;
   padding: 4px 8px;
   border-radius: 4px;
 }
@@ -128,7 +128,7 @@ a:hover { color: var(--holo-bright); }
   padding: 4px 10px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
-  font-size: 9px;
+  font-size: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -180,7 +180,7 @@ a:hover { color: var(--holo-bright); }
   border: 1px solid var(--glass-border);
   border-radius: 4px;
   padding: 4px 12px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   cursor: pointer;
@@ -199,7 +199,7 @@ a:hover { color: var(--holo-bright); }
 
 #sessionStats {
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
   margin-left: auto;
 }
@@ -210,7 +210,7 @@ a:hover { color: var(--holo-bright); }
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
 }
@@ -239,7 +239,7 @@ a:hover { color: var(--holo-bright); }
   color: var(--holo-base);
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -292,7 +292,7 @@ a:hover { color: var(--holo-bright); }
   padding: 6px 16px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   letter-spacing: 1px;
   transition: all 0.2s ease;
@@ -308,7 +308,7 @@ a:hover { color: var(--holo-bright); }
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   white-space: nowrap;
@@ -372,7 +372,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .agent-detail-card .agent-tier {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 2px;
@@ -396,7 +396,7 @@ a:hover { color: var(--holo-bright); }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
 }
 
@@ -415,7 +415,7 @@ a:hover { color: var(--holo-bright); }
 
 .agent-detail-card .tool-item {
   padding: 3px 0;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   border-bottom: 1px solid rgba(100, 200, 255, 0.06);
 }
@@ -423,7 +423,7 @@ a:hover { color: var(--holo-bright); }
 .agent-detail-card .result-preview {
   max-height: 100px;
   overflow-y: auto;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: rgba(102, 255, 170, 0.7);
   white-space: pre-wrap;
@@ -473,14 +473,14 @@ a:hover { color: var(--holo-bright); }
 }
 
 .building-detail-card .bld-category {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 2px;
 }
 
 .building-detail-card .bld-upgrade {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   letter-spacing: 1px;
 }
@@ -496,7 +496,7 @@ a:hover { color: var(--holo-bright); }
 .building-detail-card .bld-occupancy {
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 1px;
@@ -521,7 +521,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .building-detail-card .bld-section-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 1px;
@@ -534,7 +534,7 @@ a:hover { color: var(--holo-bright); }
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   margin-bottom: 4px;
@@ -543,7 +543,7 @@ a:hover { color: var(--holo-bright); }
 .building-detail-card .bld-stat-row {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
 }
 
@@ -551,7 +551,7 @@ a:hover { color: var(--holo-bright); }
 .building-detail-card .bld-stat-row .stat-value { color: var(--text-primary); }
 
 .building-detail-card .bld-empty {
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-muted);
   font-style: italic;
@@ -572,7 +572,7 @@ a:hover { color: var(--holo-bright); }
 .building-detail-card .bld-occ-icon { font-size: 12px; }
 
 .building-detail-card .bld-occ-name {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--holo-bright);
   flex: 1;
@@ -582,7 +582,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .building-detail-card .bld-occ-tier {
-  font-size: 7px;
+  font-size: 8px;
   font-family: 'Courier New', monospace;
   color: var(--text-muted);
   letter-spacing: 1px;
@@ -592,7 +592,7 @@ a:hover { color: var(--holo-bright); }
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   margin-top: 2px;
@@ -707,7 +707,7 @@ a:hover { color: var(--holo-bright); }
   padding: 3px 8px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -732,7 +732,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .chat-tab-phase {
-  font-size: 7px;
+  font-size: 8px;
   opacity: 0.5;
 }
 
@@ -786,7 +786,7 @@ a:hover { color: var(--holo-bright); }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   letter-spacing: 1.5px;
   color: var(--text-dim);
@@ -797,7 +797,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .plans-list-count {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-muted);
   letter-spacing: 0.5px;
 }
@@ -839,7 +839,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .plan-item-name {
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   word-wrap: break-word;
@@ -855,7 +855,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .plan-item-phase {
-  font-size: 7px;
+  font-size: 8px;
   padding: 1px 4px;
   border-radius: 2px;
   letter-spacing: 0.5px;
@@ -864,7 +864,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .plan-item-progress {
-  font-size: 7px;
+  font-size: 8px;
   color: var(--text-muted);
   font-family: 'Courier New', monospace;
 }
@@ -917,7 +917,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .chat-current-plan {
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   letter-spacing: 1px;
   color: var(--text-dim);
@@ -1188,7 +1188,7 @@ a:hover { color: var(--holo-bright); }
 .al-session-name {
   font-family: 'Courier New', monospace;
   letter-spacing: 0.5px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--holo-bright);
   white-space: nowrap;
   overflow: hidden;
@@ -1197,7 +1197,7 @@ a:hover { color: var(--holo-bright); }
 
 .al-session-badge {
   font-family: 'Courier New', monospace;
-  font-size: 8px;
+  font-size: 9px;
   padding: 1px 6px;
   border-radius: 3px;
   border: 1px solid;
@@ -1232,7 +1232,7 @@ a:hover { color: var(--holo-bright); }
 
 .al-agent-name {
   font-family: 'Courier New', monospace;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -1241,7 +1241,7 @@ a:hover { color: var(--holo-bright); }
 
 .al-agent-task {
   font-family: 'Courier New', monospace;
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1250,7 +1250,7 @@ a:hover { color: var(--holo-bright); }
 
 .al-agent-status {
   font-family: 'Courier New', monospace;
-  font-size: 7px;
+  font-size: 8px;
   letter-spacing: 0.5px;
   padding: 1px 4px;
   border-radius: 2px;
@@ -1261,7 +1261,7 @@ a:hover { color: var(--holo-bright); }
 .al-empty {
   padding: 12px;
   font-family: 'Courier New', monospace;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
   text-align: center;
 }
@@ -1303,7 +1303,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .queue-title {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   flex: 1;
@@ -1313,7 +1313,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .queue-status {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   padding: 2px 6px;
   border-radius: 3px;
@@ -1333,7 +1333,7 @@ a:hover { color: var(--holo-bright); }
   color: var(--holo-base);
   padding: 2px 8px;
   border-radius: 3px;
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1366,7 +1366,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .thinking-label {
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 2px;
@@ -1375,7 +1375,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .thinking-body {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -1428,7 +1428,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .help-section-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-muted);
   letter-spacing: 1.5px;
@@ -1442,7 +1442,7 @@ a:hover { color: var(--holo-bright); }
   align-items: center;
   justify-content: space-between;
   padding: 4px 0;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
 }
@@ -1456,14 +1456,14 @@ a:hover { color: var(--holo-bright); }
   background: rgba(100, 200, 255, 0.06);
   color: var(--text-primary);
   font-family: 'Courier New', monospace;
-  font-size: 9px;
+  font-size: 10px;
   text-align: center;
   letter-spacing: 0.5px;
 }
 
 .help-row span {
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 /* ── 11. Config Overlay ─────────────────────────────────────────────────── */
@@ -1506,7 +1506,7 @@ a:hover { color: var(--holo-bright); }
 
 .cfg-tab {
   padding: 6px 16px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.5px;
   font-family: 'Courier New', monospace;
@@ -1543,7 +1543,7 @@ a:hover { color: var(--holo-bright); }
 
 .cfg-btn {
   padding: 3px 8px;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.5px;
@@ -1604,7 +1604,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .cfg-range-value {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   min-width: 24px;
@@ -1613,7 +1613,7 @@ a:hover { color: var(--holo-bright); }
 
 /* ── Section dividers ── */
 .cfg-section-divider {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -1641,7 +1641,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .config-label {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
 }
@@ -1766,7 +1766,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .stat-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 1px;
@@ -1778,7 +1778,7 @@ a:hover { color: var(--holo-bright); }
   text-align: left;
   max-height: 200px;
   overflow-y: auto;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   line-height: 1.6;
   color: var(--text-primary);
@@ -1827,7 +1827,7 @@ a:hover { color: var(--holo-bright); }
 
 .ledger-tab {
   padding: 6px 16px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -1860,7 +1860,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .ledger-bar-label {
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   width: 110px;
@@ -1879,7 +1879,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .ledger-bar-val {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   flex-shrink: 0;
@@ -1893,7 +1893,7 @@ a:hover { color: var(--holo-bright); }
 .ledger-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
 }
 
@@ -1942,7 +1942,7 @@ a:hover { color: var(--holo-bright); }
   color: var(--state-done);
   padding: 4px 12px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1958,7 +1958,7 @@ a:hover { color: var(--holo-bright); }
   color: var(--state-error);
   padding: 4px 12px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1995,7 +1995,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .transcript-role {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -2004,7 +2004,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .transcript-content {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   line-height: 1.5;
   color: var(--text-primary);
@@ -2061,7 +2061,7 @@ a:hover { color: var(--holo-bright); }
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
-  font-size: 9px;
+  font-size: 10px;
   font-family: 'Courier New', monospace;
 }
 
@@ -2140,7 +2140,7 @@ a:hover { color: var(--holo-bright); }
   border: 1px solid rgba(100, 200, 255, 0.12);
   border-radius: 3px;
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
@@ -2168,13 +2168,13 @@ a:hover { color: var(--holo-bright); }
 }
 
 .model-name {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
 }
 
 .tier-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 1px;
@@ -2214,7 +2214,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .tolerance-section-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
   letter-spacing: 1.5px;
@@ -2230,7 +2230,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .tolerance-agent-name {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   flex: 1;
@@ -2277,7 +2277,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .tolerance-value {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--holo-bright);
   min-width: 16px;
@@ -2286,7 +2286,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .tolerance-preset {
-  font-size: 7px;
+  font-size: 8px;
   font-family: 'Courier New', monospace;
   letter-spacing: 1px;
   min-width: 42px;
@@ -2327,7 +2327,7 @@ a:hover { color: var(--holo-bright); }
 }
 
 .plan-card pre {
-  font-size: 10px;
+  font-size: 11px;
   font-family: 'Courier New', monospace;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -2535,7 +2535,7 @@ a:focus-visible {
 }
 
 .roster-name {
-  font-size: 10px;
+  font-size: 11px;
   color: #aaeeff;
   font-family: monospace;
   letter-spacing: 1px;
@@ -2545,7 +2545,7 @@ a:focus-visible {
 }
 
 .roster-status {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-dim);
   font-family: monospace;
   white-space: nowrap;
@@ -2554,7 +2554,7 @@ a:focus-visible {
 }
 
 .roster-level {
-  font-size: 9px;
+  font-size: 10px;
   color: #aaeeff;
   font-family: monospace;
   text-align: right;
@@ -2615,7 +2615,7 @@ a:focus-visible {
   border: 1px solid rgba(100, 200, 255, 0.15);
   color: var(--text-dim);
   padding: 4px 10px;
-  font-size: 8px;
+  font-size: 9px;
   font-family: monospace;
   letter-spacing: 1px;
   cursor: pointer;
@@ -2646,7 +2646,7 @@ a:focus-visible {
 }
 
 .agent-item-name {
-  font-size: 10px;
+  font-size: 11px;
   color: #aaeeff;
   font-family: monospace;
   overflow: hidden;
@@ -2655,12 +2655,12 @@ a:focus-visible {
 }
 
 .agent-item-score {
-  font-size: 9px;
+  font-size: 10px;
   font-family: monospace;
 }
 
 .agent-item-desc {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-dim);
   font-family: monospace;
   margin-top: 2px;
@@ -2674,7 +2674,7 @@ a:focus-visible {
 }
 
 .agent-tag {
-  font-size: 7px;
+  font-size: 8px;
   font-family: monospace;
   color: rgba(102, 204, 255, 0.7);
   background: rgba(100, 200, 255, 0.08);
@@ -2690,7 +2690,7 @@ a:focus-visible {
 
 .agents-action-btn {
   padding: 3px 8px;
-  font-size: 7px;
+  font-size: 8px;
   font-family: monospace;
   letter-spacing: 1px;
   cursor: pointer;
@@ -2709,7 +2709,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 7px;
+  font-size: 8px;
   font-family: monospace;
   color: var(--text-dim);
   letter-spacing: 0.5px;
@@ -2728,7 +2728,7 @@ a:focus-visible {
   background: rgba(100, 200, 255, 0.08);
   border: 1px dashed rgba(100, 200, 255, 0.2);
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 10px;
   font-family: monospace;
   cursor: pointer;
   transition: all 0.2s;
@@ -2747,7 +2747,7 @@ a:focus-visible {
 
 .agent-edit-form label {
   display: block;
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-dim);
   font-family: monospace;
   margin: 6px 0 2px 0;
@@ -2759,7 +2759,7 @@ a:focus-visible {
   border: 1px solid rgba(100, 200, 255, 0.15);
   color: #aaeeff;
   padding: 4px 6px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: monospace;
   box-sizing: border-box;
 }
@@ -2771,7 +2771,7 @@ a:focus-visible {
 
 .agent-save-btn, .agent-delete-btn, .agent-cancel-btn {
   padding: 4px 12px;
-  font-size: 8px;
+  font-size: 9px;
   font-family: monospace;
   cursor: pointer;
   border: 1px solid;
@@ -2849,7 +2849,7 @@ a:focus-visible {
 
 .tree-file, .tree-folder {
   padding: 3px 4px;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   border-radius: 3px;
   display: flex;
@@ -2880,12 +2880,12 @@ a:focus-visible {
 
 .tree-size {
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: 9px;
   flex-shrink: 0;
 }
 
 .preview-header {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1px;
   color: var(--holo-base);
   margin-bottom: 8px;
@@ -2895,7 +2895,7 @@ a:focus-visible {
 
 .syntax-pre {
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--text-primary);
   background: rgba(5, 5, 16, 0.6);
@@ -2913,7 +2913,7 @@ a:focus-visible {
   border: 1px solid var(--glass-border);
   border-radius: 3px;
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: 10px;
   font-family: inherit;
 }
 
@@ -2983,7 +2983,7 @@ a:focus-visible {
 .review-analytics-stats {
   display: flex;
   gap: 10px;
-  font-size: 10px;
+  font-size: 11px;
   margin-bottom: 4px;
 }
 
@@ -3045,7 +3045,7 @@ a:focus-visible {
   border: 1px solid rgba(100, 200, 255, 0.15);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3070,7 +3070,7 @@ a:focus-visible {
 }
 
 .preset-value {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-dim);
   font-weight: 400;
 }
@@ -3335,7 +3335,7 @@ a:focus-visible {
   }
 
   #sessionStats {
-    font-size: 8px;
+    font-size: 9px;
   }
 
   .top-bar-actions {
@@ -3347,7 +3347,7 @@ a:focus-visible {
   .top-bar-actions button,
   #topBar button {
     padding: 3px 6px;
-    font-size: 8px;
+    font-size: 9px;
   }
 
   /* ── Control bar: stack vertically ── */
@@ -3362,13 +3362,13 @@ a:focus-visible {
   #planInput {
     width: 100%;
     flex: none;
-    font-size: 10px;
+    font-size: 11px;
     padding: 5px 8px;
   }
 
   #btnGenerate {
     padding: 5px 10px;
-    font-size: 9px;
+    font-size: 10px;
   }
 
   /* ── All side panels: full width overlays ── */
@@ -3435,27 +3435,27 @@ a:focus-visible {
   }
 
   .chat-bubble {
-    font-size: 8px;
+    font-size: 9px;
   }
 
   .chat-name {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .chat-meta {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .thinking-body {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .queue-title {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .queue-status {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   /* Agent detail card: fluid width */
@@ -3488,7 +3488,7 @@ a:focus-visible {
   background: rgba(100,200,255,0.06);
   border: 1px solid rgba(100,200,255,0.12);
   color: var(--text-muted);
-  font-size: 7px;
+  font-size: 8px;
   padding: 2px 8px;
   cursor: pointer;
   letter-spacing: 1px;
