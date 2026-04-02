@@ -285,7 +285,7 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-muted);
 }
 
-#btnGenerate {
+#controlBar button {
   background: rgba(102, 204, 255, 0.12);
   border: 1px solid rgba(102, 204, 255, 0.4);
   color: var(--holo-bright);
@@ -299,7 +299,7 @@ a:hover { color: var(--holo-bright); }
   white-space: nowrap;
 }
 
-#btnGenerate:hover {
+#controlBar button:hover {
   background: rgba(102, 204, 255, 0.2);
 }
 
@@ -2357,7 +2357,7 @@ a:hover { color: var(--holo-bright); }
 .queue-actions button:focus-visible,
 #topBar button:focus-visible,
 .glass-card button:focus-visible,
-#btnGenerate:focus-visible,
+#controlBar button:focus-visible,
 #approvalBanner .btn-approve:focus-visible,
 #approvalBanner .btn-reject:focus-visible {
   outline: 2px solid rgba(102, 204, 255, 0.6);
