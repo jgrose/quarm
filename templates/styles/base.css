@@ -59,6 +59,16 @@ body {
 a { color: var(--holo-base); text-decoration: none; }
 a:hover { color: var(--holo-bright); }
 
+/* ── Z-Index Layering Reference ─────────────────────────────────────────
+   z:30  — Side panels (event log, agent list)
+   z:40  — Floating panels (queue, thinking, roster, file attention, transcript, timeline)
+   z:50  — Top bar, control bar
+   z:80  — Perf overlay
+   z:100 — Agent detail card
+   z:150 — Modal overlays (config, ledger, model config, cost, agents, tolerance, completion, plan viewer, review analytics, output browser)
+   z:200 — Approval banner (highest)
+   ────────────────────────────────────────────────────────────────────── */
+
 /* ── 3. Glass Card ──────────────────────────────────────────────────────── */
 
 .glass-card {
@@ -146,7 +156,7 @@ a:hover { color: var(--holo-bright); }
   background: rgba(8, 12, 24, 0.95);
   border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
-  z-index: 60;
+  z-index: 50;
   position: relative;
 }
 
@@ -356,6 +366,9 @@ a:hover { color: var(--holo-bright); }
   font-size: 13px;
   font-weight: 600;
   color: var(--holo-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-detail-card .agent-tier {
@@ -441,7 +454,7 @@ a:hover { color: var(--holo-bright); }
   top: 8px;
   bottom: 8px;
   width: 392px;
-  z-index: 40;
+  z-index: 30;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -716,7 +729,7 @@ a:hover { color: var(--holo-bright); }
   top: 8px;
   bottom: 8px;
   width: 320px;
-  z-index: 40;
+  z-index: 30;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -890,7 +903,7 @@ a:hover { color: var(--holo-bright); }
   position: absolute;
   left: 12px;
   top: 84px;
-  z-index: 50;
+  z-index: 40;
   width: 300px;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
@@ -969,7 +982,7 @@ a:hover { color: var(--holo-bright); }
   top: 84px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 50;
+  z-index: 40;
   width: 500px;
   max-height: 300px;
   background: var(--glass-bg);
@@ -1016,7 +1029,7 @@ a:hover { color: var(--holo-bright); }
 #configOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 150;
   display: none;
   align-items: center;
   justify-content: center;
@@ -1256,16 +1269,16 @@ a:hover { color: var(--holo-bright); }
 #completionOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  display: none;
+  z-index: 150;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
 }
 
-#completionOverlay.visible {
-  display: flex;
+#completionOverlay.hidden {
+  display: none !important;
 }
 
 .completion-card {
@@ -1339,16 +1352,16 @@ a:hover { color: var(--holo-bright); }
 #ledgerOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  display: none;
+  z-index: 150;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
 }
 
-#ledgerOverlay.visible {
-  display: flex;
+#ledgerOverlay.hidden {
+  display: none !important;
 }
 
 .ledger-card {
@@ -1397,6 +1410,39 @@ a:hover { color: var(--holo-bright); }
   padding: 12px;
 }
 
+.ledger-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.ledger-bar-label {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  width: 110px;
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ledger-bar-fill {
+  height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ledger-bar-val {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
 .ledger-chart {
   height: 120px;
   position: relative;
@@ -1429,7 +1475,7 @@ a:hover { color: var(--holo-bright); }
   top: 0;
   left: 0;
   right: 0;
-  z-index: 300;
+  z-index: 200;
   background: rgba(255, 170, 51, 0.1);
   border-bottom: 1px solid rgba(255, 170, 51, 0.3);
   backdrop-filter: blur(10px);
@@ -1488,7 +1534,7 @@ a:hover { color: var(--holo-bright); }
   top: 8px;
   bottom: 8px;
   width: 380px;
-  z-index: 60;
+  z-index: 40;
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -1590,7 +1636,7 @@ a:hover { color: var(--holo-bright); }
 #modelConfigOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 150;
   display: none;
   align-items: center;
   justify-content: center;
@@ -1698,7 +1744,7 @@ a:hover { color: var(--holo-bright); }
 #toleranceConfigOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 150;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1811,16 +1857,16 @@ a:hover { color: var(--holo-bright); }
 #planViewer {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  display: none;
+  z-index: 150;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
 }
 
-#planViewer.visible {
-  display: flex;
+#planViewer.hidden {
+  display: none !important;
 }
 
 .plan-card {
@@ -1910,7 +1956,7 @@ a:hover { color: var(--holo-bright); }
   width: 240px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
-  z-index: 90;
+  z-index: 40;
   padding: 12px;
 }
 
@@ -1960,6 +2006,9 @@ a:hover { color: var(--holo-bright); }
   color: #aaeeff;
   font-family: monospace;
   letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .roster-status {
@@ -2003,7 +2052,7 @@ a:hover { color: var(--holo-bright); }
   width: 500px;
   max-height: 80vh;
   overflow-y: auto;
-  z-index: 200;
+  z-index: 150;
   padding: 16px;
 }
 
@@ -2067,6 +2116,9 @@ a:hover { color: var(--holo-bright); }
   font-size: 10px;
   color: #aaeeff;
   font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-item-score {
@@ -2215,7 +2267,7 @@ a:hover { color: var(--holo-bright); }
 #outputBrowserOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 150;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2235,7 +2287,7 @@ a:hover { color: var(--holo-bright); }
   width: min(90vw, 1000px);
   height: min(80vh, 700px);
   padding: 16px;
-  z-index: 200;
+  z-index: 1;
   display: flex;
   flex-direction: column;
 }
@@ -2354,7 +2406,7 @@ a:hover { color: var(--holo-bright); }
 #reviewAnalyticsOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 150;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2375,7 +2427,7 @@ a:hover { color: var(--holo-bright); }
   max-height: 80vh;
   overflow-y: auto;
   padding: 16px;
-  z-index: 1000;
+  z-index: 1;
 }
 
 .review-analytics-row {

@@ -28,7 +28,7 @@
   left: 8px;
   bottom: 8px;
   width: 280px;
-  z-index: 90;
+  z-index: 80;
   padding: 10px 12px;
   font-family: 'Inter', system-ui, sans-serif;
 }
@@ -184,9 +184,7 @@
     if (e.key === 'p' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
       togglePerfOverlay();
     }
-    if (e.key === 'Escape' && config.perfOverlay) {
-      togglePerfOverlay();
-    }
+    // Escape handling is centralized in init.js global handler
   });
 
   window.togglePerfOverlay = function() {
