@@ -258,5 +258,275 @@ class TestTranscriptEntryFormat(unittest.TestCase):
         self.assertIn("T", entry["timestamp"])
 
 
+class TestRetryQueueOnPostFailure(unittest.TestCase):
+    """When _post fails, the payload should be queued for retry."""
+
+    def setUp(self):
+        _reset_bridge()
+        status_bridge.set_session_id("retry-test")
+        # Reset retry-related state
+        status_bridge._retry_queue.clear()
+        status_bridge._posts_sent = 0
+        status_bridge._posts_failed = 0
+        status_bridge._posts_retried = 0
+
+    def tearDown(self):
+        _reset_bridge()
+        status_bridge._retry_queue.clear()
+        status_bridge._posts_sent = 0
+        status_bridge._posts_failed = 0
+        status_bridge._posts_retried = 0
+
+    def test_failed_post_queued_for_retry(self):
+        """A failed _post call should add the payload to _retry_queue."""
+        payload = {"test": "data", "session_id": "retry-test"}
+        # Make the actual HTTP call fail
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.side_effect = Exception("Connection refused")
+            status_bridge._post(payload)
+
+        self.assertEqual(len(status_bridge._retry_queue), 1)
+        queued_item = status_bridge._retry_queue[0]
+        self.assertEqual(queued_item["payload"], payload)
+        self.assertEqual(queued_item["attempts"], 1)
+
+    def test_successful_post_not_queued(self):
+        """A successful _post call should NOT add anything to _retry_queue."""
+        payload = {"test": "data"}
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.return_value = MagicMock(status_code=200)
+            status_bridge._post(payload)
+
+        self.assertEqual(len(status_bridge._retry_queue), 0)
+
+    def test_posts_sent_counter_incremented_on_success(self):
+        """_posts_sent counter should increment on successful POST."""
+        payload = {"test": "data"}
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.return_value = MagicMock(status_code=200)
+            status_bridge._post(payload)
+
+        self.assertEqual(status_bridge._posts_sent, 1)
+
+    def test_posts_failed_counter_incremented_on_failure(self):
+        """_posts_failed counter should increment on failed POST."""
+        payload = {"test": "data"}
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.side_effect = Exception("Connection refused")
+            status_bridge._post(payload)
+
+        self.assertEqual(status_bridge._posts_failed, 1)
+
+    def test_retry_queue_maxlen(self):
+        """_retry_queue should not exceed its maxlen (100)."""
+        self.assertEqual(status_bridge._retry_queue.maxlen, 100)
+
+
+class TestRetryThreadDrains(unittest.TestCase):
+    """The retry thread should drain the queue and re-POST failed payloads."""
+
+    def setUp(self):
+        _reset_bridge()
+        status_bridge._retry_queue.clear()
+        status_bridge._posts_retried = 0
+
+    def tearDown(self):
+        _reset_bridge()
+        status_bridge._retry_queue.clear()
+        status_bridge._posts_retried = 0
+
+    def test_retry_drain_succeeds(self):
+        """_drain_retry_queue should successfully retry and remove items."""
+        status_bridge._retry_queue.append({
+            "payload": {"test": "retry-data"},
+            "attempts": 1,
+        })
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.return_value = MagicMock(status_code=200)
+            status_bridge._drain_retry_queue()
+
+        self.assertEqual(len(status_bridge._retry_queue), 0)
+        self.assertEqual(status_bridge._posts_retried, 1)
+
+    def test_retry_drain_requeues_on_failure(self):
+        """Failed retry should put the item back with incremented attempts."""
+        status_bridge._retry_queue.append({
+            "payload": {"test": "retry-data"},
+            "attempts": 1,
+        })
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.side_effect = Exception("Still down")
+            status_bridge._drain_retry_queue()
+
+        self.assertEqual(len(status_bridge._retry_queue), 1)
+        self.assertEqual(status_bridge._retry_queue[0]["attempts"], 2)
+
+    def test_retry_drain_discards_after_max_attempts(self):
+        """After 3 total attempts, the item should be discarded with a warning."""
+        status_bridge._retry_queue.append({
+            "payload": {"test": "retry-data"},
+            "attempts": 3,
+        })
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.side_effect = Exception("Still down")
+            status_bridge._drain_retry_queue()
+
+        # Should be discarded, not requeued
+        self.assertEqual(len(status_bridge._retry_queue), 0)
+
+    def test_retry_drain_handles_multiple_items(self):
+        """Multiple queued items should all be processed in one drain cycle."""
+        for i in range(3):
+            status_bridge._retry_queue.append({
+                "payload": {"index": i},
+                "attempts": 1,
+            })
+        with patch.object(status_bridge, "_HAS_REQUESTS", True), \
+             patch("status_bridge._req") as mock_req:
+            mock_req.post.return_value = MagicMock(status_code=200)
+            status_bridge._drain_retry_queue()
+
+        self.assertEqual(len(status_bridge._retry_queue), 0)
+        self.assertEqual(status_bridge._posts_retried, 3)
+
+
+class TestSessionCleanup(unittest.TestCase):
+    """cleanup_session() must remove all per-session state."""
+
+    def setUp(self):
+        _reset_bridge()
+
+    def tearDown(self):
+        _reset_bridge()
+
+    def test_cleanup_removes_all_session_state(self):
+        """cleanup_session should remove logs, transcripts, files, rosters, etc."""
+        status_bridge.set_session_id("cleanup-test")
+        status_bridge.log_event("some event")
+        status_bridge.add_transcript_entry("user", "hello", "agent1")
+        status_bridge.register_rosters(
+            sub_agents=[{"name": "a", "title": "A"}],
+            managers=[], reviewers=[],
+        )
+        status_bridge.set_project("TestProject")
+        status_bridge.set_active_reviewer("reviewer1")
+
+        # Verify state exists before cleanup
+        with status_bridge._state_lock:
+            self.assertIn("cleanup-test", status_bridge._session_logs)
+            self.assertIn("cleanup-test", status_bridge._session_transcripts)
+            self.assertIn("cleanup-test", status_bridge._session_rosters)
+
+        # Clean up
+        status_bridge.cleanup_session("cleanup-test")
+
+        # Verify all session state is removed
+        with status_bridge._state_lock:
+            self.assertNotIn("cleanup-test", status_bridge._session_logs)
+            self.assertNotIn("cleanup-test", status_bridge._session_transcripts)
+            self.assertNotIn("cleanup-test", status_bridge._session_files)
+            self.assertNotIn("cleanup-test", status_bridge._session_projects)
+            self.assertNotIn("cleanup-test", status_bridge._session_reviewers)
+            self.assertNotIn("cleanup-test", status_bridge._session_rosters)
+
+    def test_cleanup_nonexistent_session_is_safe(self):
+        """cleanup_session on a session that doesn't exist should not raise."""
+        # Should not raise
+        status_bridge.cleanup_session("does-not-exist")
+
+    def test_cleanup_removes_dropped_events_counter(self):
+        """cleanup_session should also remove the dropped events counter."""
+        status_bridge.set_session_id("drop-cleanup")
+        status_bridge._session_dropped_events["drop-cleanup"] = 5
+
+        status_bridge.cleanup_session("drop-cleanup")
+
+        self.assertNotIn("drop-cleanup", status_bridge._session_dropped_events)
+
+
+class TestDroppedEventTracking(unittest.TestCase):
+    """Track events lost when a deque is full."""
+
+    def setUp(self):
+        _reset_bridge()
+        status_bridge._session_dropped_events.clear()
+
+    def tearDown(self):
+        _reset_bridge()
+        status_bridge._session_dropped_events.clear()
+
+    def test_dropped_events_counted_when_log_deque_full(self):
+        """When the log deque is full and a new event is added, dropped count increments."""
+        status_bridge.set_session_id("drop-test")
+
+        # Fill the log deque to capacity (maxlen=80)
+        for i in range(80):
+            status_bridge.log_event(f"event-{i}")
+
+        with status_bridge._state_lock:
+            self.assertEqual(len(status_bridge._session_logs["drop-test"]), 80)
+
+        # Adding one more should cause the oldest to be evicted
+        status_bridge.log_event("overflow-event")
+
+        self.assertEqual(
+            status_bridge._session_dropped_events.get("drop-test", 0), 1
+        )
+
+    def test_dropped_events_included_in_write_status_payload(self):
+        """write_status payload should include dropped_events count."""
+        status_bridge.set_session_id("drop-payload")
+        status_bridge._session_dropped_events["drop-payload"] = 7
+
+        state = {
+            "phase": "dispatch",
+            "tasks": [],
+            "results": {},
+            "tokens_used": 0,
+        }
+
+        with patch.object(status_bridge, "_post") as mock_post:
+            status_bridge.write_status(state)
+            mock_post.assert_called_once()
+            payload = mock_post.call_args[0][0]
+            self.assertEqual(payload["dropped_events"], 7)
+
+    def test_dropped_events_zero_by_default(self):
+        """write_status payload should include dropped_events=0 for new sessions."""
+        status_bridge.set_session_id("drop-zero")
+
+        state = {
+            "phase": "dispatch",
+            "tasks": [],
+            "results": {},
+            "tokens_used": 0,
+        }
+
+        with patch.object(status_bridge, "_post") as mock_post:
+            status_bridge.write_status(state)
+            mock_post.assert_called_once()
+            payload = mock_post.call_args[0][0]
+            self.assertEqual(payload["dropped_events"], 0)
+
+
+class TestRetryThreadIsDaemon(unittest.TestCase):
+    """The retry background thread must be a daemon thread."""
+
+    def test_retry_thread_is_daemon(self):
+        """_retry_thread should be a daemon thread."""
+        self.assertTrue(status_bridge._retry_thread.daemon)
+
+    def test_retry_thread_is_alive(self):
+        """_retry_thread should be running."""
+        self.assertTrue(status_bridge._retry_thread.is_alive())
+
+
 if __name__ == "__main__":
     unittest.main()

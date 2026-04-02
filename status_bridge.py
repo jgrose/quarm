@@ -12,6 +12,7 @@ Environment:
 
 import json
 import threading
+import time
 import os
 import logging
 from collections import deque
@@ -44,9 +45,23 @@ _session_projects:    dict[str, str]   = {}   # session_id → project name
 _session_reviewers:   dict[str, str | None] = {}  # session_id → active reviewer
 _session_rosters:     dict[str, dict]  = {}   # session_id → {sub_agents, managers, reviewers}
 
+# Dropped-event tracking — per-session count of events lost to deque overflow
+_session_dropped_events: dict[str, int] = {}
+
 # Fallback globals for backward compat (single-session usage)
 _project:         str             = "NORT"
 _active_reviewer: str | None      = None
+
+# ── Retry queue & metrics ────────────────────────────────────────────────────
+
+_retry_queue: deque = deque(maxlen=100)
+_retry_lock = threading.Lock()
+
+# Module-level POST metrics
+_posts_sent:    int = 0
+_posts_failed:  int = 0
+_posts_retried: int = 0
+_MAX_RETRY_ATTEMPTS = 3
 
 
 def _get_sid() -> str:
@@ -84,6 +99,23 @@ def set_session_id(sid: str):
             _session_files[sid] = {}
         if sid not in _session_rosters:
             _session_rosters[sid] = {"sub_agents": [], "managers": [], "reviewers": []}
+
+
+def cleanup_session(sid: str):
+    """
+    Remove all per-session state for the given session ID.
+
+    Call this after an orchestration run completes (e.g., after synthesis_node
+    finishes in orchestrator.py) to free memory from completed sessions.
+    """
+    with _state_lock:
+        _session_logs.pop(sid, None)
+        _session_transcripts.pop(sid, None)
+        _session_files.pop(sid, None)
+        _session_projects.pop(sid, None)
+        _session_reviewers.pop(sid, None)
+        _session_rosters.pop(sid, None)
+        _session_dropped_events.pop(sid, None)
 
 
 def record_file_touch(path: str, operation: str, agent: str):
@@ -149,12 +181,16 @@ def log_event(msg: str):
     sid = _get_sid()
     with _state_lock:
         if sid and sid in _session_logs:
-            _session_logs[sid].append(msg)
+            dq = _session_logs[sid]
+            if len(dq) == dq.maxlen:
+                _session_dropped_events[sid] = _session_dropped_events.get(sid, 0) + 1
+            dq.append(msg)
 
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 
 def _post(payload: dict):
+    global _posts_sent, _posts_failed
     headers = {"Content-Type": "application/json"}
     if SECRET:
         headers["X-Gauntlet-Secret"] = SECRET
@@ -165,8 +201,59 @@ def _post(payload: dict):
         else:
             req = _urllib.Request(UPDATE_URL, data=body, headers=headers, method="POST")
             _urllib.urlopen(req, timeout=2)
+        _posts_sent += 1
     except Exception as e:
+        _posts_failed += 1
         log.debug(f"POST failed (server running?): {e}")
+        with _retry_lock:
+            _retry_queue.append({"payload": payload, "attempts": 1})
+
+
+def _drain_retry_queue():
+    """Process all items in the retry queue. Re-queue on failure, discard after max attempts."""
+    global _posts_retried
+    with _retry_lock:
+        items = list(_retry_queue)
+        _retry_queue.clear()
+
+    requeue = []
+    for item in items:
+        payload = item["payload"]
+        attempts = item["attempts"]
+        headers = {"Content-Type": "application/json"}
+        if SECRET:
+            headers["X-Gauntlet-Secret"] = SECRET
+        body = json.dumps(payload).encode()
+        try:
+            if _HAS_REQUESTS:
+                _req.post(UPDATE_URL, data=body, headers=headers, timeout=2)
+            else:
+                req = _urllib.Request(UPDATE_URL, data=body, headers=headers, method="POST")
+                _urllib.urlopen(req, timeout=2)
+            _posts_retried += 1
+        except Exception as e:
+            next_attempts = attempts + 1
+            if next_attempts > _MAX_RETRY_ATTEMPTS:
+                log.warning(f"Discarding update after {_MAX_RETRY_ATTEMPTS} failed attempts: {e}")
+            else:
+                requeue.append({"payload": payload, "attempts": next_attempts})
+
+    if requeue:
+        with _retry_lock:
+            for item in requeue:
+                _retry_queue.append(item)
+
+
+def _retry_loop():
+    """Background loop that wakes every 5 seconds and drains the retry queue."""
+    while True:
+        time.sleep(5)
+        if _retry_queue:
+            _drain_retry_queue()
+
+
+_retry_thread = threading.Thread(target=_retry_loop, daemon=True, name="bridge-retry")
+_retry_thread.start()
 
 
 def write_status(state: dict):
@@ -185,6 +272,7 @@ def write_status(state: dict):
         ]
         project = _session_projects.get(sid, _project)
         reviewer = _session_reviewers.get(sid, _active_reviewer)
+        dropped = _session_dropped_events.get(sid, 0)
 
     payload = {
         # ── Identity ──────────────────────────────────────────────────
@@ -228,6 +316,7 @@ def write_status(state: dict):
         "log":              log_lines,
         "transcript":       transcript,
         "files_touched":    files_list,
+        "dropped_events":   dropped,
         "updated_at":       datetime.now(timezone.utc).isoformat(),
     }
     t = threading.Thread(target=_post, args=(payload,), daemon=True)
