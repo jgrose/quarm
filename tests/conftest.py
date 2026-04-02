@@ -50,7 +50,18 @@ _tools_stub = ModuleType("tools")
 _tools_stub.get_tools = MagicMock(return_value=[])
 _tools_stub.execute_tool_call = MagicMock()
 _tools_stub.set_tool_context = MagicMock()
+_tools_stub.init_mcp_tools = MagicMock()
 sys.modules.setdefault("tools", _tools_stub)
+
+_mcp_client_stub = ModuleType("mcp_client")
+_mcp_client_stub.init_mcp_from_config = MagicMock(return_value=None)
+_mcp_client_stub.shutdown_mcp = MagicMock()
+_mcp_client_stub.get_mcp_manager = MagicMock(return_value=MagicMock())
+sys.modules.setdefault("mcp_client", _mcp_client_stub)
+
+_mcp_wrapper_stub = ModuleType("mcp_tool_wrapper")
+_mcp_wrapper_stub.register_mcp_tools_in_registry = MagicMock(return_value=0)
+sys.modules.setdefault("mcp_tool_wrapper", _mcp_wrapper_stub)
 
 _checkpoint_stub = ModuleType("checkpoint")
 _checkpoint_stub.save_checkpoint = MagicMock()

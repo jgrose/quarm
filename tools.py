@@ -401,13 +401,51 @@ TOOL_REGISTRY = {
 }
 
 
-def get_tools(tool_names: list[str], allowed_tools: list[str] = None) -> list:
+def load_default_tools() -> list[str]:
+    """Load default_tools from config.json. Returns empty list if not configured."""
+    try:
+        import json
+        config_path = Path(__file__).parent / "config.json"
+        with open(config_path) as f:
+            return json.load(f).get("default_tools", [])
+    except Exception:
+        return []
+
+
+def init_mcp_tools():
+    """Discover MCP tools and register them in TOOL_REGISTRY. Called once at startup."""
+    try:
+        from mcp_tool_wrapper import register_mcp_tools_in_registry
+        count = register_mcp_tools_in_registry(TOOL_REGISTRY)
+        if count:
+            log.info(f"Registered {count} MCP tools into TOOL_REGISTRY")
+    except ImportError:
+        pass  # mcp package not installed
+    except Exception as e:
+        log.warning(f"MCP tool init failed: {e}")
+
+
+def get_tools(tool_names: list[str], allowed_tools: list[str] = None,
+              include_defaults: bool = True) -> list:
     """Get LangChain tool objects for the given tool name strings.
+    Merges with default_tools from config.json unless disabled.
+    Pass tool_names=["none"] to disable all tools including defaults.
     If allowed_tools is non-empty, only include tools in that list."""
+    # "none" sentinel -- agent opts out of all tools
+    if tool_names == ["none"]:
+        return []
+
+    # Merge with defaults
+    if include_defaults:
+        defaults = load_default_tools()
+        merged = list(dict.fromkeys(defaults + tool_names))
+    else:
+        merged = tool_names
+
     tools = []
     seen = set()
     allowed_set = set(t.strip().lower() for t in allowed_tools) if allowed_tools else None
-    for name in tool_names:
+    for name in merged:
         name = name.strip().lower()
         if name in TOOL_REGISTRY and name not in seen:
             if allowed_set and name not in allowed_set:

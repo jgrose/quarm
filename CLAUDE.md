@@ -6,6 +6,104 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Never include Co-Authored-By, "Claude", or any AI attribution in commit messages or anywhere in the codebase.**
 
+## Tools & MCP Servers
+
+Agents have access to tools during task execution. Tools are configured in `config.json`.
+
+### Default Tools
+
+All agents automatically receive default tools unless they opt out. Configure in `config.json`:
+
+```json
+"default_tools": ["web_search", "browse_url", "read_file"]
+```
+
+- Agents with no `- tools:` line in the plan get the defaults
+- Agents with explicit `- tools: [execute_code]` get defaults PLUS their listed tools
+- Use `- tools: none` in a plan to disable all tools (including defaults) for that agent
+
+### Built-in Tools
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | DuckDuckGo search, returns top 5 results |
+| `browse_url` | Headless Chromium (Playwright), returns page as markdown |
+| `rag_search` | Search NORT knowledge base from past projects |
+| `rag_store` | Ingest text into knowledge base |
+| `download_artifact` | Download URL content, save to artifacts |
+| `read_file` | Read project files |
+| `write_file` | Write to artifacts directory |
+| `execute_code` | Run Python in sandboxed subprocess (requires approval) |
+
+### MCP Server Integration
+
+Agents can use tools from external MCP (Model Context Protocol) servers. Add servers to `config.json`:
+
+```json
+"mcp_servers": {
+  "brave_search": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic/brave-search-mcp"],
+    "env": {"BRAVE_API_KEY": "${BRAVE_API_KEY}"}
+  },
+  "filesystem": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic/filesystem-mcp", "/tmp/sandbox"]
+  },
+  "remote_api": {
+    "type": "sse",
+    "url": "http://localhost:3001/sse"
+  }
+}
+```
+
+**Server types:**
+
+- `stdio` — Launches a local subprocess. Set `command`, `args`, and optionally `env`. Environment variables use `${VAR}` syntax to pull from your shell environment.
+- `sse` — Connects to a remote MCP server over HTTP/SSE. Set `url`.
+
+**How it works:**
+
+1. On startup, the orchestrator connects to each configured MCP server
+2. Tools are auto-discovered via `list_tools()` and registered as `server_name.tool_name`
+3. Agents can reference them in plans: `- tools: [brave_search.brave_web_search]`
+4. MCP tools can also be added to `default_tools` for automatic availability
+5. Connections are lazy (established on first use) and reconnect on failure
+
+**Setup steps:**
+
+```bash
+# 1. Install the mcp package (already in .venv)
+pip install mcp
+
+# 2. Install any MCP servers you want (example: Brave Search)
+npm install -g @anthropic/brave-search-mcp
+
+# 3. Set required API keys in your environment or .env
+export BRAVE_API_KEY=your-key-here
+
+# 4. Add the server to config.json under "mcp_servers" (see examples above)
+
+# 5. Run the orchestrator — MCP tools are discovered automatically
+python orchestrator.py plan.md
+```
+
+**Using MCP tools in a plan:**
+
+```markdown
+### AGENT: researcher
+- description: Web researcher who finds and analyzes sources
+- tools: [brave_search.brave_web_search, browse_url]
+```
+
+Or add to defaults so all agents get them:
+
+```json
+"default_tools": ["web_search", "browse_url", "read_file", "brave_search.brave_web_search"]
+```
+
 ## What This Is
 
 NORT is a 4-layer multi-agent orchestrator built on LangGraph. It takes a structured plan (markdown), dispatches tasks to specialist sub-agents, and runs each result through two quality gates: a domain manager review and a specialist reviewer panel (security engineer, UX designer, user tester). Results and a final executive report are written to `results.json`.

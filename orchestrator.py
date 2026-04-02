@@ -33,8 +33,14 @@ from status_bridge import (
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
-from tools import get_tools, execute_tool_call, set_tool_context
+from tools import get_tools, execute_tool_call, set_tool_context, init_mcp_tools
 from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
+
+try:
+    from mcp_client import init_mcp_from_config, shutdown_mcp
+except ImportError:
+    init_mcp_from_config = None
+    shutdown_mcp = None
 from validate_plan import validate as validate_plan_file
 
 load_dotenv()
@@ -1413,6 +1419,14 @@ def run(plan_path="plan.md", plan_id: str = ""):
 
     fetch_available_models()
 
+    # ── Initialize MCP tools ──
+    if init_mcp_from_config:
+        try:
+            init_mcp_from_config()
+            init_mcp_tools()
+        except Exception as e:
+            log_event(f"[WARN] MCP initialization failed: {e}")
+
     # ── Check for existing checkpoint ──
     checkpoint = load_checkpoint(plan_id) if plan_id else None
 
@@ -1576,6 +1590,13 @@ def run(plan_path="plan.md", plan_id: str = ""):
     # Clean up checkpoint on successful completion
     if plan_id:
         clear_checkpoint(plan_id)
+
+    # Clean up MCP connections
+    if shutdown_mcp:
+        try:
+            shutdown_mcp()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

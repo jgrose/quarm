@@ -76,7 +76,7 @@ SCHEMA (follow exactly)
 ## Sub-Agents
 ### AGENT: [agent_name]
 - description: [Specialist role and exact output format this agent produces]
-- tools: [choose from: web_search, browse_url, rag_search, rag_store, download_artifact, read_file, write_file, execute_code]
+- tools: [optional — choose from: web_search, browse_url, rag_search, rag_store, download_artifact, read_file, write_file, execute_code. Omit to use defaults. Use "none" to disable all tools. MCP tools use server_name.tool_name notation]
 - model: [optional — specific model ID to use for this agent, omit to auto-select]
 
 [Define 2-5 sub-agents. Each should be a distinct specialist.]
