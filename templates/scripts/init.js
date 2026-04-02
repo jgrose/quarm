@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (toleranceCfg) toleranceCfg.classList.add('hidden');
       var outputBrowser = document.getElementById('outputBrowserOverlay');
       if (outputBrowser) outputBrowser.classList.add('hidden');
+      var costPanel = document.getElementById('costPanelOverlay');
+      if (costPanel) costPanel.classList.add('hidden');
     }
     if (e.key === 'q' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       toggleQueue();
