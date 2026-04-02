@@ -47,6 +47,7 @@ var config = {
   hexNodes: false,
   taskArrows: true,
   activeIndicators: true,
+  dependencies: true,
   // Performance settings
   qualityPreset: 'high',
   shadowQuality: 'high',

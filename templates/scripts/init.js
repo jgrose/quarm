@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.key === 'l' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       if (typeof toggleAgentList === 'function') toggleAgentList();
     }
+    if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      config.dependencies = !config.dependencies;
+    }
   });
 
   // Enter key on plan input
