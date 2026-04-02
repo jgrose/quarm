@@ -23,9 +23,25 @@
     {% include "components/panels/agent_list.html" %}
   </div>
 
+  {% include "components/panels/queue.html" %}
+  {% include "components/panels/thinking.html" %}
   {% include "components/panels/config.html" %}
-  {% include "components/panels/cost_panel.html" %}
+  {% include "components/panels/completion.html" %}
+  {% include "components/panels/ledger.html" %}
+  {% include "components/panels/plan_viewer.html" %}
+  {% include "components/panels/model_config.html" %}
+  {% include "components/panels/tolerance_config.html" %}
+  {% include "components/panels/transcript.html" %}
+  {% include "components/panels/timeline.html" %}
+  {% include "components/panels/file_attention.html" %}
+  {% include "components/panels/roster.html" %}
+  {% include "components/panels/agents.html" %}
+  {% include "components/panels/output_browser.html" %}
+  {% include "components/panels/review_analytics.html" %}
   {% include "components/panels/perf_panel.html" %}
+  {% include "components/panels/dag_panel.html" %}
+  {% include "components/panels/cost_panel.html" %}
+  {% include "components/panels/help.html" %}
 
   <script>
     {% include "scripts/colors.js" %}
@@ -47,6 +63,7 @@
     {% include "scripts/websocket.js" %}
     {% include "scripts/api.js" %}
     {% include "scripts/panels.js" %}
+    {% include "scripts/dag.js" %}
     {% include "scripts/flow_background.js" %}
     {% include "scripts/flow_render.js" %}
     {% include "scripts/flow_init.js" %}

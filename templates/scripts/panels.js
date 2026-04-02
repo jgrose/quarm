@@ -1205,9 +1205,10 @@ function renderLedger(costs, scores) {
   // Recent runs
   var runs = costs.recent_runs || [];
   if (runs.length) {
-    html += '<div style="font-size:9px;color:' + C.textDim + ';letter-spacing:1px;margin:8px 0 4px">RECENT RUNS</div>';
+    var cappedRuns = runs.slice(0, 5);
+    html += '<div style="font-size:9px;color:' + C.textDim + ';letter-spacing:1px;margin:8px 0 4px">RECENT RUNS' + (runs.length > 5 ? ' (' + runs.length + ' total)' : '') + '</div>';
     html += '<table class="ledger-table"><tr><th>PLAN</th><th>TOKENS</th><th>TASKS</th><th>STATUS</th></tr>';
-    runs.forEach(function(r) {
+    cappedRuns.forEach(function(r) {
       var sColor = r.status === 'done' ? '#00ff88' : '#ff8800';
       html += '<tr><td>' + escapeHtml(r.plan_name || '?') + '</td><td>' + (r.total_tokens || 0).toLocaleString() +
         '</td><td>' + (r.task_count || 0) + '</td><td style="color:' + sColor + '">' + (r.status || '?').toUpperCase() + '</td></tr>';
@@ -1238,9 +1239,10 @@ function renderLedger(costs, scores) {
   // Recent scores
   var recent = scores.recent_scores || [];
   if (recent.length) {
-    html += '<div style="font-size:9px;color:' + C.textDim + ';letter-spacing:1px;margin:8px 0 4px">RECENT REVIEWS</div>';
+    var cappedRecent = recent.slice(0, 8);
+    html += '<div style="font-size:9px;color:' + C.textDim + ';letter-spacing:1px;margin:8px 0 4px">RECENT REVIEWS' + (recent.length > 8 ? ' (' + recent.length + ' total)' : '') + '</div>';
     html += '<table class="ledger-table"><tr><th>TASK</th><th>AGENT</th><th>SCORE</th><th>VERDICT</th><th>REVIEWER</th></tr>';
-    recent.forEach(function(s) {
+    cappedRecent.forEach(function(s) {
       var vColor = s.verdict === 'PASS' ? '#00ff88' : '#ff4444';
       html += '<tr><td>' + escapeHtml(s.task_id) + '</td><td>' + escapeHtml(s.agent) + '</td><td>' + s.score + '/10</td>' +
         '<td style="color:' + vColor + '">' + s.verdict + '</td><td>' + escapeHtml(s.reviewer) + '</td></tr>';
@@ -2050,6 +2052,7 @@ function updateAgentToleranceLabel(el) {
 
 var _outputPlanId = null;
 var _outputSource = 'artifacts'; // 'artifacts' or 'output'
+var _cachedResults = null;
 
 function _updateSourceToggle() {
   var togArt = document.getElementById('srcArtifacts');
@@ -2066,12 +2069,25 @@ function switchOutputSource(source) {
 
 function showOutputBrowserForPlan(planId) {
   _outputPlanId = planId;
-  _outputSource = 'output';
+  _cachedResults = null;
   var overlay = document.getElementById('outputBrowserOverlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  _updateSourceToggle();
-  loadOutputTree(planId);
+  // Probe output first; fall back to artifacts if empty
+  fetch('/api/output/' + planId + '/files')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (_outputPlanId !== planId) return; // guard against rapid clicks
+      _outputSource = (data.files && data.files.length > 0) ? 'output' : 'artifacts';
+      _updateSourceToggle();
+      loadOutputTree(planId);
+    })
+    .catch(function() {
+      if (_outputPlanId !== planId) return;
+      _outputSource = 'artifacts';
+      _updateSourceToggle();
+      loadOutputTree(planId);
+    });
 }
 
 function _downloadBlob(resp, filename, btn, okLabel, failLabel) {
@@ -2096,7 +2112,27 @@ function downloadOutputZip(planId, btnEl) {
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
   fetch('/output/' + planId + '/download')
     .then(function(resp) { return resp.ok ? resp : fetch('/api/artifacts/' + planId + '/download'); })
-    .then(function(resp) { _downloadBlob(resp, planId + '_output.zip', btnEl, '\u2B07', '\u2717'); });
+    .then(function(resp) {
+      if (resp.ok) {
+        _downloadBlob(resp, planId + '_output.zip', btnEl, '\u2B07', '\u2717');
+      } else {
+        // Fall back to results.json for text-only plans
+        fetch('/api/results/' + planId)
+          .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+          .then(function(data) {
+            var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = planId + '_results.json';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }
+          })
+          .catch(function() {
+            if (btnEl) { btnEl.textContent = '\u2717'; setTimeout(function() { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }, 2000); }
+          });
+      }
+    });
 }
 
 function showOutputBrowser() {
@@ -2123,10 +2159,14 @@ function loadOutputTree(planId) {
   fetch(endpoint)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      renderFileTree(data.tree || {}, data.files || []);
+      if ((data.files || []).length > 0) {
+        renderFileTree(data.tree || {}, data.files || []);
+      } else {
+        _loadResultsAsPreview(planId);
+      }
     })
     .catch(function() {
-      document.getElementById('outputFileTree').innerHTML = '<div style="color:var(--text-dim);padding:12px">No artifacts found</div>';
+      _loadResultsAsPreview(planId);
     });
 }
 
@@ -2183,10 +2223,61 @@ function _buildTreeHTML(node, depth) {
   return html;
 }
 
+function _loadResultsAsPreview(planId) {
+  var treeEl = document.getElementById('outputFileTree');
+  var preview = document.getElementById('outputFilePreview');
+  fetch('/api/results/' + planId)
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      _cachedResults = data.task_results || {};
+      var keys = Object.keys(_cachedResults);
+      if (!keys.length) {
+        if (treeEl) treeEl.textContent = 'No artifacts or results';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < keys.length; i++) {
+        var tid = keys[i];
+        html += '<div class="tree-file" style="padding-left:0" data-path="' + escapeHtml(tid) + '" onclick="_showResultText(\'' + escapeHtml(tid) + '\')">';
+        html += '<span class="tree-icon">\u{1F4DD}</span>';
+        html += '<span class="tree-name">' + escapeHtml(tid) + '</span>';
+        html += '<span class="tree-size">text</span>';
+        html += '</div>';
+      }
+      if (treeEl) treeEl.innerHTML = html;
+      _showResultText(keys[0]);
+    })
+    .catch(function() {
+      if (treeEl) treeEl.textContent = 'No artifacts';
+    });
+}
+
+function _showResultText(taskId) {
+  var preview = document.getElementById('outputFilePreview');
+  if (!preview) return;
+  var treeItems = document.querySelectorAll('.tree-file');
+  for (var ti = 0; ti < treeItems.length; ti++) treeItems[ti].classList.remove('active');
+  var clicked = document.querySelector('.tree-file[data-path="' + taskId.replace(/"/g, '\\"') + '"]');
+  if (clicked) clicked.classList.add('active');
+  var content = (_cachedResults && _cachedResults[taskId]) || '(no content)';
+  preview.innerHTML = '<div class="preview-header">' + escapeHtml(taskId) + ' <span style="color:var(--text-dim)">(text result)</span></div>' +
+    '<pre class="syntax-pre">' + escapeHtml(content) + '</pre>';
+}
+
 function previewArtifact(filePath) {
-  var parts = filePath.split('/');
-  var planId = parts[0];
-  var relPath = parts.slice(1).join('/');
+  var planId, relPath, taskId, endpoint;
+  if (_outputSource === 'output') {
+    planId = _outputPlanId;
+    relPath = filePath;
+    taskId = '';
+    endpoint = '/api/output/' + planId + '/file?path=' + encodeURIComponent(relPath);
+  } else {
+    var parts = filePath.split('/');
+    planId = parts[0];
+    relPath = parts.slice(1).join('/');
+    taskId = parts.length > 2 ? parts[1] : '';
+    endpoint = '/api/artifacts/' + planId + '/file?path=' + encodeURIComponent(relPath);
+  }
   var preview = document.getElementById('outputFilePreview');
   if (!preview) return;
   var treeItems = document.querySelectorAll('.tree-file');
@@ -2195,9 +2286,7 @@ function previewArtifact(filePath) {
   if (clicked) clicked.classList.add('active');
   preview.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
 
-  var taskId = parts.length > 1 ? parts[1] : '';
-
-  fetch('/api/artifacts/' + planId + '/file?path=' + encodeURIComponent(relPath))
+  fetch(endpoint)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.binary) {
@@ -2296,8 +2385,22 @@ function downloadArtifacts() {
   if (!planId) return;
   var btn = document.getElementById('outputDownloadBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'PREPARING...'; }
-  fetch('/api/artifacts/' + planId + '/download')
-    .then(function(resp) { _downloadBlob(resp, planId + '_artifacts.zip', btn, 'DOWNLOAD ZIP', 'NO ARTIFACTS'); })
+  var endpoint = _outputSource === 'output'
+    ? '/output/' + planId + '/download'
+    : '/api/artifacts/' + planId + '/download';
+  var filename = _outputSource === 'output'
+    ? planId + '_output.zip'
+    : planId + '_artifacts.zip';
+  fetch(endpoint)
+    .then(function(resp) {
+      if (resp.ok) return _downloadBlob(resp, filename, btn, 'DOWNLOAD ZIP', 'NO ARTIFACTS');
+      // Fall back: output→artifacts, artifacts→results.json
+      if (_outputSource === 'output') {
+        return fetch('/api/artifacts/' + planId + '/download')
+          .then(function(r) { _downloadBlob(r, planId + '_artifacts.zip', btn, 'DOWNLOAD ZIP', 'NO ARTIFACTS'); });
+      }
+      _downloadBlob(resp, filename, btn, 'DOWNLOAD ZIP', 'NO ARTIFACTS');
+    })
     .catch(function() { if (btn) { btn.textContent = 'DOWNLOAD FAILED'; setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000); } });
 }
 

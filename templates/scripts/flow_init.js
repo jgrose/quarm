@@ -42,13 +42,12 @@
     if (typeof hideAgentDetail === 'function') hideAgentDetail();
   });
 
-  // Add "CITY VIEW" link to top bar
-  var topBarActions = document.querySelector('.top-bar-actions');
-  if (topBarActions) {
-    var cityBtn = document.createElement('button');
-    cityBtn.textContent = 'CITY VIEW';
-    cityBtn.onclick = function() { window.location.href = '/'; };
-    topBarActions.insertBefore(cityBtn, topBarActions.firstChild);
+  // Repurpose the view toggle button for flow → city navigation
+  var viewBtn = document.getElementById('viewToggleBtn');
+  if (viewBtn) {
+    viewBtn.textContent = 'CITY';
+    viewBtn.title = 'Switch to city view';
+    viewBtn.onclick = function() { window.location.href = '/'; };
   }
 
   // Connect WebSocket and start API polling

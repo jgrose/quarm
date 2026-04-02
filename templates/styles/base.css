@@ -1779,7 +1779,10 @@ a:hover { color: var(--holo-bright); }
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   width: 520px;
+  max-height: 80vh;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
   box-shadow:
     0 0 40px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 var(--glass-highlight);
@@ -1789,6 +1792,7 @@ a:hover { color: var(--holo-bright); }
   display: flex;
   flex-direction: row;
   gap: 0;
+  flex-shrink: 0;
 }
 
 .ledger-tab {
@@ -1814,9 +1818,17 @@ a:hover { color: var(--holo-bright); }
   color: var(--text-primary);
 }
 
-.ledger-body {
+#ledgerBody {
   padding: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
+
+#ledgerBody::-webkit-scrollbar { width: 4px; }
+#ledgerBody::-webkit-scrollbar-track { background: transparent; }
+#ledgerBody::-webkit-scrollbar-thumb { background: rgba(102, 204, 255, 0.2); border-radius: 2px; }
+#ledgerBody::-webkit-scrollbar-thumb:hover { background: rgba(102, 204, 255, 0.4); }
 
 .ledger-bar-row {
   display: flex;

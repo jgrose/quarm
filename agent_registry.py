@@ -626,9 +626,17 @@ def format_agent_catalog() -> str:
                 lines.append(f"  tools: {', '.join(a['tools'])}")
             # Show top 3 specialization strengths if available
             agent_spec = spec_matrix.get(a["name"], {})
-            if agent_spec:
+            tag_data = agent_spec.get("tags", agent_spec) if isinstance(agent_spec, dict) else {}
+            if tag_data:
+                # Normalize: values may be floats or dicts with a "score" key
+                normalized = {}
+                for tag, val in tag_data.items():
+                    if isinstance(val, dict):
+                        normalized[tag] = val.get("score", 0)
+                    elif isinstance(val, (int, float)):
+                        normalized[tag] = val
                 strengths = sorted(
-                    agent_spec.items(), key=lambda x: x[1], reverse=True
+                    normalized.items(), key=lambda x: x[1], reverse=True
                 )[:3]
                 if strengths:
                     strength_str = ", ".join(
