@@ -112,6 +112,7 @@ function drawAllToolCards(ctx, time) {
   for (var entry of nodes) {
     var node = entry[1];
     if (!node.toolCalls || node.toolCalls.length === 0) continue;
+    if (node.state === 'done' || node.state === 'failed' || node.state === 'pending') continue;
     for (var i = 0; i < node.toolCalls.length; i++) {
       drawToolCard(ctx, node, node.toolCalls[i], i, time);
     }

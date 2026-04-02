@@ -600,10 +600,11 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
                 tc_name = tc["name"]
                 tc_args = tc["args"]
                 log_event(f"  [TOOL] {tc_name}({str(tc_args)[:80]})")
-                result = execute_tool_call(tc, agent_tools)
+                result = execute_tool_call(tc, agent_tools, auto_approve_all=True)
                 result_str = str(result)[:4000]
                 messages.append(ToolMessage(content=result_str, tool_call_id=tc["id"]))
-                tool_calls_log.append({"tool": tc_name, "args_preview": str(tc_args)[:100],
+                tool_calls_log.append({"name": tc_name, "state": "complete",
+                                       "args_preview": str(tc_args)[:100],
                                        "result_preview": result_str[:200]})
         draft = resp.content or ""
         if not draft.strip():
@@ -1071,7 +1072,15 @@ def composition_node(state):
 
 def route_master(s):
     p = s.get("phase", "dispatch")
-    return "synthesis" if p == "done" else "sub_agent" if p == "execute" else "master"
+    if p == "done":
+        return "synthesis"
+    if p == "execute":
+        return "sub_agent"
+    if p == "manager_review":
+        return "manager_review"
+    if p == "specialist_review":
+        return "specialist_review"
+    return "master"
 
 def route_manager(s):
     p = s.get("phase")
@@ -1096,7 +1105,8 @@ def build_graph():
 
     g.set_entry_point("master")
     g.add_conditional_edges("master", route_master,
-        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master"})
+        {"sub_agent":"sub_agent","synthesis":"synthesis","master":"master",
+         "manager_review":"manager_review","specialist_review":"specialist_review"})
     g.add_edge("sub_agent", "manager_review")
     g.add_conditional_edges("manager_review", route_manager,
         {"sub_agent":"sub_agent","specialist_review":"specialist_review","master":"master"})
