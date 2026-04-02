@@ -68,25 +68,109 @@ document.addEventListener('DOMContentLoaded', function() {
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      hideAgentDetail();
-      hidePlanViewer();
-      hideCompletion();
+      // Close ONE panel per Escape press, highest z-index first.
+      // Each check returns early after closing the topmost visible panel.
+
+      // z:200 — Approval banner (highest interactive layer)
+      // (Approval banner has no close-on-escape — it requires explicit action)
+
+      // z:150 — Modal overlays (completion, plan viewer)
+      var completionOvl = document.getElementById('completionOverlay');
+      if (completionOvl && !completionOvl.classList.contains('hidden')) {
+        hideCompletion(); return;
+      }
+      var planViewerOvl = document.getElementById('planViewer');
+      if (planViewerOvl && !planViewerOvl.classList.contains('hidden')) {
+        hidePlanViewer(); return;
+      }
+
+      // z:150 — Config overlays (config, model config, ledger, cost, agents, tolerance, review analytics, output browser)
       var cfgOverlay = document.getElementById('configOverlay');
-      if (cfgOverlay) cfgOverlay.classList.remove('visible');
-      var ledger = document.getElementById('ledgerOverlay');
-      if (ledger) ledger.classList.add('hidden');
+      if (cfgOverlay && cfgOverlay.classList.contains('visible')) {
+        cfgOverlay.classList.remove('visible'); return;
+      }
       var modelCfg = document.getElementById('modelConfigOverlay');
-      if (modelCfg) modelCfg.classList.remove('visible');
-      var agentsOvl = document.getElementById('agentsOverlay');
-      if (agentsOvl) agentsOvl.classList.add('hidden');
-      var reviewAnalytics = document.getElementById('reviewAnalyticsOverlay');
-      if (reviewAnalytics) reviewAnalytics.classList.add('hidden');
-      var toleranceCfg = document.getElementById('toleranceConfigOverlay');
-      if (toleranceCfg) toleranceCfg.classList.add('hidden');
-      var outputBrowser = document.getElementById('outputBrowserOverlay');
-      if (outputBrowser) outputBrowser.classList.add('hidden');
+      if (modelCfg && modelCfg.classList.contains('visible')) {
+        modelCfg.classList.remove('visible'); return;
+      }
+      var ledger = document.getElementById('ledgerOverlay');
+      if (ledger && !ledger.classList.contains('hidden')) {
+        ledger.classList.add('hidden'); return;
+      }
       var costPanel = document.getElementById('costPanelOverlay');
-      if (costPanel) costPanel.classList.add('hidden');
+      if (costPanel && !costPanel.classList.contains('hidden')) {
+        if (typeof toggleCostPanel === 'function') toggleCostPanel();
+        else costPanel.classList.add('hidden');
+        return;
+      }
+      var agentsOvl = document.getElementById('agentsOverlay');
+      if (agentsOvl && !agentsOvl.classList.contains('hidden')) {
+        agentsOvl.classList.add('hidden'); return;
+      }
+      var toleranceCfg = document.getElementById('toleranceConfigOverlay');
+      if (toleranceCfg && !toleranceCfg.classList.contains('hidden')) {
+        toleranceCfg.classList.add('hidden'); return;
+      }
+      var reviewAnalytics = document.getElementById('reviewAnalyticsOverlay');
+      if (reviewAnalytics && !reviewAnalytics.classList.contains('hidden')) {
+        reviewAnalytics.classList.add('hidden'); return;
+      }
+      var outputBrowser = document.getElementById('outputBrowserOverlay');
+      if (outputBrowser && !outputBrowser.classList.contains('hidden')) {
+        outputBrowser.classList.add('hidden'); return;
+      }
+
+      // z:100 — Agent detail card
+      var agentCard = document.getElementById('agentDetailCard');
+      if (agentCard && !agentCard.classList.contains('hidden')) {
+        hideAgentDetail(); return;
+      }
+
+      // z:80 — Perf overlay
+      var perfPanel = document.getElementById('perfPanel');
+      if (perfPanel && !perfPanel.classList.contains('hidden')) {
+        if (typeof togglePerfOverlay === 'function') togglePerfOverlay();
+        else perfPanel.classList.add('hidden');
+        return;
+      }
+
+      // z:40 — Floating panels (queue, thinking, roster, file attention, transcript, timeline)
+      var queuePanel = document.getElementById('queuePanel');
+      if (queuePanel && !queuePanel.classList.contains('hidden')) {
+        toggleQueue(); return;
+      }
+      var thinkingPanel = document.getElementById('thinkingPanel');
+      if (thinkingPanel && !thinkingPanel.classList.contains('hidden')) {
+        hideThinkingPanel(); return;
+      }
+      var rosterPanel = document.getElementById('rosterPanel');
+      if (rosterPanel && !rosterPanel.classList.contains('hidden')) {
+        if (typeof toggleRoster === 'function') toggleRoster();
+        else rosterPanel.classList.add('hidden');
+        return;
+      }
+      var fileAttn = document.getElementById('fileAttention');
+      if (fileAttn && !fileAttn.classList.contains('hidden')) {
+        fileAttn.classList.add('hidden'); return;
+      }
+      var transcript = document.getElementById('transcriptPanel');
+      if (transcript && !transcript.classList.contains('hidden')) {
+        transcript.classList.add('hidden'); return;
+      }
+      var timeline = document.getElementById('timelinePanel');
+      if (timeline && !timeline.classList.contains('hidden')) {
+        timeline.classList.add('hidden'); return;
+      }
+
+      // z:30 — Side panels (event log, agent list) — close if open
+      var eventLog = document.getElementById('eventLog');
+      if (eventLog && !eventLog.classList.contains('collapsed')) {
+        toggleChat(); return;
+      }
+      var agentList = document.getElementById('agentListPanel');
+      if (agentList && !agentList.classList.contains('collapsed')) {
+        toggleAgentList(); return;
+      }
     }
     if (e.key === 'q' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       toggleQueue();
