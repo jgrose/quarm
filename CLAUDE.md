@@ -19,12 +19,28 @@ pip install langgraph langchain langchain-openai python-dotenv fastapi uvicorn p
 # Generate a plan from a project description
 python generate_plan.py "Build a web dashboard for AWS cost monitoring"
 
+# Validate a plan before running
+python validate_plan.py plan.md
+
 # Run the orchestrator against a plan
 python orchestrator.py plan.md
 
 # Start the live dashboard server (run before orchestrator for real-time UI)
 python serve.py
-# Then open http://localhost:8000/
+# Then open http://localhost:8000/ (city view) or http://localhost:8000/flow (flow view)
+
+# Run all tests (no LLM or network required — conftest.py stubs all external deps)
+pytest tests/ -v
+
+# Run a single test file
+pytest tests/test_plan_parser.py -v
+
+# Run a single test by name
+pytest tests/test_routing.py -v -k "test_manager_review_pass"
+
+# Smoke tests (require serve.py running + playwright installed)
+pip install playwright pytest-playwright && python -m playwright install chromium
+pytest tests/test_smoke.py -v
 ```
 
 The live dashboard requires running `serve.py` in one terminal and `orchestrator.py` in another. The orchestrator pushes state to the server via HTTP POST; the server broadcasts to browser clients over WebSocket.
@@ -43,31 +59,36 @@ generate_plan.py  →  plan.md  →  orchestrator.py  →  results.json
 
 **generate_plan.py** — Uses the `openai` SDK to generate a structured `plan.md` from a natural-language project description. The system prompt enforces the plan schema.
 
-**status_bridge.py** — Fire-and-forget bridge between orchestrator and dashboard. Maintains an in-memory event log, roster registry, transcript log, and file attention tracker. Pushes serialized state to `serve.py` via background `threading.Thread` POSTs.
+**status_bridge.py** — Fire-and-forget bridge between orchestrator and dashboard. Maintains per-session in-memory event logs, roster registry, transcript log, and file attention tracker. Pushes serialized state to `serve.py` via background `threading.Thread` POSTs. Uses `requests` if available, falls back to `urllib`. Thread-local storage for session IDs enables concurrent plan runs.
 
-**serve.py** — FastAPI WebSocket server with Jinja2 template rendering. Receives POST `/update` from the bridge and broadcasts to all connected WebSocket clients. Supports multi-session tracking keyed by session_id. Replays all active session states to new connections.
+**serve.py** — FastAPI WebSocket server (57 API endpoints) with Jinja2 template rendering. Receives POST `/update` from the bridge and broadcasts to all connected WebSocket clients. Supports multi-session tracking keyed by session_id. Replays all active session states to new connections.
 
-## Dashboard (Jinja2 Templates)
+**tools.py** — Tool registry mapping plan.md tool names to LangChain tool functions. 8 core tools with aliases (e.g., `search` → `web_search`, `browse` → `browse_url`). Hybrid approval system: most tools auto-execute, `execute_code` blocks until human approval via dashboard.
 
-The dashboard is composed from `templates/` via Jinja2 `{% include %}` directives, served as a single HTML response:
+**agent_registry.py** — Persistent agent definitions in `agents/registry.json`. Uses atomic writes (tmp file + fsync + `os.replace`) with `.json.bak` backup. Tracks performance history, version history with rollback, and earned tolerance bonuses.
 
-```
-templates/
-├── base.html                     # Composition shell
-├── styles/base.css               # Glass morphism + holographic palette
-├── components/                   # HTML partials (top bar, control bar, panels)
-└── scripts/                      # 16 JS modules
-    ├── colors.js, constants.js   # Palette + animation config
-    ├── nodes.js, force.js        # Node model + force simulation
-    ├── draw_*.js (5 files)       # Canvas rendering (hex nodes, edges, particles, effects, tools)
-    ├── bloom.js, camera.js       # Post-processing + pan/zoom
-    ├── render.js                 # 60fps render loop
-    ├── websocket.js              # WS + applyStatus()
-    ├── api.js, panels.js         # API calls + UI panel logic
-    └── init.js                   # Boot + keyboard shortcuts
-```
+**checkpoint.py** — Task-level state persistence for crash recovery. Saves `OrchestratorState` to `plans/{plan_id}_checkpoint.json` at each dispatch boundary. Uses atomic write for crash safety. On resume, in-flight tasks reset to pending.
+
+**content_scanner.py** — Scans agent-written artifacts for secrets, credentials, and malicious patterns before inclusion in output.
+
+## Dashboard
+
+Two views share the same WebSocket data:
+
+- **City view** (`/`) — Isometric Sim City SNES-style pixel art. Agent programs walk between 12 buildings, enter through animated doors. Day/night cycle, weather, building upgrades.
+- **Flow view** (`/flow`) — Holographic node graph with force-directed layout against a void background with depth particles and pulsing hex grid.
+
+The dashboard is composed from `templates/` via Jinja2 `{% include %}` directives, served as a single HTML response per view. 20 panel overlays in `templates/components/panels/`. Canvas rendering split across 17 `draw_*.js` modules.
 
 Node hierarchy: NEXUS (master, 36px) → SENTINEL (manager, 28px) → DRONE (worker, 22px) → PROBE (reviewer, 18px) → SHARD (parallel sub-agent, 16px).
+
+## Testing Patterns
+
+**Critical: module stubbing in conftest.py.** The orchestrator imports `status_bridge`, `model_config`, `tracking`, `tools`, `checkpoint`, `agent_registry`, and `rag` at module level — all of which have import-time side effects (DB init, network calls). `tests/conftest.py` replaces these with `ModuleType` stubs via `sys.modules.setdefault()` BEFORE `import orchestrator`. When adding new test files that import `orchestrator`, they must go through `conftest.py` (pytest auto-loads it) or replicate the stubbing.
+
+Key test fixtures: `parsed_simple_plan`, `parsed_complex_plan` (parse fixture plans), `mock_llm_pass`/`mock_llm_fail` (patch `orchestrator.llm`), `make_base_state()` (builds minimal `OrchestratorState` dict). Test fixtures live in `tests/fixtures/`.
+
+Smoke tests (`test_smoke.py`) use Playwright and require `serve.py` to be running. They auto-start the server if not reachable. Marked with `@pytest.mark.smoke`.
 
 ## Plan Schema
 
@@ -80,8 +101,20 @@ Plans are markdown files with sections: `## Objective`, `## Sub-Agents` (### AGE
 - `NORT_SERVER` env var — bridge target URL (default `http://localhost:8000`). `QUARM_SERVER` also accepted.
 - `NORT_SECRET` env var — optional shared secret for bridge-to-server auth. `QUARM_SECRET` also accepted.
 - `.env` file — must contain `OPENAI_API_KEY` and `OPENAI_BASE_URL`
+- `config.json` — server-side config: allowed models, tolerance settings, webhook URL, active preset
+- `agents/registry.json` — persistent agent definitions, performance history, version history
 - LLM model is auto-selected at runtime; optional `- model:` field in plan.md overrides per agent/task
 
 ## Review Flow
 
 Tasks follow: `pending → in_progress → in_manager_review → in_specialist_review → done`. On FAIL/FLAG from either gate, the task loops back to `revision` status and the sub-agent re-executes with consolidated feedback. After `MAX_REVISIONS`, the result is force-accepted. Custom reviewers defined in `plan.md` override builtins with the same name.
+
+### Tolerance Precedence (highest wins)
+
+1. `config.json` per-agent override
+2. Task-level `- tolerance:` field in plan.md
+3. Plan per-agent override
+4. `config.json` global setting (`default_tolerance`)
+5. `DEFAULT_TOLERANCE` constant (6)
+
+Agents with `avg_score > 8` over 5+ tasks earn a `+1` tolerance bonus. Tasks scoring 9+ at manager review can skip the specialist panel (`skip_specialist_on_high_score` config toggle).
