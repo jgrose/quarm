@@ -37,6 +37,29 @@
 - [x] Multi-session backend — per-session state isolation via threading.local() in status_bridge, session_id wired from plan_id through orchestrator
 - [x] Agent list panel — left-side drawer showing all active agents grouped by plan/session with live status, task assignments, and session switching
 - [x] Session switching — click a plan in agent list to switch canvas, chat, and stats to that session; multiple concurrent plans supported
+- [x] Unit & integration test suite — 30 tests covering plan parser, routing, status bridge, tolerance, review integration (pytest)
+- [x] Playwright smoke tests — 6 headless browser tests verifying page load, canvas, FPS > 30, WebSocket, keyboard shortcuts, health endpoint
+- [x] FPS monitoring & profiling — per-system timing with EMA smoothing, performance overlay panel (press P), canvas + HTML dual rendering
+- [x] WebSocket hardening — exponential backoff (1s-30s + jitter), heartbeat ping/pong (30s/10s timeout), console.warn error logging, connection status API
+- [x] City state persistence — building upgrades and node positions saved to localStorage (`nort_city_state`) with 24h TTL, restored on page load
+- [x] Render optimizations — glow cache cap (500), force simulation settled-skip, building/program viewport culling, bloom conditional skip, offscreen grid canvas
+- [x] Cost tracking per agent — COSTS panel with LIVE (per-agent bar chart from WebSocket) and HISTORY (drill-down by run) tabs, `$` keyboard shortcut
+- [x] Task dependency visualization — animated dashed bezier lines between dependent programs, "BLOCKED 0/2" badge, `d` toggle, Settings panel row
+- [x] Output browser in dashboard — file tree + syntax-highlighted preview, `/api/artifacts/{plan_id}` endpoint
+- [x] Download output as zip — streaming ZIP via `/api/artifacts/{plan_id}/download`, button in output browser
+- [x] Review analytics dashboard — reviewer pass/fail rates, score distribution, tolerance override frequency
+- [x] Per-task tolerance — `- tolerance:` field on tasks, precedence chain (config per-agent > task-level > plan per-agent > config global > DEFAULT)
+- [x] Adaptive tolerance — auto-suggest adjustments based on revision history, earned tolerance bonus (+1 for avg_score > 8 over 5+ runs)
+- [x] Tolerance presets — one-click Prototype(8)/Production(5)/Audit(3) profiles in tolerance config panel
+- [x] Conditional review skipping — skip specialist panel for tasks scoring 9+ at manager review (config toggle `skip_specialist_on_high_score`)
+- [x] Agent flow dashboard — `/flow` route with agent-flow holographic style, void background, depth particles, pulsing hex grid, Claude spark logo, free-form force layout
+- [x] Output composition agent — dedicated composition_node reviews assembled project for cross-file coherence
+- [x] Artifact versioning across revisions — revision snapshots stored at `artifacts/{plan_id}/{TASK-ID}/revisions/rev_{N}/`
+- [x] Post-assembly validation — linter/syntax checks on output files (`python -m py_compile`, `node --check`)
+- [x] Team presets — save agent groups as teams for one-click assignment
+- [x] Agent import/export — share agent definitions as JSON
+- [x] Earned tolerance — agents with avg_score > 8 over 5+ tasks auto-earn +1 tolerance bonus
+- [x] DAG panel — task dependency graph visualization
 
 ---
 
@@ -44,14 +67,9 @@
 
 ### Testing & Stability
 - [ ] **End-to-end QA with live plan** — run full orchestrator plan, verify programs walk between buildings correctly, roster shows real names, arrows fire, building upgrades increment
-- [ ] **Performance audit** — profile FPS with all 10+ draw systems active, optimize sprite cache sizes, road tile count, reduce redundant redraws
-- [ ] **Error resilience** — graceful handling when WebSocket disconnects mid-run, reconnect and restore city state
-- [ ] **Save/persist city state** — building upgrades, XP/levels, layout to localStorage or server so progress survives refresh
-- [ ] **Automated smoke tests** — headless browser test that loads the page, verifies no JS console errors, checks FPS > 30
 
 ### Orchestrator Core
 - [ ] **Plan preview mode** — when typing a plan description, ghost-highlight which buildings will activate and which agents will spawn
-- [ ] **Task dependency visualization** — show dependency chains as visual connections between tasks/programs, blocked tasks shown with lock icon
 - [ ] **Parallel execution indicators** — when multiple tasks run simultaneously, show visual "lightning bolt" connections between active programs
 - [ ] **Review chain animation** — when task moves through review stages, show the program physically carrying a "document" sprite between buildings
 - [ ] **Failure recovery visualization** — when a task fails and retries, show program walking to Derezzed Zone then back to Code Forge with "revision" badge
@@ -59,23 +77,12 @@
 - [ ] **Plan templates** — save successful plans as reusable templates, suggest templates when plan description matches
 - [ ] **Sub-task decomposition** — allow agents to break large tasks into sub-tasks at runtime, spawning child programs
 - [ ] **Inter-agent communication** — agents can request information from other agents mid-task via a message-passing building (Comms Tower)
-- [ ] **Cost tracking per agent** — show token spend per agent in the registry, flag expensive agents
 
 ### Review & Quality Gate Enhancements
-- [ ] **Review analytics dashboard** — visualize reviewer pass/fail rates, average scores, tolerance override frequency per reviewer to help calibrate settings
-- [ ] **Per-task tolerance** — allow `- tolerance:` field on individual tasks (e.g., prototype tasks get lenient reviews, auth tasks stay strict)
-- [ ] **Adaptive tolerance** — auto-suggest tolerance adjustments based on revision history (reviewer consistently overridden = prompt to raise tolerance)
-- [ ] **Tolerance presets** — one-click profiles (Prototype=8, Production=5, Audit=3) in the UI instead of manual slider tweaking
 - [ ] **Review override visualization** — surface tolerance overrides in the city (visual indicator when a review is auto-passed vs genuinely passed)
 - [ ] **Reviewer calibration mode** — run a "dry review" on past task outputs to test how tolerance changes would affect outcomes before applying to live runs
-- [ ] **Conditional review skipping** — skip specialist panel entirely for tasks scoring 9+ at manager review (high-confidence fast path)
 
 ### Output & Deliverables
-- [ ] **Output browser in dashboard** — browse/preview assembled output files from the web UI, syntax-highlighted code viewer
-- [ ] **Download output as zip** — one-click download of the assembled output folder from the dashboard
-- [ ] **Artifact versioning across revisions** — track file diffs between revision cycles so you can see what changed when a reviewer flagged a task
-- [ ] **Post-assembly validation** — run linters/syntax checks on output files (e.g. `python -m py_compile`, `node --check`) and report errors before declaring done
-- [ ] **Output composition agent** — after all tasks complete, a dedicated agent reviews the assembled project for cross-file coherence (imports match, configs reference correct paths, README matches actual structure)
 - [ ] **Auto-generate project scaffolding** — emit a Makefile, setup script, or docker-compose that runs the assembled output based on detected file types
 
 ### Security & Sandboxing
@@ -88,10 +95,7 @@
 - [ ] **Agent versioning** — track description/tool changes over time, rollback to previous versions
 - [ ] **Agent cloning** — duplicate an existing agent as a starting point for a variant
 - [ ] **Agent retirement** — soft-delete agents that consistently underperform (avg_score < 4 after 5+ runs)
-- [ ] **Team presets** — save groups of agents that work well together as a "team" for one-click assignment
-- [ ] **Agent import/export** — share agent definitions as JSON, import from other NORT instances
 - [ ] **Skill tree** — agents unlock new tools or capabilities after reaching certain XP/performance thresholds
-- [ ] **Earned tolerance** — agents with consistently high review scores (avg > 8 over 5+ tasks) auto-earn higher tolerance, reducing review friction for proven performers
 
 ---
 
@@ -180,21 +184,21 @@
 
 ## Architecture Considerations
 
-- **Performance**: With 10+ draw systems, monitor FPS. Consider offscreen canvas caching for static elements (roads, trees) that don't change per frame.
+- **Performance**: ~~With 10+ draw systems, monitor FPS.~~ FPS profiler added (press P). ~~Consider offscreen canvas caching for static elements.~~ Offscreen grid canvas implemented. Glow cache capped at 500. Force simulation auto-pauses when settled. Viewport culling active for buildings and programs.
 - **State management**: Currently all state is in global JS variables. Consider a simple event bus for state changes to reduce coupling between draw modules.
-- **Code organization**: The `draw_locations.js` file is now ~1100 lines. Consider splitting into `draw_roads.js`, `draw_trees.js`, `draw_location_sprites.js`.
-- **Testing**: No automated tests exist for the canvas rendering. Consider screenshot-comparison tests or at least smoke tests that verify the render loop doesn't crash.
+- **Code organization**: The `draw_locations.js` file is now ~1300 lines. Consider splitting into `draw_roads.js`, `draw_trees.js`, `draw_location_sprites.js`.
+- **Testing**: ~~No automated tests exist.~~ 78 pytest tests (unit, integration, tolerance, validation, error recovery) + 6 Playwright smoke tests. Consider screenshot-comparison tests for visual regression.
 - **Accessibility**: The dashboard is entirely visual. Add ARIA live regions for event log, screen reader state descriptions.
-- **Bundle size**: ~6000+ lines inlined via Jinja2 includes. Consider esbuild/rollup build step for minification.
+- **Bundle size**: ~8000+ lines inlined via Jinja2 includes. Consider esbuild/rollup build step for minification.
 - **TypeScript**: Original `agent-flow/` has TS sources. Migrate growing JS to TS for type safety on complex state machines.
-- **Database**: File-based JSON (`registry.json`, `queue.json`). Migrate to SQLite if multi-user/concurrent access needed.
-- **WebSocket versioning**: Add `version` field to WS messages for backward compatibility.
+- **Database**: File-based JSON (`registry.json`, `queue.json`). SQLite used for tracking (runs, scores, tolerance overrides). Migrate remaining JSON to SQLite if multi-user/concurrent access needed.
+- **WebSocket versioning**: Add `version` field to WS messages for backward compatibility. ~~No reconnect logic.~~ Exponential backoff + heartbeat ping/pong implemented.
 - **Plugin architecture**: Draw modules should register with render loop instead of hardcoded in render.js.
-- **Memory**: Sprite caches grow unbounded. Add LRU eviction or size limits.
-- **Worker threads**: Move force simulation and sprite rendering to Web Workers for consistent 60fps.
+- **Memory**: ~~Sprite caches grow unbounded.~~ Glow cache capped at 500 with batch eviction. Text measurement cache capped at 2000. Consider LRU for other caches.
+- **Worker threads**: Move force simulation and sprite rendering to Web Workers for consistent 60fps. ~~Force runs every frame.~~ Force auto-skips when settled (velocity < 0.5 for 60 frames).
 - **Security**: Agent descriptions are user-editable and injected into LLM prompts — sanitize to prevent prompt injection.
 - **Rate limiting**: No rate limiting on API endpoints. Add if exposed beyond localhost.
 - **Multi-session memory**: `_sessions` dict in frontend and per-session dicts in `status_bridge.py` grow unbounded. Add max session count with LRU eviction for completed sessions.
-- **Session state serialization**: Currently `switchSession()` clears and rebuilds the entire canvas. Consider serializing/restoring node positions to avoid layout jitter on switch.
+- **Session state serialization**: ~~City state lost on refresh.~~ Node positions and building state persisted to localStorage with 24h TTL. Consider server-side persistence for cross-device.
 - **Thread safety audit**: Per-session dicts in `status_bridge.py` use `_state_lock` but concurrent plan runs may still race on deque operations. Consider per-session locks for finer granularity.
 - **Structured log migration**: Event log parsing relies on regex against `[AGENT_NAME]` brackets. Migrating to structured log entries from the backend would be more robust and enable richer chat features (timestamps, message types, threading).

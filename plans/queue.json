@@ -10,28 +10,28 @@
     "id": "b4d182e04a87",
     "title": "synthwave_chess",
     "description": "generate a simple chess game in javascript. use a synthwave theme (80s/cyberpunk) for the pieces.",
-    "status": "failed",
+    "status": "running",
     "created_at": "2026-04-02T03:55:37.210337+00:00"
   },
   {
     "id": "b9485d7aa078",
     "title": "Synthwave Checkers",
     "description": "synthwave themed checkers game in python",
-    "status": "running",
+    "status": "failed",
     "created_at": "2026-04-02T04:03:50.878828+00:00"
   },
   {
     "id": "ca6afb4ddce1",
     "title": "dogs_webpage",
     "description": "a single web page about dogs",
-    "status": "running",
+    "status": "failed",
     "created_at": "2026-04-02T04:04:08.393595+00:00"
   },
   {
     "id": "66dcec9a4c40",
     "title": "sparky_short_story",
     "description": "a short story about a man and his best friend an AI named sparky",
-    "status": "done",
+    "status": "running",
     "created_at": "2026-04-02T04:04:24.815851+00:00"
   }
 ]

@@ -139,156 +139,26 @@ function saveToleranceAgent(name, value) {
 }
 
 async function loadReviewStats() {
-  try {
-    var res = await fetch('/api/review-stats');
-    if (!res.ok) throw new Error(await res.text());
-    var data = await res.json();
-    renderReviewAnalytics(data);
-  } catch (e) {
-    console.error('loadReviewStats:', e);
-    var body = document.getElementById('reviewAnalyticsBody');
-    if (body) body.innerHTML = '<div style="color:var(--state-error);font-size:11px;text-align:center;padding:20px">Failed to load review data</div>';
-  }
+  var data = await _apiGet('/api/review-stats', 'loadReviewStats');
+  if (data) { renderReviewAnalytics(data); }
+  else { var body = document.getElementById('reviewAnalyticsBody'); if (body) body.innerHTML = '<div style="color:var(--state-error);font-size:11px;text-align:center;padding:20px">Failed to load review data</div>'; }
 }
 
 // ── Agent Registry API ────────────────────────────────────────────────────
 
 async function fetchAgentVersions(agentType, name) {
-  try {
-    var res = await fetch('/api/agents/' + agentType + '/' + name + '/versions');
-    if (!res.ok) return [];
-    var data = await res.json();
-    return data.versions || [];
-  } catch (e) {
-    console.error('fetchAgentVersions:', e);
-    return [];
-  }
+  var data = await _apiGet('/api/agents/' + agentType + '/' + name + '/versions', 'fetchAgentVersions');
+  return data ? (data.versions || []) : [];
 }
+async function rollbackAgent(agentType, name, version) { return _apiPostJson('/api/agents/' + agentType + '/' + name + '/rollback', { version: version }, 'rollbackAgent'); }
+async function cloneAgent(agentType, name, newName) { return _apiPostJson('/api/agents/' + agentType + '/' + name + '/clone', newName ? { new_name: newName } : {}, 'cloneAgent'); }
+async function retireAgent(agentType, name, retired) { return _apiPostJson('/api/agents/' + agentType + '/' + name + '/retire', { retired: retired }, 'retireAgent'); }
 
-async function rollbackAgent(agentType, name, version) {
-  try {
-    var res = await fetch('/api/agents/' + agentType + '/' + name + '/rollback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version: version })
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('rollbackAgent:', e);
-    return null;
-  }
-}
+async function fetchTeams() { var data = await _apiGet('/api/teams', 'fetchTeams'); return data ? (data.teams || []) : []; }
+async function createTeam(spec) { return _apiPostJson('/api/teams', spec, 'createTeam'); }
+async function deleteTeam(name) { await _apiDelete('/api/teams/' + name, 'deleteTeam'); }
+async function fetchTeamPresets() { var data = await _apiGet('/api/teams/presets', 'fetchTeamPresets'); return data ? (data.presets || []) : []; }
+async function applyTeamPreset(presetName, teamName) { return _apiPostJson('/api/teams/presets/' + presetName + '/apply', { team_name: teamName }, 'applyTeamPreset'); }
 
-async function cloneAgent(agentType, name, newName) {
-  try {
-    var body = newName ? { new_name: newName } : {};
-    var res = await fetch('/api/agents/' + agentType + '/' + name + '/clone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('cloneAgent:', e);
-    return null;
-  }
-}
-
-async function retireAgent(agentType, name, retired) {
-  try {
-    var res = await fetch('/api/agents/' + agentType + '/' + name + '/retire', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ retired: retired })
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('retireAgent:', e);
-    return null;
-  }
-}
-
-async function fetchTeams() {
-  try {
-    var res = await fetch('/api/teams');
-    if (!res.ok) return [];
-    var data = await res.json();
-    return data.teams || [];
-  } catch (e) {
-    console.error('fetchTeams:', e);
-    return [];
-  }
-}
-
-async function createTeam(spec) {
-  try {
-    var res = await fetch('/api/teams', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(spec)
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('createTeam:', e);
-    return null;
-  }
-}
-
-async function deleteTeam(name) {
-  try {
-    await fetch('/api/teams/' + name, { method: 'DELETE' });
-  } catch (e) {
-    console.error('deleteTeam:', e);
-  }
-}
-
-async function fetchTeamPresets() {
-  try {
-    var res = await fetch('/api/teams/presets');
-    if (!res.ok) return [];
-    var data = await res.json();
-    return data.presets || [];
-  } catch (e) {
-    console.error('fetchTeamPresets:', e);
-    return [];
-  }
-}
-
-async function applyTeamPreset(presetName, teamName) {
-  try {
-    var res = await fetch('/api/teams/presets/' + presetName + '/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ team_name: teamName })
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('applyTeamPreset:', e);
-    return null;
-  }
-}
-
-async function exportAgentsData() {
-  try {
-    var res = await fetch('/api/agents/export');
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  } catch (e) {
-    console.error('exportAgentsData:', e);
-    return null;
-  }
-}
-
-async function importAgentsData(data, overwrite) {
-  try {
-    var res = await fetch('/api/agents/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: data, overwrite: overwrite })
-    });
-    return await res.json();
-  } catch (e) {
-    console.error('importAgentsData:', e);
-    return null;
-  }
-}
+async function exportAgentsData() { return _apiGet('/api/agents/export', 'exportAgentsData'); }
+async function importAgentsData(data, overwrite) { return _apiPostJson('/api/agents/import', { data: data, overwrite: overwrite }, 'importAgentsData'); }

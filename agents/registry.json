@@ -4,46 +4,173 @@
       "name": "general_developer",
       "tags": [
         "code",
+        "devops",
+        "execute_code",
+        "fullstack",
         "general",
-        "fullstack"
+        "javascript",
+        "read_file",
+        "tdd",
+        "web_search",
+        "write_file"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
-      "runs": 0,
-      "avg_score": 0,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:31:34.493985+00:00",
+      "runs": 2,
+      "avg_score": 6.5,
+      "total_revisions": 2,
       "builtin": false,
       "title": "General Developer",
-      "description": "Versatile full-stack developer. Handles any coding task.",
+      "description": "Versatile developer responsible for implementing chess game logic \u2014 piece movement rules, turn management, check/checkmate detection, move validation, and game state management. Produces complete JavaScript modules.",
       "tools": [
         "write_file",
         "read_file",
         "execute_code",
         "web_search"
-      ]
+      ],
+      "versions": [
+        {
+          "name": "general_developer",
+          "tags": [
+            "code",
+            "general",
+            "fullstack"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-01T21:15:27.226860+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "General Developer",
+          "description": "Versatile full-stack developer. Handles any coding task.",
+          "tools": [
+            "write_file",
+            "read_file",
+            "execute_code",
+            "web_search"
+          ],
+          "version": 1,
+          "timestamp": "2026-04-02T04:31:27.689909+00:00"
+        },
+        {
+          "name": "general_developer",
+          "tags": [
+            "code",
+            "devops",
+            "fullstack",
+            "general",
+            "tdd"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-02T04:31:27.699695+00:00",
+          "runs": 2,
+          "avg_score": 6.5,
+          "total_revisions": 2,
+          "builtin": false,
+          "title": "General Developer",
+          "description": "Versatile full-stack developer. Handles any coding task including Python, JavaScript, databases, APIs, and infrastructure. Expert in test-driven development and CI/CD pipelines.",
+          "tools": [
+            "write_file",
+            "read_file",
+            "execute_code",
+            "web_search"
+          ],
+          "tasks_passed": 1,
+          "rejection_rate": 0.5,
+          "last_task_at": "2026-04-02T04:31:27.699693+00:00",
+          "tasks_failed": 1,
+          "version": 2,
+          "timestamp": "2026-04-02T04:31:34.493983+00:00"
+        }
+      ],
+      "tasks_passed": 1,
+      "rejection_rate": 0.5,
+      "last_task_at": "2026-04-02T04:31:27.699693+00:00",
+      "tasks_failed": 1
     },
     "frontend_developer": {
       "name": "frontend_developer",
       "tags": [
-        "frontend",
-        "ui",
-        "html",
         "css",
+        "frontend",
+        "html",
         "javascript",
-        "react"
+        "react",
+        "read_file",
+        "ui",
+        "web_search",
+        "write_file"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
+      "updated_at": "2026-04-02T04:31:34.492369+00:00",
       "runs": 0,
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false,
       "title": "Frontend Developer",
-      "description": "Expert in HTML, CSS, JavaScript, React, responsive design.",
+      "description": "Expert frontend developer responsible for building the HTML structure, CSS synthwave styling, and core UI layout of the chess board and pieces. Produces complete HTML/CSS files with neon gradients, glow effects, retro grid patterns, and responsive layout.",
       "tools": [
         "write_file",
         "read_file",
         "web_search"
+      ],
+      "versions": [
+        {
+          "name": "frontend_developer",
+          "tags": [
+            "frontend",
+            "ui",
+            "html",
+            "css",
+            "javascript",
+            "react"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-01T21:15:27.226860+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "Frontend Developer",
+          "description": "Expert in HTML, CSS, JavaScript, React, responsive design.",
+          "tools": [
+            "write_file",
+            "read_file",
+            "web_search"
+          ],
+          "version": 1,
+          "timestamp": "2026-04-02T04:31:34.475784+00:00"
+        },
+        {
+          "name": "frontend_developer",
+          "tags": [
+            "css",
+            "frontend",
+            "html",
+            "javascript",
+            "react",
+            "read_file",
+            "ui",
+            "web_search",
+            "write_file"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-02T04:31:34.475793+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "Frontend Developer",
+          "description": "Frontend specialist responsible for building the complete single-page HTML/CSS/JS file about dogs, including responsive layout, visual design, and interactive elements.",
+          "tools": [
+            "write_file",
+            "read_file",
+            "web_search"
+          ],
+          "version": 2,
+          "timestamp": "2026-04-02T04:31:34.492364+00:00"
+        }
       ]
     },
     "backend_developer": {
@@ -73,23 +200,52 @@
     "technical_writer": {
       "name": "technical_writer",
       "tags": [
+        "api_docs",
         "documentation",
-        "writing",
+        "read_file",
         "readme",
-        "api_docs"
+        "web_search",
+        "write_file",
+        "writing"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:22:20.952398+00:00",
+      "updated_at": "2026-04-02T04:31:34.476295+00:00",
       "runs": 0,
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false,
       "title": "Technical Writer",
-      "description": "Creates clear documentation, READMEs, guides, and API docs.",
+      "description": "Content specialist responsible for researching and writing engaging, accurate copy about dogs \u2014 breeds, facts, care tips, and section descriptions.",
       "tools": [
         "write_file",
         "read_file",
         "web_search"
+      ],
+      "versions": [
+        {
+          "name": "technical_writer",
+          "tags": [
+            "documentation",
+            "writing",
+            "readme",
+            "api_docs"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-01T21:22:20.952398+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "Technical Writer",
+          "description": "Creates clear documentation, READMEs, guides, and API docs.",
+          "tools": [
+            "write_file",
+            "read_file",
+            "web_search"
+          ],
+          "version": 1,
+          "timestamp": "2026-04-02T04:31:34.476293+00:00"
+        }
       ]
     },
     "security_auditor": {
@@ -233,24 +389,52 @@
     "tech_lead": {
       "name": "tech_lead",
       "tags": [
-        "technical",
+        "architecture",
         "code",
-        "architecture"
+        "frontend",
+        "technical"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
+      "updated_at": "2026-04-02T04:31:34.495001+00:00",
       "runs": 0,
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false,
       "title": "Technical Lead",
-      "description": "Reviews code quality, architecture decisions, testing strategy, and production readiness.",
+      "description": "Owns overall code quality, architecture coherence, and correctness of the chess engine logic. Ensures the game logic is bug-free, the code is clean, and the frontend and logic integrate seamlessly.",
       "expertise_blend": [
         "architecture",
         "code_quality",
         "testing",
         "performance",
         "security"
+      ],
+      "versions": [
+        {
+          "name": "tech_lead",
+          "tags": [
+            "technical",
+            "code",
+            "architecture"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-01T21:15:27.226860+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "Technical Lead",
+          "description": "Reviews code quality, architecture decisions, testing strategy, and production readiness.",
+          "expertise_blend": [
+            "architecture",
+            "code_quality",
+            "testing",
+            "performance",
+            "security"
+          ],
+          "version": 1,
+          "timestamp": "2026-04-02T04:31:34.494999+00:00"
+        }
       ]
     },
     "project_manager": {
@@ -461,9 +645,9 @@
         "documentation"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:09:01.001358+00:00",
-      "runs": 16,
-      "avg_score": 6.11,
+      "updated_at": "2026-04-02T04:33:10.446763+00:00",
+      "runs": 17,
+      "avg_score": 6.1,
       "total_revisions": 0,
       "builtin": true,
       "title": "End-User Representative",
@@ -482,7 +666,10 @@
         "dashboard",
         "api",
         "frontend"
-      ]
+      ],
+      "tasks_passed": 1,
+      "rejection_rate": 0.0,
+      "last_task_at": "2026-04-02T04:33:10.446757+00:00"
     },
     "creative_director": {
       "name": "creative_director",

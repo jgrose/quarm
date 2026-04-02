@@ -29,13 +29,15 @@ function setConfigValue(key, value) {
   syncConfigUI();
 }
 
-function switchConfigTab(tab, btn) {
-  document.querySelectorAll('.cfg-tab').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('.cfg-tab-content').forEach(function(s) { s.classList.remove('active'); });
+function _switchTab(tabClass, contentClass, prefix, tab, btn) {
+  document.querySelectorAll('.' + tabClass).forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.' + contentClass).forEach(function(s) { s.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  var section = document.getElementById('cfgTab-' + tab);
+  var section = document.getElementById(prefix + tab);
   if (section) section.classList.add('active');
 }
+
+function switchConfigTab(tab, btn) { _switchTab('cfg-tab', 'cfg-tab-content', 'cfgTab-', tab, btn); }
 
 var _qualityPresets = {
   low:    { shadowQuality: 'off', bloomQuality: 'off', particles: false, maxParticles: 10, maxEffects: 5, maxTrailLength: 10, edgeDetail: 4, weather: false, hexGrid: false, completionFx: false, lodEnabled: true, viewportCulling: true },
@@ -253,14 +255,20 @@ function _updateBuildingDetailIfNeeded() {
   }
 }
 
+// ── Shared panel toggle helper ──────────────────────────────────────────────
+
+function _togglePanel(panelId, btnId) {
+  var panel = document.getElementById(panelId);
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+  var btn = document.getElementById(btnId);
+  if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
+}
+
 // ── Agent List Panel ────────────────────────────────────────────────────────
 
 function toggleAgentList() {
-  var panel = document.getElementById('agentListPanel');
-  var btn = document.getElementById('agentListToggle');
-  if (!panel) return;
-  panel.classList.toggle('collapsed');
-  if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
+  _togglePanel('agentListPanel', 'agentListToggle');
 }
 
 function renderAgentList() {
@@ -296,23 +304,11 @@ function renderAgentList() {
             done + '/' + total + ' ' + phase.toUpperCase() + '</span>';
     html += '</div>';
 
-    // Build categorized agent lists
-    var managers = d.managers || [];
-    var subAgents = d.sub_agents || [];
-    var reviewers = d.reviewers || [];
     var tasks = d.tasks || [];
-
-    // Managers (sentinels)
-    for (var i = 0; i < managers.length; i++) {
-      html += _renderAgentRow(managers[i], 'sentinel', tasks);
-    }
-    // Sub-agents (drones)
-    for (var i = 0; i < subAgents.length; i++) {
-      html += _renderAgentRow(subAgents[i], 'drone', tasks);
-    }
-    // Reviewers (probes)
-    for (var i = 0; i < reviewers.length; i++) {
-      html += _renderAgentRow(reviewers[i], 'probe', tasks);
+    var roster = [['sentinel', d.managers], ['drone', d.sub_agents], ['probe', d.reviewers]];
+    for (var ri = 0; ri < roster.length; ri++) {
+      var agents = roster[ri][1] || [];
+      for (var ai = 0; ai < agents.length; ai++) html += _renderAgentRow(agents[ai], roster[ri][0], tasks);
     }
 
     html += '</div>';
@@ -358,13 +354,9 @@ function _findTaskForAgent(agentName, tasks) {
 // ── Agent Chat (Event Log) ──────────────────────────────────────────────────
 
 function toggleChat() {
+  _togglePanel('eventLog', 'chatToggle');
   var panel = document.getElementById('eventLog');
-  var btn = document.getElementById('chatToggle');
-  if (!panel) return;
-  panel.classList.toggle('collapsed');
-  var isCollapsed = panel.classList.contains('collapsed');
-  if (btn) btn.innerHTML = isCollapsed ? '&#x25B6;' : '&#x25C0;';
-  if (isCollapsed) closePlansList();
+  if (panel && panel.classList.contains('collapsed')) closePlansList();
 }
 
 // ── Chat Plan Tabs ─────────────────────────────────────────────────────────
@@ -1191,13 +1183,7 @@ function showVerdict(verdict) {
 
 // ── Ledger Rendering ────────────────────────────────────────────────────────
 
-function switchLedgerTab(tab, btn) {
-  document.querySelectorAll('.ledger-tab').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('.ledger-section').forEach(function(s) { s.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
-  var section = document.getElementById('ledger-' + tab);
-  if (section) section.classList.add('active');
-}
+function switchLedgerTab(tab, btn) { _switchTab('ledger-tab', 'ledger-section', 'ledger-', tab, btn); }
 
 function renderLedger(costs, scores) {
   var body = document.getElementById('ledgerBody');
