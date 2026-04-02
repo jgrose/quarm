@@ -137,11 +137,13 @@ function drawBlockedIndicators(ctx, time) {
       drawY = prog.y;
     } else if (info.agent) {
       // Find program by agent name
-      for (var j = 0; j < ambientPrograms.length; j++) {
-        if (ambientPrograms[j].agentName === info.agent) {
-          drawX = ambientPrograms[j].x;
-          drawY = ambientPrograms[j].y;
-          break;
+      if (typeof ambientPrograms !== 'undefined') {
+        for (var j = 0; j < ambientPrograms.length; j++) {
+          if (ambientPrograms[j].agentName === info.agent) {
+            drawX = ambientPrograms[j].x;
+            drawY = ambientPrograms[j].y;
+            break;
+          }
         }
       }
       if (drawX === undefined) continue;
@@ -201,6 +203,7 @@ function drawBlockedIndicators(ctx, time) {
 // ─── Helpers ───
 
 function _findProgramForTask(taskId) {
+  if (typeof ambientPrograms === 'undefined') return null;
   for (var i = 0; i < ambientPrograms.length; i++) {
     if (ambientPrograms[i].assignedTask && ambientPrograms[i].assignedTask.id === taskId) {
       return ambientPrograms[i];

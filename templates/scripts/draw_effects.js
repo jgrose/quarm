@@ -54,7 +54,7 @@ function drawEffects(ctx, dt) {
       }
 
       // Sound
-      if (config.sound && fx.age <= dt * 1.5) {
+      if (config.sound && fx.age <= dt * 1.5 && typeof playAgentSpawn === 'function') {
         playAgentSpawn();
       }
     }
@@ -95,7 +95,7 @@ function drawEffects(ctx, dt) {
       ctx.stroke();
 
       // Sound
-      if (config.sound && fx.age <= dt * 1.5) {
+      if (config.sound && fx.age <= dt * 1.5 && typeof playAgentComplete === 'function') {
         playAgentComplete();
       }
     }
@@ -139,7 +139,7 @@ function drawEffects(ctx, dt) {
       }
 
       // Sound
-      if (config.sound && fx.age <= dt * 1.5) {
+      if (config.sound && fx.age <= dt * 1.5 && typeof playError === 'function') {
         playError();
       }
     }

@@ -2,6 +2,12 @@
 // Simplified render loop for the /flow agent-graph view.
 // Draws only the node graph — no buildings, programs, weather, atmosphere, minimap.
 
+// Globals normally declared in render.js (city view) — declare here for flow standalone
+if (typeof dpr === 'undefined') var dpr = 1;
+if (typeof _canvas === 'undefined') var _canvas = null;
+if (typeof _ctx === 'undefined') var _ctx = null;
+if (typeof bloomRenderer === 'undefined') var bloomRenderer = new BloomRenderer();
+
 var _flowLastFrame = 0;
 var _flowTime = 0;
 
