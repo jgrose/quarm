@@ -1,186 +1,157 @@
-# Agent Status Dashboard — Agent-Flow Visual Style
+# README.md Rewrite Plan
 
 ## Context
 
-The user needs a way to see agent status clearly. The current NORT dashboard is an isometric city with buildings, walking programs, weather, and day/night — visually rich but agent status is buried across multiple panels. The `agent-flow/` directory contains a separate React/Canvas2D visualization with a clean holographic node-graph style focused on agent execution flow.
+The current README.md is outdated — it only describes the orchestrator's 4-layer architecture, built-in reviewers, and basic CLI usage. It doesn't mention the live dashboard, WebSocket integration, 54 API endpoints, 20 dashboard panels, sessions, agent registry, tolerance system, cost tracking, or any of the 60+ features shipped. The install instructions reference `langchain-anthropic` when the codebase uses `langchain-openai`. The "Extending" section lists features that are all now implemented.
 
-**Goal**: Create a new `/flow` route that renders an agent-flow-style dashboard using the same WebSocket data, reusing existing draw modules where possible. No isometric city — pure node graph focused on agent status.
+**Goal**: Rewrite README.md to comprehensively document the current state of NORT — scannable in 30 seconds, actionable quickstart in < 5 minutes, with full feature coverage.
 
-**Architecture decision**: New Jinja2 page with vanilla JS (not React). The NORT dashboard already ported ~80% of agent-flow's canvas rendering to vanilla JS (bloom, hex nodes, edges, particles, effects, tool cards, bubbles). The delta is small. Adding React/Vite would introduce a build toolchain the project doesn't use.
+## Approach
 
----
+Single agent rewrites `README.md` in place. No other files modified. The agent reads current source files for accuracy and uses the exploration data below.
 
-## What Gets Reused (no modification needed)
+## File to Modify
 
-These existing NORT scripts already contain agent-flow's visual effects:
+- `/home/localuser/projects/quarm/README.md` — full rewrite
 
-| Module | Agent-Flow Equivalent | Notes |
-|--------|----------------------|-------|
-| `bloom.js` | `bloom-renderer.ts` | Same multi-pass blur, additive blend |
-| `draw_agents.js` | `draw-agents.ts` | Hex nodes, glows, state colors, badges |
-| `draw_edges.js` | `draw-edges.ts` | Tapered bezier curves, particle trails |
-| `draw_effects.js` | `draw-effects.ts` | Spawn/complete/error VFX |
-| `draw_tools.js` | `draw-tool-calls.ts` | Tool call cards |
-| `draw_bubbles.js` | `draw-bubbles.ts` | Message overlays |
-| `draw_context.js` | Context ring/bar | Token usage visualization |
-| `draw_cost.js` | `draw-cost.ts` | Cost pills per agent |
-| `draw_discoveries.js` | `draw-discoveries.ts` | Discovery cards |
-| `draw_dependencies.js` | N/A (NORT-only) | Task dependency lines |
-| `camera.js` | `use-canvas-camera.ts` | Pan/zoom with inertia |
-| `render_cache.js` | `render-cache.ts` | Glow sprite caching |
-| `colors.js` | `colors.ts` | Holographic palette |
-| `constants.js` | `canvas-constants.ts` | Animation config |
-| `nodes.js` | `agent-types.ts` | Node model + config |
-| `websocket.js` | N/A | WebSocket + applyStatus() |
-| `api.js` | N/A | API fetch helpers |
-| `panels.js` | N/A | Panel UI logic |
+## Source Files to Read for Accuracy
 
-**What gets dropped** (city-only, not included in flow.html):
-`draw_programs.js`, `draw_locations.js`, `draw_atmosphere.js`, `draw_weather.js`, `draw_minimap.js`, `draw_roster.js`, `draw_background.js` (isometric grid portion), `audio.js`
+- `CLAUDE.md` — architecture diagram, node hierarchy, config
+- `roadmap.md` — completed features list (authoritative)
+- `plan.example.md` — canonical plan schema example
+- `serve.py` lines 1-50 — PORT config, imports
+- `orchestrator.py` lines 1-50 — docstring, constants (MAX_REVISIONS, DEFAULT_TOLERANCE)
 
----
+## README Structure (18 sections)
 
-## New Files (4)
+### 1. Hero Block
+- Existing logo image (`assets/images/quarm_logo.png`)
+- One-line tagline: "4-layer multi-agent orchestrator with a Tron-themed isometric city dashboard"
+- Stat badges: `54 API endpoints` | `20 panels` | `78 tests` | `17 canvas systems`
 
-### 1. `templates/flow.html` (~80 lines)
+### 2. Table of Contents
+- Linked anchors for all major sections (10-12 entries)
 
-Page shell modeled after `base.html` but focused on agent status:
+### 3. What is NORT?
+- 3-4 sentence description covering: markdown plan → specialist agents → two quality gates → isometric city dashboard
+- 6 bullet differentiators: LangGraph state machine, two quality gates, dynamic model selection, tolerance system, pixel-art dashboard, checkpoint/resume
+- Two dashboard views: City (`/`) and Flow (`/flow`)
 
-**Includes (HTML panels):**
-- `components/top_bar.html` — connection status, session tabs, stats
-- Agent detail card (inline glass-card)
-- `components/event_log.html` — agent chat
-- `components/panels/agent_list.html` — agent status sidebar
-- `components/panels/cost_panel.html` — token breakdown
-- `components/panels/config.html` — settings (display toggles)
-- `components/panels/perf_panel.html` — FPS monitoring
+### 4. Quickstart
+- **Prerequisites**: Python 3.11+, OpenAI-compatible LLM endpoint
+- **Install**: `pip install langgraph langchain langchain-openai python-dotenv fastapi uvicorn python-multipart jinja2`
+- **.env**: `OPENAI_API_KEY` + `OPENAI_BASE_URL`
+- **Generate a plan**: `python generate_plan.py "description"`
+- **Run with dashboard**: Terminal 1: `python serve.py` / Terminal 2: `python orchestrator.py plan.md` / Browser: `http://localhost:8000/`
+- **Run headless**: `python orchestrator.py plan.md` → `results.json`
 
-**Does NOT include**: queue, thinking, completion, ledger, plan_viewer, model_config, tolerance_config, transcript, timeline, file_attention, roster, agents registry, output_browser, review_analytics, DAG panel
+### 5. Architecture
+- ASCII data flow diagram (from CLAUDE.md): `generate_plan.py → plan.md → orchestrator.py → results.json` with `status_bridge.py → serve.py → browser` branch
+- 4-layer pipeline diagram (from current README, cleaned up): MASTER → SUB-AGENT → MANAGER REVIEW → SPECIALIST REVIEW → DONE
+- File map table (13 Python files with one-line purpose each)
 
-**Includes (JS scripts — ~20 of the 29):**
-- `colors.js`, `constants.js`, `render_cache.js`, `nodes.js`, `force.js`
-- `draw_agents.js`, `draw_edges.js`, `draw_effects.js`, `draw_tools.js`, `draw_bubbles.js`, `draw_context.js`, `draw_cost.js`, `draw_dependencies.js`, `draw_discoveries.js`
-- `bloom.js`, `camera.js`
-- `websocket.js`, `api.js`, `panels.js`
-- **NEW**: `flow_background.js`, `flow_render.js`, `flow_init.js`
+### 6. Plan Format
+- Four sections: `## Objective`, `## Sub-Agents`, `## Managers`, `## Tasks`, optional `## Custom Reviewers`
+- Condensed inline example (1 agent, 1 manager, 2 tasks with dependency)
+- Field reference tables for tasks, agents, managers
+- Mention `python validate_plan.py plan.md` for validation
 
-### 2. `templates/scripts/flow_background.js` (~60 lines)
+### 7. Quality Gates
+- Task lifecycle: `pending → in_progress → in_manager_review → in_specialist_review → done`
+- Revision loop: FAIL/FLAG → consolidated feedback → sub-agent revises (MAX_REVISIONS=3)
+- Built-in reviewers table (security_engineer, ux_designer, user_tester) — keep from current README
+- Custom reviewers — keep from current README
+- **Tolerance system**: precedence chain, earned bonus (+1 for avg > 8 over 5+ runs), specialist skip (score >= 9), presets (Prototype/Production/Audit)
 
-Stripped-down background with agent-flow's void aesthetic:
-- Background color: `#050510` (deep void)
-- Depth particles: reuse the `initDepthParticles()` / `drawDepthParticles()` functions from `draw_background.js` (copy the ~40 lines of depth particle code)
-- Hex grid: pulsing hexagonal grid from agent-flow (distance-based alpha with `Math.sin(time * 0.5 + dist * 0.005)`), NOT the isometric diamond grid
-- No isometric tiles, no offscreen canvas caching (those are city-only)
+### 8. Dashboard — City View (`/`)
+- One-paragraph description of the isometric Sim City SNES-style pixel art city
+- Key visual features as bullets:
+  - 11 Tron-themed buildings (table: 6 idle + 5 work with task-state mapping)
+  - 5 agent tiers (NEXUS 36px → SHARD 16px)
+  - 6 ambient programs with walking, bunker entry, light cycle trails
+  - Day/night cycle (120s), weather (data rain + lightning storms)
+  - Building upgrades at task thresholds (3/7/15)
+  - Bloom post-processing, depth particles
 
-### 3. `templates/scripts/flow_render.js` (~100 lines)
+### 9. Dashboard — Flow View (`/flow`)
+- Holographic node graph with void background (#050510)
+- Claude spark logo on NEXUS, free-form force layout
+- Same WebSocket data, focused on agent status
+- "CITY VIEW" button to switch back
 
-Simplified render loop (vs the 250-line `render.js`):
+### 10. Dashboard Panels & Shortcuts
+- Table of all 20 panels with keyboard shortcut and one-line purpose
+- Full keyboard shortcut reference: Q, R, M, A, C, L, P, D, $, ?, ESC
 
-```
-function flowRender(timestamp) {
-  // dt, currentTime calculation
-  // FPS sampling (reuse _fps, _frameCount pattern)
-  // Clear to #050510
-  // Draw flow background (depth particles + hex grid)
-  // Apply camera transform
-  // Draw edges (drawAllEdges)
-  // Draw particles (drawAllParticles)
-  // Draw agents (drawAllAgents) 
-  // Draw context bars (drawAllContextBars)
-  // Draw tool cards (drawAllToolCards)
-  // Draw bubbles (drawAllBubbles)
-  // Draw discoveries (drawAllDiscoveries)
-  // Draw dependencies (drawDependencyLines, drawBlockedIndicators)
-  // Draw cost pills (drawAllCostPills)
-  // Draw effects (drawEffects)
-  // Tick force simulation (free mode)
-  // Apply bloom
-  // FPS badge (if perfOverlay)
-  // requestAnimationFrame(flowRender)
-}
-```
+### 11. Canvas Systems
+- Table of 17 draw modules with one-line descriptions
+- Note: 60fps render loop, bloom post-processing, render caching, viewport culling, idle pause
 
-Key difference from `render.js`: no buildings, programs, weather, atmosphere, minimap, roster badges. Just the agent node graph.
+### 12. API Reference
+- Grouped endpoint tables (HTTP method | path | description):
+  - Plan Management (7 endpoints)
+  - Sessions (3)
+  - Agents (12)
+  - Teams (5)
+  - Analytics (5)
+  - Artifacts & Output (7)
+  - Configuration (6)
+  - RAG (2)
+  - Approvals (2)
+  - Models (2)
+  - System (2: health, WebSocket)
 
-### 4. `templates/scripts/flow_init.js` (~80 lines)
+### 13. Agent Tools
+- Table of available tools: read_file, write_file, execute_code, browse_url, web_search, etc.
+- Tool approval system (execute_code requires human approval)
+- Content scanning for secrets/injection patterns
 
-Boot script for the flow page:
-- Initialize canvas + camera
-- Set `config.flowMode = true` (used by force.js to skip zone attraction)
-- Set background to void color
-- Connect WebSocket (reuses `connectWS()` from websocket.js)
-- Register keyboard shortcuts (subset: Q, C, L, A, P, $, ESC)
-- Add "CITY VIEW" button in top bar linking back to `/`
-- Start `flowRender()` loop
+### 14. Configuration
+- Environment variables table (NORT_PORT, NORT_SERVER, NORT_SECRET, OPENAI_API_KEY, OPENAI_BASE_URL)
+- config.json overview (tolerance, models, webhook)
+- Agent registry (`agents/registry.json`)
 
----
+### 15. Testing
+- `pytest tests/` — 78 tests in 0.10s
+- Test file list with categories
+- Note: conftest.py stubs all external dependencies for isolation
 
-## Modified Files (4)
+### 16. Project Structure
+- Directory tree showing: Python files, templates/, tests/, agents/, plans/, artifacts/, output/
 
-### 1. `serve.py` — Add `/flow` route (3 lines)
+### 17. results.json
+- Output format example (keep from current README, add artifacts and validation fields)
+- Revision count as quality signal
 
-After the existing root route (around line 394):
-```python
-@app.get("/flow", response_class=HTMLResponse)
-async def flow_view(request: Request):
-    return templates.TemplateResponse(request, "flow.html", {"port": PORT})
-```
+### 18. Security
+- Content scanner, path traversal prevention, tool approval, sandbox mode
 
-### 2. `templates/scripts/force.js` — Add free layout mode (~6 lines)
+## What Gets Removed from Current README
 
-At lines 41-48 (zone attraction block), wrap in a config check:
-```javascript
-if (!config.flowMode) {
-  // Zone attraction — pull toward zone's Y band
-  var targetY = zoneH * (n.zone + 1);
-  ...
-}
-```
-When `config.flowMode` is true, nodes use pure charge/spring layout without zone banding — same physics as agent-flow's D3-force.
+- **"Extending" section** — all 5 items are now implemented (parallel reviewers, real tools, checkpointing, human-in-loop, quality metrics)
+- **Incorrect install** — `langchain-anthropic` → `langchain-openai`, `ANTHROPIC_API_KEY` → `OPENAI_API_KEY`
 
-### 3. `templates/scripts/draw_agents.js` — Add Claude spark logo (~25 lines)
+## What Gets Kept from Current README
 
-Port the `drawClaudeSpark()` function from `agent-flow/web/components/agent-visualizer/canvas/draw-agents.ts:16-27`:
-- Add `CLAUDE_SPARK_D` SVG path constant (from `draw-misc.ts:68`)
-- Add `_claudeSparkPath = null` lazy Path2D cache
-- Add `drawClaudeSpark(ctx, cx, cy, r, color)` function
-- In the main agent draw function, when `config.flowMode && node.tier === 'nexus'`, draw spark instead of current icon
+- Logo image reference
+- 4-layer architecture ASCII diagram (cleaned up)
+- Built-in reviewers table
+- Reviewer assignment guide
+- Custom reviewers section
+- results.json example (expanded)
 
-### 4. `templates/styles/base.css` — Add `.flow-page` styles (~30 lines)
+## Execution
 
-```css
-.flow-page { background: #050510; }
-.flow-page #canvasWrap { background: transparent; }
-.flow-page .top-bar-actions button { /* agent-flow glass style */ }
-```
+**Single agent** — one Engineer agent rewrites README.md. No parallelization needed since it's a single file. The agent should:
 
----
-
-## Parallelization
-
-**Two agents, single wave:**
-
-| Agent | Files | Scope |
-|-------|-------|-------|
-| **Flow-Shell** | `serve.py`, `flow.html`, `flow_init.js`, `flow_background.js` | Route, page shell, boot, background |
-| **Flow-Render** | `flow_render.js`, `force.js`, `draw_agents.js`, `base.css` | Render loop, force mode, spark logo, styles |
-
-**File conflict**: None. Each agent touches completely separate files.
-
-**Dependency**: Flow-Render needs to know that `flow_background.js` exports `drawFlowBackground(ctx, W, H, time)` and `initFlowParticles(W, H)` — just the function signatures.
-
----
+1. Read: `README.md`, `CLAUDE.md`, `roadmap.md` (completed section), `plan.example.md`, `serve.py` (first 50 lines + grep for all route decorators), `orchestrator.py` (first 50 lines)
+2. Write the full README.md following the 18-section structure above
+3. Verify: no broken markdown, all sections present, accurate install instructions
 
 ## Verification
 
-1. Start `serve.py`, navigate to `http://localhost:8000/flow`
-2. See void background with depth particles and pulsing hex grid
-3. Run an orchestrator plan — agents appear as hexagonal nodes with state colors
-4. NEXUS node shows Claude spark logo
-5. Edges connect managers to agents with particle trails
-6. Tool cards appear near active agents
-7. Nodes use free-form layout (no zone banding)
-8. Press `C` for chat, `L` for agent list, `$` for costs — panels work
-9. Press `P` — FPS badge appears
-10. Click "CITY VIEW" to return to main dashboard at `/`
-11. Run `python3 -m pytest tests/ -v --ignore=tests/test_smoke.py` — no regressions
+1. Read the output README.md and verify all 18 sections are present
+2. Confirm install command matches actual dependencies (`langchain-openai`, not `langchain-anthropic`)
+3. Confirm API endpoint count matches (grep `@app.` in serve.py)
+4. Confirm keyboard shortcuts match init.js
+5. Confirm building count matches draw_locations.js LOCATION_DEFS

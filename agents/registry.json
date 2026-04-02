@@ -103,9 +103,9 @@
         "write_file"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:31:34.492369+00:00",
-      "runs": 0,
-      "avg_score": 0,
+      "updated_at": "2026-04-02T04:34:16.608265+00:00",
+      "runs": 1,
+      "avg_score": 7.0,
       "total_revisions": 0,
       "builtin": false,
       "title": "Frontend Developer",
@@ -171,7 +171,10 @@
           "version": 2,
           "timestamp": "2026-04-02T04:31:34.492364+00:00"
         }
-      ]
+      ],
+      "tasks_passed": 1,
+      "rejection_rate": 0.0,
+      "last_task_at": "2026-04-02T04:34:16.608261+00:00"
     },
     "backend_developer": {
       "name": "backend_developer",
@@ -440,23 +443,50 @@
     "project_manager": {
       "name": "project_manager",
       "tags": [
-        "management",
         "delivery",
+        "html",
+        "management",
         "requirements"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T21:15:27.226860+00:00",
+      "updated_at": "2026-04-02T04:33:41.902849+00:00",
       "runs": 0,
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false,
-      "title": "Project Manager",
-      "description": "Ensures deliverables meet requirements, are well-structured, and ready for stakeholders.",
+      "title": "Project Delivery Lead",
+      "description": "Ensures the HTML file meets the exact requirements \u2014 bold text, no CSS, no JS, valid HTML.",
       "expertise_blend": [
         "requirements",
         "delivery",
         "quality",
         "communication"
+      ],
+      "versions": [
+        {
+          "name": "project_manager",
+          "tags": [
+            "management",
+            "delivery",
+            "requirements"
+          ],
+          "created_at": "2026-04-01T21:15:27.226860+00:00",
+          "updated_at": "2026-04-01T21:15:27.226860+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "title": "Project Manager",
+          "description": "Ensures deliverables meet requirements, are well-structured, and ready for stakeholders.",
+          "expertise_blend": [
+            "requirements",
+            "delivery",
+            "quality",
+            "communication"
+          ],
+          "version": 1,
+          "timestamp": "2026-04-02T04:33:41.902829+00:00"
+        }
       ]
     },
     "cinematics_lead": {
@@ -611,9 +641,9 @@
         "frontend"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:15:52.360167+00:00",
-      "runs": 14,
-      "avg_score": 7.06,
+      "updated_at": "2026-04-02T04:41:11.623505+00:00",
+      "runs": 18,
+      "avg_score": 5.72,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior UX/UI Designer",
@@ -634,7 +664,10 @@
         "dashboard",
         "form",
         "user_flow"
-      ]
+      ],
+      "tasks_failed": 4,
+      "rejection_rate": 1.0,
+      "last_task_at": "2026-04-02T04:41:11.623494+00:00"
     },
     "user_tester": {
       "name": "user_tester",
@@ -645,10 +678,10 @@
         "documentation"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:33:10.446763+00:00",
-      "runs": 17,
-      "avg_score": 6.1,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:41:54.911748+00:00",
+      "runs": 21,
+      "avg_score": 5.8,
+      "total_revisions": 1,
       "builtin": true,
       "title": "End-User Representative",
       "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
@@ -667,9 +700,10 @@
         "api",
         "frontend"
       ],
-      "tasks_passed": 1,
-      "rejection_rate": 0.0,
-      "last_task_at": "2026-04-02T04:33:10.446757+00:00"
+      "tasks_passed": 3,
+      "rejection_rate": 0.4,
+      "last_task_at": "2026-04-02T04:41:54.911741+00:00",
+      "tasks_failed": 2
     },
     "creative_director": {
       "name": "creative_director",
@@ -680,10 +714,10 @@
         "elegance"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:10:57.649743+00:00",
-      "runs": 28,
-      "avg_score": 5.7,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:42:36.394645+00:00",
+      "runs": 36,
+      "avg_score": 5.42,
+      "total_revisions": 1,
       "builtin": true,
       "title": "Creative Director",
       "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
@@ -706,7 +740,11 @@
         "user_flow",
         "backend",
         "documentation"
-      ]
+      ],
+      "tasks_failed": 4,
+      "rejection_rate": 0.5,
+      "last_task_at": "2026-04-02T04:42:36.394635+00:00",
+      "tasks_passed": 4
     },
     "devils_advocate": {
       "name": "devils_advocate",
@@ -717,9 +755,9 @@
         "review"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:14:31.344631+00:00",
-      "runs": 55,
-      "avg_score": 5.86,
+      "updated_at": "2026-04-02T04:42:09.618702+00:00",
+      "runs": 59,
+      "avg_score": 5.61,
       "total_revisions": 0,
       "builtin": true,
       "title": "Devil's Advocate",
@@ -744,7 +782,10 @@
         "ui",
         "frontend",
         "user_flow"
-      ]
+      ],
+      "tasks_failed": 4,
+      "rejection_rate": 1.0,
+      "last_task_at": "2026-04-02T04:42:09.618694+00:00"
     },
     "performance_engineer": {
       "name": "performance_engineer",
@@ -755,9 +796,9 @@
         "optimization"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:15:38.876328+00:00",
-      "runs": 45,
-      "avg_score": 6.02,
+      "updated_at": "2026-04-02T04:40:45.154910+00:00",
+      "runs": 49,
+      "avg_score": 5.71,
       "total_revisions": 0,
       "builtin": true,
       "title": "Performance Engineer",
@@ -778,7 +819,11 @@
         "backend",
         "infrastructure",
         "config"
-      ]
+      ],
+      "tasks_passed": 1,
+      "rejection_rate": 0.75,
+      "last_task_at": "2026-04-02T04:40:45.154902+00:00",
+      "tasks_failed": 3
     },
     "code_reviewer": {
       "name": "code_reviewer",
