@@ -741,7 +741,12 @@ var TREE_POLE = [
   [0,0,7,7,0,0],
 ];
 
-var TREE_TYPES = [TREE_CRYSTAL, TREE_BUSH, TREE_POLE];
+// Marker arrays for new geometric-only types (no pixel data, just need unique refs)
+var TREE_OBELISK = [[1]];
+var TREE_ARC_LAMP = [[2]];
+
+var TREE_TYPES = [TREE_CRYSTAL, TREE_BUSH, TREE_POLE, TREE_OBELISK, TREE_ARC_LAMP];
+// type 0=crystal, 1=bush, 2=streetlight, 3=obelisk, 4=arc lamp
 
 // Fixed tree placements (col, row, typeIndex, glowColor)
 // type 0=crystal, 1=bush, 2=streetlight
@@ -811,6 +816,24 @@ var TREE_PLACEMENTS = [
   { col: 26, row: 45, type: 1, glow: '#66ffaa' },
   { col: 24, row: 47, type: 0, glow: '#66ffaa' },
   { col: 26, row: 47, type: 0, glow: '#66ffaa' },
+  // ─── Obelisks (type 3) — data monoliths ───
+  { col: 22, row: 8,  type: 3, glow: '#aaeeff' },
+  { col: 28, row: 8,  type: 3, glow: '#aaeeff' },
+  { col: 13, row: 24, type: 3, glow: '#cc88ff' },
+  { col: 37, row: 24, type: 3, glow: '#cc88ff' },
+  { col: 20, row: 44, type: 3, glow: '#66ffaa' },
+  { col: 30, row: 44, type: 3, glow: '#66ffaa' },
+  { col: 6,  row: 36, type: 3, glow: '#ff8866' },
+  { col: 44, row: 36, type: 3, glow: '#ff8866' },
+  // ─── Arc lamps (type 4) — modern curved streetlights ───
+  { col: 22, row: 18, type: 4, glow: '#66ccff' },
+  { col: 28, row: 18, type: 4, glow: '#66ccff' },
+  { col: 10, row: 30, type: 4, glow: '#cc88ff' },
+  { col: 40, row: 30, type: 4, glow: '#cc88ff' },
+  { col: 18, row: 40, type: 4, glow: '#66ffaa' },
+  { col: 32, row: 40, type: 4, glow: '#66ffaa' },
+  { col: 15, row: 20, type: 4, glow: '#ffbb44' },
+  { col: 35, row: 20, type: 4, glow: '#ffbb44' },
 ];
 
 var _treeCache = {};
@@ -836,72 +859,202 @@ function _initTrees() {
   }
 }
 
-function _renderTreeSprite(tree) {
-  var key = tree.glow + '_t' + TREE_TYPES.indexOf(tree.sprite);
-  if (_treeCache[key]) return _treeCache[key];
+// ─── Polygonal Tron-style tree rendering (direct canvas draw) ───
 
-  var frame = tree.sprite;
-  var rows = frame.length;
-  var cols = frame[0].length;
-  var px = LOC_PX * 0.8; // trees at 80% of building pixel size
-  var c = document.createElement('canvas');
-  c.width = Math.ceil(cols * px);
-  c.height = Math.ceil(rows * px);
-  var cx = c.getContext('2d');
-  cx.imageSmoothingEnabled = false;
+function _drawTreeCrystal(ctx, x, y, glow, time) {
+  // Diamond spire — tall crystal growing from ground
+  var h = 36, w = 14;
+  ctx.save();
+  // Spire body (diamond)
+  ctx.beginPath();
+  ctx.moveTo(x, y - h);           // top point
+  ctx.lineTo(x + w / 2, y - h * 0.35); // right shoulder
+  ctx.lineTo(x + w * 0.3, y);     // right base
+  ctx.lineTo(x - w * 0.3, y);     // left base
+  ctx.lineTo(x - w / 2, y - h * 0.35); // left shoulder
+  ctx.closePath();
+  ctx.fillStyle = hexToRgba(glow, 0.08);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(glow, 0.6);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Inner edge line
+  ctx.beginPath();
+  ctx.moveTo(x, y - h);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = hexToRgba(glow, 0.2);
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  // Bright tip
+  ctx.beginPath();
+  ctx.arc(x, y - h, 2, 0, Math.PI * 2);
+  ctx.fillStyle = hexToRgba(glow, 0.9);
+  ctx.fill();
+  ctx.restore();
+}
 
-  var gr = parseInt(tree.glow.slice(1,3),16);
-  var gg = parseInt(tree.glow.slice(3,5),16);
-  var gb = parseInt(tree.glow.slice(5,7),16);
-
-  for (var r = 0; r < rows; r++) {
-    for (var cl = 0; cl < cols; cl++) {
-      var v = frame[r][cl];
-      if (v === 0) continue;
-      var fr, fg, fb;
-      switch (v) {
-        case 7: fr = Math.floor(gr*0.08); fg = Math.floor(gg*0.08); fb = Math.floor(gb*0.08+15); break;
-        case 2: fr = Math.floor(gr*0.12+8); fg = Math.floor(gg*0.12+8); fb = Math.floor(gb*0.12+18); break;
-        case 1: fr = Math.floor(gr*0.18+15); fg = Math.floor(gg*0.18+15); fb = Math.floor(gb*0.18+30); break;
-        case 5: fr = Math.floor(gr*0.3+25); fg = Math.floor(gg*0.3+25); fb = Math.floor(gb*0.3+45); break;
-        case 8: fr = Math.floor(gr*0.5); fg = Math.floor(gg*0.5); fb = Math.floor(gb*0.5); break;
-        case 4: fr = gr; fg = gg; fb = gb; break;
-        case 6: fr = Math.min(255,Math.floor(gr*0.8+100)); fg = Math.min(255,Math.floor(gg*0.8+100)); fb = Math.min(255,Math.floor(gb*0.8+100)); break;
-        default: fr = gr; fg = gg; fb = gb;
-      }
-      cx.fillStyle = 'rgb(' + fr + ',' + fg + ',' + fb + ')';
-      cx.fillRect(Math.floor(cl * px), Math.floor(r * px), Math.ceil(px), Math.ceil(px));
-    }
+function _drawTreeBush(ctx, x, y, glow, time) {
+  // Hexagonal data node — low geometric cluster
+  var r = 10, h = 8;
+  ctx.save();
+  // Hex shape
+  ctx.beginPath();
+  for (var i = 0; i < 6; i++) {
+    var angle = (Math.PI / 3) * i - Math.PI / 6;
+    var px = x + Math.cos(angle) * r;
+    var py = y - h / 2 + Math.sin(angle) * r * 0.5; // squashed for iso
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
+  ctx.closePath();
+  ctx.fillStyle = hexToRgba(glow, 0.06);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(glow, 0.5);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(x, y - h / 2, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = hexToRgba(glow, 0.7);
+  ctx.fill();
+  ctx.restore();
+}
 
-  _treeCache[key] = c;
-  return c;
+function _drawTreePole(ctx, x, y, glow, time) {
+  // Light pole — vertical line with glowing top
+  var h = 50;
+  ctx.save();
+  // Pole shaft
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y - h);
+  ctx.strokeStyle = hexToRgba(glow, 0.3);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Lamp glow
+  var pulse = 0.6 + Math.sin(time * 2 + x * 0.01) * 0.2;
+  ctx.beginPath();
+  ctx.arc(x, y - h, 3, 0, Math.PI * 2);
+  ctx.fillStyle = hexToRgba(glow, pulse);
+  ctx.fill();
+  // Light cone (subtle triangle beneath lamp)
+  ctx.beginPath();
+  ctx.moveTo(x - 8, y - h + 12);
+  ctx.lineTo(x, y - h + 2);
+  ctx.lineTo(x + 8, y - h + 12);
+  ctx.closePath();
+  ctx.fillStyle = hexToRgba(glow, 0.04);
+  ctx.fill();
+  ctx.restore();
+}
+
+function _drawTreeObelisk(ctx, x, y, glow, time) {
+  // Tall narrow monolith — rectangular slab with beveled top edge
+  var w = 6, h = 44;
+  var pulse = 0.5 + Math.sin(time * 1.5 + y * 0.02) * 0.15;
+  ctx.save();
+  // Main slab
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2, y);               // bottom-left
+  ctx.lineTo(x - w / 2, y - h + 4);       // top-left below bevel
+  ctx.lineTo(x, y - h);                    // apex
+  ctx.lineTo(x + w / 2, y - h + 4);       // top-right below bevel
+  ctx.lineTo(x + w / 2, y);               // bottom-right
+  ctx.closePath();
+  ctx.fillStyle = hexToRgba(glow, 0.06);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(glow, 0.5);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Vertical circuit line
+  ctx.beginPath();
+  ctx.moveTo(x, y - 4);
+  ctx.lineTo(x, y - h + 6);
+  ctx.strokeStyle = hexToRgba(glow, 0.3 * pulse);
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Data dots along the circuit line
+  for (var d = 0; d < 3; d++) {
+    var dotY = y - 10 - d * 10;
+    if (dotY < y - h + 8) break;
+    ctx.beginPath();
+    ctx.arc(x, dotY, 1, 0, Math.PI * 2);
+    ctx.fillStyle = hexToRgba(glow, 0.5 + d * 0.15);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function _drawTreeArcLamp(ctx, x, y, glow, time) {
+  // Modern arc lamp — curved arm with hanging light
+  var h = 46, armLen = 16;
+  var pulse = 0.55 + Math.sin(time * 2.5 + x * 0.02) * 0.25;
+  ctx.save();
+  // Vertical shaft
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y - h);
+  ctx.strokeStyle = hexToRgba(glow, 0.3);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Curved arm (quadratic bezier arching right)
+  ctx.beginPath();
+  ctx.moveTo(x, y - h);
+  ctx.quadraticCurveTo(x + armLen * 0.8, y - h - 4, x + armLen, y - h + 6);
+  ctx.strokeStyle = hexToRgba(glow, 0.35);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Hanging light at arm tip
+  var lampX = x + armLen, lampY = y - h + 6;
+  ctx.beginPath();
+  ctx.moveTo(lampX - 3, lampY);
+  ctx.lineTo(lampX, lampY + 5);
+  ctx.lineTo(lampX + 3, lampY);
+  ctx.closePath();
+  ctx.fillStyle = hexToRgba(glow, pulse);
+  ctx.fill();
+  // Ground light pool (ellipse)
+  ctx.beginPath();
+  ctx.ellipse(lampX, y, 10, 3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = hexToRgba(glow, 0.03);
+  ctx.fill();
+  // Base plate
+  ctx.beginPath();
+  ctx.moveTo(x - 5, y);
+  ctx.lineTo(x + 5, y);
+  ctx.strokeStyle = hexToRgba(glow, 0.4);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+var _treeDrawFuncs = [_drawTreeCrystal, _drawTreeBush, _drawTreePole, _drawTreeObelisk, _drawTreeArcLamp];
+
+function drawSingleTree(ctx, t, time) {
+  var typeIdx = TREE_TYPES.indexOf(t.sprite);
+  var fn = _treeDrawFuncs[typeIdx] || _drawTreeCrystal;
+  fn(ctx, t.x, t.y, t.glow, time);
 }
 
 function drawTrees(ctx, time) {
   _initTrees();
   if (!_treeObjects.length) return;
+  // Trees are now drawn from drawAmbientPrograms for proper depth sorting.
+  // This function is kept as a fallback if programs haven't initialized yet.
+  if (ambientPrograms && ambientPrograms.length > 0) return;
 
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+  var treeView = (typeof getVisibleRect === 'function') ? getVisibleRect(
+    (document.getElementById('canvas') || {}).width / (window.devicePixelRatio || 1) || 800,
+    (document.getElementById('canvas') || {}).height / (window.devicePixelRatio || 1) || 600
+  ) : null;
+  var treeMargin = 60;
 
   for (var i = 0; i < _treeObjects.length; i++) {
     var t = _treeObjects[i];
-    var sprite = _renderTreeSprite(t);
-    var drawX = Math.floor(t.x - sprite.width / 2);
-    var drawY = Math.floor(t.y - sprite.height + LOC_PX);
-
-    // Subtle glow
-    ctx.save();
-    ctx.shadowColor = t.glow;
-    ctx.shadowBlur = 6;
-    ctx.drawImage(sprite, drawX, drawY);
-    ctx.shadowBlur = 0;
-    ctx.drawImage(sprite, drawX, drawY);
-    ctx.restore();
+    if (treeView && (t.x < treeView.x - treeMargin || t.x > treeView.x + treeView.w + treeMargin ||
+        t.y < treeView.y - treeMargin || t.y > treeView.y + treeView.h + treeMargin)) continue;
+    drawSingleTree(ctx, t, time);
   }
-
-  ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════
@@ -972,14 +1125,21 @@ function drawAllLocations(ctx, W, H, time, dt) {
   drawTrees(ctx, time);
 
   // 3. Buildings (depth-sorted by y — back to front, viewport culled)
-  var locView = (typeof getVisibleRect === 'function') ? getVisibleRect(W, H) : { x: 0, y: 0, w: W, h: H };
-  var locMargin = 100;
-  var sorted = gridLocations.slice().sort(function(a, b) { return a.y - b.y; });
-  for (var i = 0; i < sorted.length; i++) {
-    var loc = sorted[i];
-    if (loc.x < locView.x - locMargin || loc.x > locView.x + locView.w + locMargin ||
-        loc.y < locView.y - locMargin || loc.y > locView.y + locView.h + locMargin) continue;
-    _drawSingleLocation(ctx, loc, time);
+  // When programs are active, buildings are drawn from drawAmbientPrograms for proper z-ordering
+  if (typeof ambientPrograms === 'undefined' || !ambientPrograms.length) {
+    var locView = (typeof getVisibleRect === 'function') ? getVisibleRect(W, H) : { x: 0, y: 0, w: W, h: H };
+    var locMargin = 100;
+    if (!drawAllLocations._sorted || drawAllLocations._sortLen !== gridLocations.length) {
+      drawAllLocations._sorted = gridLocations.slice().sort(function(a, b) { return a.y - b.y; });
+      drawAllLocations._sortLen = gridLocations.length;
+    }
+    var sorted = drawAllLocations._sorted;
+    for (var i = 0; i < sorted.length; i++) {
+      var loc = sorted[i];
+      if (loc.x < locView.x - locMargin || loc.x > locView.x + locView.w + locMargin ||
+          loc.y < locView.y - locMargin || loc.y > locView.y + locView.h + locMargin) continue;
+      _drawSingleLocation(ctx, loc, time);
+    }
   }
 
   // 4. Task flow arrows between buildings
@@ -989,6 +1149,7 @@ function drawAllLocations(ctx, W, H, time, dt) {
 }
 
 function _drawSingleLocation(ctx, loc, time) {
+  var sq = config.shadowQuality || 'high';
   var sprite = _renderLocationSprite(loc);
 
   // Animation modulation
@@ -1004,15 +1165,15 @@ function _drawSingleLocation(ctx, loc, time) {
   var drawX = Math.floor(loc.x - sprite.width / 2);
   var drawY = Math.floor(loc.y - sprite.height + LOC_PX * 4);
 
-  // Glow pass
+  // Glow + crisp pass (shadow quality aware)
   ctx.save();
   ctx.globalAlpha *= animAlpha;
-  ctx.shadowColor = loc.glowColor;
-  ctx.shadowBlur = 14;
-  ctx.drawImage(sprite, drawX, drawY);
-
-  // Crisp pass on top
-  ctx.shadowBlur = 0;
+  if (sq !== 'off') {
+    ctx.shadowColor = loc.glowColor;
+    ctx.shadowBlur = sq === 'low' ? 5 : 14;
+    ctx.drawImage(sprite, drawX, drawY);
+    ctx.shadowBlur = 0;
+  }
   ctx.drawImage(sprite, drawX, drawY);
   ctx.restore();
 
@@ -1045,8 +1206,7 @@ function _drawSingleLocation(ctx, loc, time) {
     ];
     ctx.save();
     ctx.fillStyle = hexToRgba(loc.glowColor, 0.7);
-    ctx.shadowColor = loc.glowColor;
-    ctx.shadowBlur = 6;
+    if (sq !== 'off') { ctx.shadowColor = loc.glowColor; ctx.shadowBlur = sq === 'low' ? 3 : 6; }
     for (var cd = 0; cd < cDots.length; cd++) {
       ctx.beginPath();
       ctx.arc(loc.x + cDots[cd].dx, loc.y + cDots[cd].dy, 2, 0, Math.PI * 2);
@@ -1066,8 +1226,7 @@ function _drawSingleLocation(ctx, loc, time) {
     ctx.lineTo(antennaX, antennaBaseY - LOC_PX * 3);
     ctx.stroke();
     ctx.fillStyle = hexToRgba(loc.glowColor, 0.9);
-    ctx.shadowColor = loc.glowColor;
-    ctx.shadowBlur = 4;
+    if (sq !== 'off') { ctx.shadowColor = loc.glowColor; ctx.shadowBlur = sq === 'low' ? 2 : 4; }
     ctx.beginPath();
     ctx.arc(antennaX, antennaBaseY - LOC_PX * 3 - 2, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -1079,8 +1238,7 @@ function _drawSingleLocation(ctx, loc, time) {
     ctx.save();
     ctx.strokeStyle = hexToRgba(loc.glowColor, ringPulse);
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = loc.glowColor;
-    ctx.shadowBlur = 8;
+    if (sq !== 'off') { ctx.shadowColor = loc.glowColor; ctx.shadowBlur = sq === 'low' ? 4 : 8; }
     var ringW = sprite.width * 0.9;
     var ringH = sprite.width * 0.45;
     drawIsoDiamond(ctx, loc.x, loc.y + LOC_PX, ringW, ringH);
@@ -1088,18 +1246,31 @@ function _drawSingleLocation(ctx, loc, time) {
     ctx.restore();
   }
 
-  // Ground light pool
+  // Ground shadow diamond (anchors building to iso grid)
+  var groundW = sprite.width * 0.75;
+  var groundH = groundW * 0.5;
   ctx.fillStyle = hexToRgba(loc.glowColor, 0.06);
-  var gw = Math.ceil(sprite.width * 0.7);
-  ctx.fillRect(Math.floor(loc.x - gw / 2), Math.floor(loc.y + 6), gw, LOC_PX * 2);
+  drawIsoDiamond(ctx, loc.x, loc.y + LOC_PX, groundW, groundH);
+  ctx.fill();
 
-  // Label
+  // Label — larger with dark background pill
   ctx.save();
-  ctx.fillStyle = hexToRgba(loc.glowColor, 0.65);
-  ctx.font = '10px monospace';
+  var labelSize = 13;
+  if (config.lodEnabled && camera.zoom < 0.8) {
+    labelSize = Math.round(13 / Math.max(camera.zoom, 0.25));
+  }
+  ctx.font = 'bold ' + labelSize + 'px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(loc.name, loc.x, loc.y + 14);
+  var labelText = loc.name;
+  var labelY = loc.y + LOC_PX * 3;
+  var tw = ctx.measureText(labelText).width;
+  ctx.fillStyle = 'rgba(5, 5, 16, 0.55)';
+  ctx.beginPath();
+  ctx.roundRect(loc.x - tw / 2 - 6, labelY - 2, tw + 12, labelSize + 6, 3);
+  ctx.fill();
+  ctx.fillStyle = hexToRgba(loc.glowColor, 0.85);
+  ctx.fillText(labelText, loc.x, labelY);
   ctx.restore();
 
   // Active building indicator — pulsing ring when programs are working inside
@@ -1124,7 +1295,7 @@ function _drawSingleLocation(ctx, loc, time) {
     // Task count badge
     ctx.save();
     ctx.fillStyle = hexToRgba(loc.glowColor, 0.8);
-    ctx.font = 'bold 8px monospace';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(activeCount + ' ACTIVE', loc.x, loc.y - sprite.height + LOC_PX * 3);

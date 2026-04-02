@@ -109,10 +109,18 @@ function drawToolCard(ctx, node, tool, index, time) {
 }
 
 function drawAllToolCards(ctx, time) {
+  var _tcView = null;
+  if (config.viewportCulling) {
+    var _tcC = document.getElementById('canvas');
+    var _tcD = window.devicePixelRatio || 1;
+    _tcView = getVisibleRect(_tcC.width / _tcD, _tcC.height / _tcD);
+  }
   for (var entry of nodes) {
     var node = entry[1];
     if (!node.toolCalls || node.toolCalls.length === 0) continue;
     if (node.state === 'done' || node.state === 'failed' || node.state === 'pending') continue;
+    if (_tcView && (node.x < _tcView.x - 120 || node.x > _tcView.x + _tcView.w + 120 ||
+        node.y < _tcView.y - 120 || node.y > _tcView.y + _tcView.h + 120)) continue;
     for (var i = 0; i < node.toolCalls.length; i++) {
       drawToolCard(ctx, node, node.toolCalls[i], i, time);
     }

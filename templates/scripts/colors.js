@@ -46,11 +46,20 @@ function getStateColor(state) {
   return C[state] || C.pending;
 }
 
+var _hexRgbaCache = {};
+var _hexRgbaCacheSize = 0;
+
 function hexToRgba(hex, alpha) {
+  var key = hex + '|' + alpha;
+  if (_hexRgbaCache[key]) return _hexRgbaCache[key];
   var r = parseInt(hex.slice(1, 3), 16);
   var g = parseInt(hex.slice(3, 5), 16);
   var b = parseInt(hex.slice(5, 7), 16);
-  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  var result = 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  if (_hexRgbaCacheSize > 500) { _hexRgbaCache = {}; _hexRgbaCacheSize = 0; }
+  _hexRgbaCache[key] = result;
+  _hexRgbaCacheSize++;
+  return result;
 }
 
 function alphaHex(a) {

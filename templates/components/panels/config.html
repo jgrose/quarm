@@ -1,50 +1,139 @@
 <div id="configOverlay">
   <div class="config-card glass-card" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div class="config-title" style="margin:0">SETTINGS</div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>
         <button class="close-btn" onclick="document.getElementById('configOverlay').classList.remove('visible')">&times;</button>
       </div>
     </div>
-    <div class="config-row">
-      <span class="config-label">BLOOM</span>
-      <div class="cfg-toggle on" data-key="bloom" onclick="toggleConfig('bloom')"></div>
+
+    <!-- Tab bar -->
+    <div class="cfg-tab-bar">
+      <button class="cfg-tab active" onclick="switchConfigTab('display', this)">DISPLAY</button>
+      <button class="cfg-tab" onclick="switchConfigTab('performance', this)">PERFORMANCE</button>
     </div>
-    <div class="config-row">
-      <span class="config-label">HEX GRID</span>
-      <div class="cfg-toggle on" data-key="hexGrid" onclick="toggleConfig('hexGrid')"></div>
+
+    <!-- DISPLAY tab -->
+    <div id="cfgTab-display" class="cfg-tab-content active">
+      <div class="config-row">
+        <span class="config-label">BLOOM</span>
+        <div class="cfg-toggle on" data-key="bloom" onclick="toggleConfig('bloom')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">HEX GRID</span>
+        <div class="cfg-toggle on" data-key="hexGrid" onclick="toggleConfig('hexGrid')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">PARTICLES</span>
+        <div class="cfg-toggle on" data-key="particles" onclick="toggleConfig('particles')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">NODE STATS</span>
+        <div class="cfg-toggle on" data-key="nodeStats" onclick="toggleConfig('nodeStats')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">TOOL CARDS</span>
+        <div class="cfg-toggle on" data-key="toolCards" onclick="toggleConfig('toolCards')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">EDGE LABELS</span>
+        <div class="cfg-toggle on" data-key="edgeLabels" onclick="toggleConfig('edgeLabels')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">COMPLETION FX</span>
+        <div class="cfg-toggle on" data-key="completionFx" onclick="toggleConfig('completionFx')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">SOUND</span>
+        <div class="cfg-toggle" data-key="sound" onclick="toggleConfig('sound')"></div>
+      </div>
+      <div class="config-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,200,255,0.08);">
+        <div class="config-label" style="margin-bottom: 6px;">WEBHOOK URL</div>
+        <div style="display:flex;gap:6px">
+          <input id="webhookInput" type="text" placeholder="https://..." style="flex:1">
+          <button onclick="saveWebhook(document.getElementById('webhookInput').value)">SAVE</button>
+          <button onclick="testWebhook().then(ok => alert(ok ? 'Sent!' : 'Failed'))">TEST</button>
+        </div>
+      </div>
     </div>
-    <div class="config-row">
-      <span class="config-label">PARTICLES</span>
-      <div class="cfg-toggle on" data-key="particles" onclick="toggleConfig('particles')"></div>
-    </div>
-    <div class="config-row">
-      <span class="config-label">NODE STATS</span>
-      <div class="cfg-toggle on" data-key="nodeStats" onclick="toggleConfig('nodeStats')"></div>
-    </div>
-    <div class="config-row">
-      <span class="config-label">TOOL CARDS</span>
-      <div class="cfg-toggle on" data-key="toolCards" onclick="toggleConfig('toolCards')"></div>
-    </div>
-    <div class="config-row">
-      <span class="config-label">EDGE LABELS</span>
-      <div class="cfg-toggle on" data-key="edgeLabels" onclick="toggleConfig('edgeLabels')"></div>
-    </div>
-    <div class="config-row">
-      <span class="config-label">COMPLETION FX</span>
-      <div class="cfg-toggle on" data-key="completionFx" onclick="toggleConfig('completionFx')"></div>
-    </div>
-    <div class="config-row">
-      <span class="config-label">SOUND</span>
-      <div class="cfg-toggle" data-key="sound" onclick="toggleConfig('sound')"></div>
-    </div>
-    <div class="config-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(100,200,255,0.08);">
-      <div class="config-label" style="margin-bottom: 6px;">WEBHOOK URL</div>
-      <div style="display:flex;gap:6px">
-        <input id="webhookInput" type="text" placeholder="https://..." style="flex:1">
-        <button onclick="saveWebhook(document.getElementById('webhookInput').value)">SAVE</button>
-        <button onclick="testWebhook().then(ok => alert(ok ? 'Sent!' : 'Failed'))">TEST</button>
+
+    <!-- PERFORMANCE tab -->
+    <div id="cfgTab-performance" class="cfg-tab-content">
+
+      <!-- Quality Preset -->
+      <div class="config-row">
+        <span class="config-label">QUALITY PRESET</span>
+        <div class="cfg-btn-group" data-cfg="qualityPreset">
+          <button class="cfg-btn" data-val="low" onclick="applyQualityPreset('low')">LOW</button>
+          <button class="cfg-btn" data-val="medium" onclick="applyQualityPreset('medium')">MED</button>
+          <button class="cfg-btn active" data-val="high" onclick="applyQualityPreset('high')">HIGH</button>
+          <button class="cfg-btn" data-val="ultra" onclick="applyQualityPreset('ultra')">ULTRA</button>
+        </div>
+      </div>
+
+      <div class="cfg-section-divider">RENDERING</div>
+
+      <div class="config-row">
+        <span class="config-label">SHADOW QUALITY</span>
+        <div class="cfg-btn-group" data-cfg="shadowQuality">
+          <button class="cfg-btn" data-val="off" onclick="setConfigValue('shadowQuality','off')">OFF</button>
+          <button class="cfg-btn" data-val="low" onclick="setConfigValue('shadowQuality','low')">LOW</button>
+          <button class="cfg-btn active" data-val="high" onclick="setConfigValue('shadowQuality','high')">HIGH</button>
+        </div>
+      </div>
+
+      <div class="config-row">
+        <span class="config-label">BLOOM QUALITY</span>
+        <div class="cfg-btn-group" data-cfg="bloomQuality">
+          <button class="cfg-btn" data-val="off" onclick="setConfigValue('bloomQuality','off')">OFF</button>
+          <button class="cfg-btn" data-val="low" onclick="setConfigValue('bloomQuality','low')">LOW</button>
+          <button class="cfg-btn active" data-val="high" onclick="setConfigValue('bloomQuality','high')">HIGH</button>
+        </div>
+      </div>
+
+      <div class="config-row">
+        <span class="config-label">EDGE DETAIL</span>
+        <div class="cfg-btn-group" data-cfg="edgeDetail">
+          <button class="cfg-btn" data-val="4" onclick="setConfigValue('edgeDetail',4)">LOW</button>
+          <button class="cfg-btn" data-val="8" onclick="setConfigValue('edgeDetail',8)">MED</button>
+          <button class="cfg-btn active" data-val="16" onclick="setConfigValue('edgeDetail',16)">HIGH</button>
+        </div>
+      </div>
+
+      <div class="cfg-section-divider">LIMITS</div>
+
+      <div class="config-row">
+        <span class="config-label">MAX PARTICLES</span>
+        <div class="cfg-range-row">
+          <input type="range" class="cfg-range" data-cfg="maxParticles" min="5" max="100" step="5"
+                 value="50" oninput="setConfigValue('maxParticles', parseInt(this.value))">
+          <span class="cfg-range-value" data-cfg-display="maxParticles">50</span>
+        </div>
+      </div>
+
+      <div class="config-row">
+        <span class="config-label">MAX EFFECTS</span>
+        <div class="cfg-range-row">
+          <input type="range" class="cfg-range" data-cfg="maxEffects" min="5" max="50" step="5"
+                 value="30" oninput="setConfigValue('maxEffects', parseInt(this.value))">
+          <span class="cfg-range-value" data-cfg-display="maxEffects">30</span>
+        </div>
+      </div>
+
+      <div class="cfg-section-divider">OPTIMIZATION</div>
+
+      <div class="config-row">
+        <span class="config-label">VIEWPORT CULLING</span>
+        <div class="cfg-toggle on" data-key="viewportCulling" onclick="toggleConfig('viewportCulling')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">LOD AT DISTANCE</span>
+        <div class="cfg-toggle on" data-key="lodEnabled" onclick="toggleConfig('lodEnabled')"></div>
+      </div>
+      <div class="config-row">
+        <span class="config-label">IDLE PAUSE</span>
+        <div class="cfg-toggle on" data-key="idlePause" onclick="toggleConfig('idlePause')"></div>
       </div>
     </div>
   </div>

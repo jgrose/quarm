@@ -6,6 +6,12 @@ var dpr = 1;
 var bloomRenderer = new BloomRenderer();
 var _canvas = null;
 var _ctx = null;
+var _nodeArr = [];
+
+// ── Idle detection ──
+var _idleFrameCount = 0;
+var _isIdle = false;
+var _lastRenderTime = 0;
 
 // ── FPS counter state ──
 var _frameCount = 0;
@@ -78,6 +84,31 @@ function initCanvas() {
 }
 
 function render(timestamp) {
+  // Idle render throttle: ~4fps when nothing is animating
+  if (config.idlePause) {
+    var idle = _forceSettled &&
+               particles.length === 0 &&
+               effects.length === 0 &&
+               !camera.dragging;
+    if (idle) {
+      for (var _ie of nodes) {
+        if (_ie[1].opacity < 1 || _ie[1].scale < 1) { idle = false; break; }
+      }
+    }
+    if (idle) {
+      _idleFrameCount++;
+      if (_idleFrameCount > 30 && timestamp - _lastRenderTime < 250) {
+        _isIdle = true;
+        requestAnimationFrame(render);
+        return;
+      }
+    } else {
+      _idleFrameCount = 0;
+      _isIdle = false;
+    }
+  }
+  _lastRenderTime = timestamp;
+
   var frameStart = performance.now();
   var dt = Math.min((timestamp - lastFrame) / 1000, ANIM.maxDt) || ANIM.defaultDt;
   lastFrame = timestamp;
@@ -141,7 +172,9 @@ function render(timestamp) {
 
   // Force simulation
   var _t3 = _timeStart();
-  tickForce(Array.from(nodes.values()), edges, W, H, dt);
+  _nodeArr.length = 0;
+  for (var _ne of nodes) _nodeArr.push(_ne[1]);
+  tickForce(_nodeArr, edges, W, H, dt);
   _timeEnd('force', _t3);
 
   // Animate node fade-in
@@ -154,12 +187,12 @@ function render(timestamp) {
   // Draw layers (back to front)
   if (config.hexNodes) {
     var _t4 = _timeStart();
-    drawAllEdges(ctx, currentTime);
+    drawAllEdges(ctx, currentTime, W, H);
     _timeEnd('edges', _t4);
     updateParticles(dt);
     drawAllParticles(ctx, currentTime);
     var _t5 = _timeStart();
-    drawAllAgents(ctx, currentTime);
+    drawAllAgents(ctx, currentTime, W, H);
     _timeEnd('agents', _t5);
   }
   if (config.nodeStats && typeof drawAllContextBars === 'function') drawAllContextBars(ctx, currentTime);

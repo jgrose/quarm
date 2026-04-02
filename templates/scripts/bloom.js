@@ -10,12 +10,15 @@ function BloomRenderer() {
 }
 
 BloomRenderer.prototype.apply = function(sourceCanvas) {
-  // Skip if bloom disabled via config or intensity is zero
-  if (typeof config !== 'undefined' && !config.bloom) return;
+  // Determine quality: bloomQuality takes precedence, fall back to bloom boolean
+  var quality = (typeof config !== 'undefined' && config.bloomQuality) ? config.bloomQuality : 'high';
+  if (typeof config !== 'undefined' && !config.bloom) quality = 'off';
+  if (quality === 'off') return;
   if (this.intensity <= 0) return;
 
-  var w = Math.floor(sourceCanvas.width / 2);
-  var h = Math.floor(sourceCanvas.height / 2);
+  var divisor = quality === 'low' ? 4 : 2;
+  var w = Math.floor(sourceCanvas.width / divisor);
+  var h = Math.floor(sourceCanvas.height / divisor);
   if (w === 0 || h === 0) return;
 
   if (this.canvas.width !== w || this.canvas.height !== h) {
@@ -25,14 +28,18 @@ BloomRenderer.prototype.apply = function(sourceCanvas) {
     this.tempCanvas.height = h;
   }
 
-  // Draw source at half resolution
+  // Draw source at reduced resolution
   this.ctx.clearRect(0, 0, w, h);
   this.ctx.drawImage(sourceCanvas, 0, 0, w, h);
 
-  // 3-pass box blur using CSS filter
-  this._blur(w, h, 8);
-  this._blur(w, h, 6);
-  this._blur(w, h, 4);
+  // Blur passes: 1 for low quality, 3 for high
+  if (quality === 'low') {
+    this._blur(w, h, 6);
+  } else {
+    this._blur(w, h, 8);
+    this._blur(w, h, 6);
+    this._blur(w, h, 4);
+  }
 
   // Composite bloom over source with additive blending
   var mainCtx = sourceCanvas.getContext('2d');

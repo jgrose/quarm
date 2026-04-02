@@ -95,97 +95,85 @@ function drawHexPath(ctx, cx, cy, r) {
   ctx.closePath();
 }
 
-// ─── Offscreen grid cache ───
-
-var _gridCache = null;
-var _gridCacheCanvas = null;
-var _cachedZoom = null;
-var _cachedPanX = null;
-var _cachedPanY = null;
-var _cachedW = 0;
-var _cachedH = 0;
-var _cachedTimeBucket = -1;
-
-// ─── Isometric grid renderer ───
+// ─── Tron grid line renderer ───
+// Two sets of parallel diagonal lines forming the isometric diamond pattern.
+// O(cols + rows) line draws instead of O(cols × rows) diamond strokes.
 
 function drawHexGrid(ctx, W, H, time) {
   var view = (typeof getVisibleRect === 'function')
     ? getVisibleRect(W, H)
     : { x: 0, y: 0, w: W, h: H };
 
-  // Quantize time to ~4fps for the subtle pulse animation (refresh every 250ms)
-  var timeBucket = Math.floor(time * 4);
+  // Iso grid line directions:
+  //   Col-axis lines run along (TILE_W/2, TILE_H/2) — slope = TILE_H/TILE_W
+  //   Row-axis lines run along (-TILE_W/2, TILE_H/2) — slope = -TILE_H/TILE_W
+  var halfW = TILE_W / 2;   // 32
+  var halfH = TILE_H / 2;   // 16
+  var slope = halfH / halfW; // 0.5
 
-  // Check if we can reuse the cached offscreen canvas
-  var panX = Math.round(camera.x * 10);
-  var panY = Math.round(camera.y * 10);
-  var zoom = Math.round(camera.zoom * 100);
+  // LOD: skip every other line when zoomed out
+  var step = 1;
+  if (config.lodEnabled && camera.zoom < 0.35) step = 3;
+  else if (config.lodEnabled && camera.zoom < 0.55) step = 2;
 
-  if (_gridCacheCanvas && zoom === _cachedZoom && panX === _cachedPanX && panY === _cachedPanY &&
-      W === _cachedW && H === _cachedH && timeBucket === _cachedTimeBucket) {
-    // Blit cached grid — coordinates are already in world space from the ctx transform
-    ctx.save();
-    ctx.globalAlpha = 1;
-    ctx.drawImage(_gridCacheCanvas, view.x, view.y);
-    ctx.restore();
-    return;
-  }
+  // How many lines needed to cover the visible viewport
+  // Lines are spaced halfH apart perpendicular to their direction
+  var diagExtent = Math.sqrt(view.w * view.w + view.h * view.h) * 0.6;
+  var numLines = Math.ceil(diagExtent / halfH) + 4;
 
-  // Convert viewport corners to iso grid coords to find visible range
-  var tl = screenToIso(view.x - TILE_W, view.y - TILE_H);
-  var tr = screenToIso(view.x + view.w + TILE_W, view.y - TILE_H);
-  var bl = screenToIso(view.x - TILE_W, view.y + view.h + TILE_H);
-  var br = screenToIso(view.x + view.w + TILE_W, view.y + view.h + TILE_H);
+  // Viewport center in world coords
+  var vcx = view.x + view.w / 2;
+  var vcy = view.y + view.h / 2;
 
-  var minCol = Math.floor(Math.min(tl.col, bl.col)) - 1;
-  var maxCol = Math.ceil(Math.max(tr.col, br.col)) + 1;
-  var minRow = Math.floor(Math.min(tl.row, tr.row)) - 1;
-  var maxRow = Math.ceil(Math.max(bl.row, br.row)) + 1;
+  // Line length: extend well past viewport edges
+  var lineLen = diagExtent + 200;
 
-  var timeSin = time * 0.5;
+  var timeFactor = time * 0.8;
+  var gridAlpha = typeof atmGridAlpha !== 'undefined' ? atmGridAlpha : 0.35;
 
-  // Render to offscreen canvas
-  var cw = Math.ceil(view.w) + 2;
-  var ch = Math.ceil(view.h) + 2;
-  if (!_gridCacheCanvas) {
-    _gridCacheCanvas = document.createElement('canvas');
-    _gridCache = _gridCacheCanvas.getContext('2d');
-  }
-  if (_gridCacheCanvas.width !== cw || _gridCacheCanvas.height !== ch) {
-    _gridCacheCanvas.width = cw;
-    _gridCacheCanvas.height = ch;
-  }
-
-  _gridCache.clearRect(0, 0, cw, ch);
-  _gridCache.strokeStyle = C.hexGrid;
-  _gridCache.lineWidth = 0.6;
-
-  for (var col = minCol; col <= maxCol; col++) {
-    for (var row = minRow; row <= maxRow; row++) {
-      var pos = isoToScreen(col, row);
-      var dist = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
-      var pulse = Math.sin(timeSin + dist * 0.003) * 0.3 + 0.7;
-      var alpha = 0.3 * pulse;
-
-      _gridCache.globalAlpha = alpha;
-      drawIsoDiamond(_gridCache, pos.x - view.x, pos.y - view.y, TILE_W, TILE_H);
-      _gridCache.stroke();
-    }
-  }
-
-  _gridCache.globalAlpha = 1;
-
-  // Update cache state
-  _cachedZoom = zoom;
-  _cachedPanX = panX;
-  _cachedPanY = panY;
-  _cachedW = W;
-  _cachedH = H;
-  _cachedTimeBucket = timeBucket;
-
-  // Blit to main canvas
   ctx.save();
-  ctx.globalAlpha = 1;
-  ctx.drawImage(_gridCacheCanvas, view.x, view.y);
+  ctx.lineWidth = 0.6;
+
+  // ─── Set 1: Lines parallel to col-axis (row = constant) ───
+  // Each line passes through world origin offset by row index.
+  // Perpendicular offset from origin: row * halfH in the row-perp direction.
+  // Screen: base point at (-row * halfW, row * halfH), direction (1, slope)
+  for (var i = -numLines; i <= numLines; i += step) {
+    var baseX = vcx + (-i * halfW);
+    var baseY = vcy + (i * halfH);
+
+    // Distance from world origin for pulse
+    var dist = Math.abs(i) * halfH;
+    var pulse = Math.sin(timeFactor + dist * 0.006) * 0.25 + 0.6;
+    var edgeFade = 1.0 - Math.min(1, Math.abs(i) / numLines);
+    var alpha = gridAlpha * pulse * edgeFade;
+    if (alpha < 0.008) continue;
+
+    ctx.strokeStyle = hexToRgba(C.hexGrid, alpha);
+    ctx.beginPath();
+    ctx.moveTo(baseX - lineLen, baseY - lineLen * slope);
+    ctx.lineTo(baseX + lineLen, baseY + lineLen * slope);
+    ctx.stroke();
+  }
+
+  // ─── Set 2: Lines parallel to row-axis (col = constant) ───
+  // Direction (-1, slope) or equivalently (1, -slope) — going top-right to bottom-left
+  for (var i = -numLines; i <= numLines; i += step) {
+    var baseX = vcx + (i * halfW);
+    var baseY = vcy + (i * halfH);
+
+    var dist = Math.abs(i) * halfH;
+    var pulse = Math.sin(timeFactor + dist * 0.006) * 0.25 + 0.6;
+    var edgeFade = 1.0 - Math.min(1, Math.abs(i) / numLines);
+    var alpha = gridAlpha * pulse * edgeFade;
+    if (alpha < 0.008) continue;
+
+    ctx.strokeStyle = hexToRgba(C.hexGrid, alpha);
+    ctx.beginPath();
+    ctx.moveTo(baseX - lineLen, baseY + lineLen * slope);
+    ctx.lineTo(baseX + lineLen, baseY - lineLen * slope);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }

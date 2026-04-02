@@ -1038,14 +1038,48 @@ function drawAmbientPrograms(ctx, time) {
   var progView = (typeof getVisibleRect === 'function') ? getVisibleRect(_progW, _progH) : { x: 0, y: 0, w: _progW, h: _progH };
   var progMargin = 80;
 
-  // Depth sort — draw programs with lower y first (further from camera)
-  var sorted = ambientPrograms.slice().sort(function(a, b) { return a.y - b.y; });
+  // Merge programs + trees + buildings into one Y-sorted draw list for proper depth ordering
+  var drawList = [];
+  for (var pi = 0; pi < ambientPrograms.length; pi++) {
+    drawList.push({ type: 'program', obj: ambientPrograms[pi], y: ambientPrograms[pi].y });
+  }
+  if (typeof _treeObjects !== 'undefined') {
+    for (var ti = 0; ti < _treeObjects.length; ti++) {
+      drawList.push({ type: 'tree', obj: _treeObjects[ti], y: _treeObjects[ti].y });
+    }
+  }
+  if (typeof gridLocations !== 'undefined') {
+    for (var li = 0; li < gridLocations.length; li++) {
+      drawList.push({ type: 'building', obj: gridLocations[li], y: gridLocations[li].y });
+    }
+  }
+  var sorted = drawList.sort(function(a, b) { return a.y - b.y; });
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
   for (var i = 0; i < sorted.length; i++) {
-    var p = sorted[i];
+    var item = sorted[i];
+
+    // Draw trees inline for proper depth sorting
+    if (item.type === 'tree') {
+      var tt = item.obj;
+      if (tt.x < progView.x - progMargin || tt.x > progView.x + progView.w + progMargin ||
+          tt.y < progView.y - progMargin || tt.y > progView.y + progView.h + progMargin) continue;
+      if (typeof drawSingleTree === 'function') drawSingleTree(ctx, tt, time);
+      continue;
+    }
+
+    // Draw buildings inline for proper depth sorting
+    if (item.type === 'building') {
+      var bl = item.obj;
+      if (bl.x < progView.x - 120 || bl.x > progView.x + progView.w + 120 ||
+          bl.y < progView.y - 120 || bl.y > progView.y + progView.h + 120) continue;
+      if (typeof _drawSingleLocation === 'function') _drawSingleLocation(ctx, bl, time);
+      continue;
+    }
+
+    var p = item.obj;
 
     // Skip invisible programs (inside bunker)
     if (p.visible === false) continue;
@@ -1080,30 +1114,37 @@ function drawAmbientPrograms(ctx, time) {
       sprite = _renderSpriteToCanvas(frames[frameIdx], p.glow, effectiveScale);
     }
 
-    // Trail
-    _drawPixelTrail(ctx, p.trail, p.glow, p.scale, p.cycleMode);
+    // Trail (skip at low zoom for performance)
+    if (!config.lodEnabled || camera.zoom >= 0.4) {
+      _drawPixelTrail(ctx, p.trail, p.glow, p.scale, p.cycleMode);
+    }
 
     var drawX = Math.floor(p.x - sprite.width / 2);
     var drawY = Math.floor(p.y - sprite.height + 6);
 
-    // Glow pass
+    // Glow pass (shadow quality aware)
+    var _progSq = config.shadowQuality || 'high';
     ctx.save();
     ctx.globalAlpha = bunkerAlpha;
-    ctx.shadowColor = p.glow;
-    ctx.shadowBlur = 18;
+    if (_progSq !== 'off') {
+      ctx.shadowColor = p.glow;
+      ctx.shadowBlur = _progSq === 'low' ? 6 : 18;
+    }
 
-    if (flip) {
-      ctx.save();
-      ctx.translate(drawX + sprite.width, drawY);
-      ctx.scale(-1, 1);
-      ctx.drawImage(sprite, 0, 0);
-      ctx.restore();
-    } else {
-      ctx.drawImage(sprite, drawX, drawY);
+    if (_progSq !== 'off') {
+      if (flip) {
+        ctx.save();
+        ctx.translate(drawX + sprite.width, drawY);
+        ctx.scale(-1, 1);
+        ctx.drawImage(sprite, 0, 0);
+        ctx.restore();
+      } else {
+        ctx.drawImage(sprite, drawX, drawY);
+      }
+      ctx.shadowBlur = 0;
     }
 
     // Crisp pass
-    ctx.shadowBlur = 0;
     if (flip) {
       ctx.save();
       ctx.translate(drawX + sprite.width, drawY);
@@ -1115,11 +1156,13 @@ function drawAmbientPrograms(ctx, time) {
     }
     ctx.restore();
 
-    // Isometric ground shadow (diamond-shaped)
-    var px = PX * p.scale;
-    ctx.fillStyle = hexToRgba(p.glow, 0.06 * bunkerAlpha);
-    drawIsoDiamond(ctx, p.x, p.y + 4, px * 8, px * 4);
-    ctx.fill();
+    // Isometric ground shadow (skip at low zoom)
+    if (!config.lodEnabled || camera.zoom >= 0.4) {
+      var px = PX * p.scale;
+      ctx.fillStyle = hexToRgba(p.glow, 0.06 * bunkerAlpha);
+      drawIsoDiamond(ctx, p.x, p.y + 4, px * 8, px * 4);
+      ctx.fill();
+    }
 
     // ─── Task status icon above head (Feature 5) ───
     if (p.assignedTask && typeof getStateColor === 'function') {
@@ -1130,11 +1173,14 @@ function drawAmbientPrograms(ctx, time) {
       var iconY = Math.floor(drawY - iconPx - 4 + bobY);
       ctx.save();
       ctx.globalAlpha = bunkerAlpha * 0.9;
-      ctx.shadowColor = taskColor;
-      ctx.shadowBlur = 6;
+      if (_progSq !== 'off') {
+        ctx.shadowColor = taskColor;
+        ctx.shadowBlur = _progSq === 'low' ? 3 : 6;
+        ctx.fillStyle = taskColor;
+        ctx.fillRect(iconX, iconY, iconPx, iconPx);
+        ctx.shadowBlur = 0;
+      }
       ctx.fillStyle = taskColor;
-      ctx.fillRect(iconX, iconY, iconPx, iconPx);
-      ctx.shadowBlur = 0;
       ctx.fillRect(iconX, iconY, iconPx, iconPx);
       ctx.restore();
     }

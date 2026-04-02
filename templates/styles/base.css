@@ -1034,11 +1034,137 @@ a:hover { color: var(--holo-bright); }
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  width: 320px;
+  width: 360px;
   padding: 20px;
   box-shadow:
     0 0 40px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ── Config tab bar ── */
+.cfg-tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.08);
+}
+
+.cfg-tab {
+  padding: 6px 16px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cfg-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.cfg-tab.active {
+  border-bottom-color: var(--holo-base);
+  color: var(--holo-bright);
+}
+
+.cfg-tab-content {
+  display: none;
+}
+
+.cfg-tab-content.active {
+  display: block;
+}
+
+/* ── Button groups ── */
+.cfg-btn-group {
+  display: flex;
+  gap: 2px;
+}
+
+.cfg-btn {
+  padding: 3px 8px;
+  font-size: 8px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid rgba(100, 200, 255, 0.1);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cfg-btn:hover:not(.active) {
+  background: rgba(100, 200, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.cfg-btn.active {
+  background: rgba(102, 204, 255, 0.2);
+  border-color: rgba(102, 204, 255, 0.4);
+  color: var(--holo-bright);
+}
+
+/* ── Range slider ── */
+.cfg-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cfg-range {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(100, 200, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+}
+
+.cfg-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  cursor: pointer;
+  border: none;
+}
+
+.cfg-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--holo-base);
+  cursor: pointer;
+  border: none;
+}
+
+.cfg-range-value {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  min-width: 24px;
+  text-align: right;
+}
+
+/* ── Section dividers ── */
+.cfg-section-divider {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin: 10px 0 6px 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(100, 200, 255, 0.06);
 }
 
 .config-title {

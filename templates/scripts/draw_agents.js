@@ -23,6 +23,8 @@ function _glowIntensity(state) {
 // ─── Depth shadow ───
 
 function _drawDepthShadow(ctx, node, r) {
+  var sq = config.shadowQuality || 'high';
+  if (sq === 'off') return;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0)';
   ctx.shadowBlur = 0;
@@ -30,7 +32,7 @@ function _drawDepthShadow(ctx, node, r) {
   ctx.ellipse(node.x + 3, node.y + 5, r * 0.8, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 15;
+  ctx.shadowBlur = sq === 'low' ? 5 : 15;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
   ctx.fill();
@@ -291,9 +293,18 @@ function _drawTokenBadge(ctx, node, r) {
   ctx.fillText(label + ' tok', node.x, node.y + r + 20);
 }
 
+// ─── LOD level based on zoom ───
+
+function _getLodLevel() {
+  if (!config.lodEnabled) return 0;
+  if (camera.zoom >= 0.8) return 0;
+  if (camera.zoom >= 0.4) return 1;
+  return 2;
+}
+
 // ─── Draw single agent ───
 
-function _drawSingleAgent(ctx, node, time) {
+function _drawSingleAgent(ctx, node, time, lod) {
   var color = getStateColor(node.state);
   var breath = getBreathScale(node.state, time);
   var r = node.radius * breath * node.scale;
@@ -304,47 +315,65 @@ function _drawSingleAgent(ctx, node, time) {
   ctx.save();
   ctx.globalAlpha = node.opacity;
 
-  // 1. Depth shadow
-  _drawDepthShadow(ctx, node, r);
-
-  // 2. Pre-rendered glow
-  _drawAgentGlow(ctx, node, r, color, node.state, isHover);
-
-  // 3. Ambient outer ring
-  _drawAmbientRing(ctx, node, r, color);
-
-  // 4. Hex body with state ring
-  _drawHexBody(ctx, node, r, color, node.state, time);
-
-  // 5. State-specific effects
-  if (node.state === 'in_progress') {
-    _drawScanline(ctx, node, r, color, time, true);
-    _drawOrbitParticles(ctx, node, r, color, time);
+  if (lod <= 1) {
+    // 1. Depth shadow (LOD 0-1, simplified at LOD 1)
+    _drawDepthShadow(ctx, node, r);
   }
 
-  if (node.state === 'in_manager_review' || node.state === 'in_specialist_review') {
-    _drawWaitingRipples(ctx, node, r, color, time);
-    _drawWaitingOrbitParticles(ctx, node, r, color, time);
-    _drawDashedRing(ctx, node, r, color, time);
+  if (lod === 0) {
+    // 2. Pre-rendered glow (LOD 0 only)
+    _drawAgentGlow(ctx, node, r, color, node.state, isHover);
   }
 
-  if (node.state === 'revision') {
-    _drawDashedRing(ctx, node, r, color, time);
-    _drawScanline(ctx, node, r, color, time, false);
+  if (lod <= 1) {
+    // 3. Ambient outer ring (LOD 0-1)
+    _drawAmbientRing(ctx, node, r, color);
+    // 4. Hex body with state ring
+    _drawHexBody(ctx, node, r, color, node.state, time);
+  } else {
+    // LOD 2: simple filled circle
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = C.nodeInterior;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
-  if (node.state === 'failed') {
+  // 5. State-specific effects (LOD 0 only)
+  if (lod === 0) {
+    if (node.state === 'in_progress') {
+      _drawScanline(ctx, node, r, color, time, true);
+      _drawOrbitParticles(ctx, node, r, color, time);
+    }
+
+    if (node.state === 'in_manager_review' || node.state === 'in_specialist_review') {
+      _drawWaitingRipples(ctx, node, r, color, time);
+      _drawWaitingOrbitParticles(ctx, node, r, color, time);
+      _drawDashedRing(ctx, node, r, color, time);
+    }
+
+    if (node.state === 'revision') {
+      _drawDashedRing(ctx, node, r, color, time);
+      _drawScanline(ctx, node, r, color, time, false);
+    }
+  }
+
+  if (lod <= 1 && node.state === 'failed') {
     _drawErrorArc(ctx, node, r, color, time);
   }
 
-  // 6. Center icon
-  _drawCenterIcon(ctx, node, r, color, time);
+  // 6. Center icon (LOD 0-1)
+  if (lod <= 1) {
+    _drawCenterIcon(ctx, node, r, color, time);
+  }
 
   // 7. Name label below
   _drawNameLabel(ctx, node, r);
 
-  // 8. Optional stat badges
-  if (config.nodeStats) {
+  // 8. Optional stat badges (LOD 0 only)
+  if (lod === 0 && config.nodeStats) {
     _drawModelBadge(ctx, node, r);
     _drawTokenBadge(ctx, node, r);
   }
@@ -354,9 +383,21 @@ function _drawSingleAgent(ctx, node, time) {
 
 // ─── Draw all agents (public API) ───
 
-function drawAllAgents(ctx, time) {
+function drawAllAgents(ctx, time, W, H) {
+  var lod = _getLodLevel();
+  var view = null;
+  var margin = 60;
+
+  if (config.viewportCulling && W && H) {
+    view = getVisibleRect(W, H);
+  }
+
   for (var entry of nodes) {
     var node = entry[1];
-    _drawSingleAgent(ctx, node, time);
+    if (view) {
+      if (node.x < view.x - margin || node.x > view.x + view.w + margin ||
+          node.y < view.y - margin || node.y > view.y + view.h + margin) continue;
+    }
+    _drawSingleAgent(ctx, node, time, lod);
   }
 }

@@ -129,12 +129,18 @@ function applyAtmosphere(ctx, W, H, time) {
 
   // Optional: apply a subtle vignette overlay that intensifies at night
   var vignetteAlpha = 0.03 + 0.07 * atmGlowMult;
-  var gradient = ctx.createRadialGradient(
-    W * 0.5, H * 0.5, W * 0.2,
-    W * 0.5, H * 0.5, W * 0.8
-  );
-  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  gradient.addColorStop(1, 'rgba(0, 0, 0, ' + vignetteAlpha + ')');
-  ctx.fillStyle = gradient;
+  var alphaQ = Math.round(vignetteAlpha * 100);
+  if (!applyAtmosphere._vigGrad || applyAtmosphere._vigW !== W || applyAtmosphere._vigH !== H || applyAtmosphere._vigA !== alphaQ) {
+    applyAtmosphere._vigGrad = ctx.createRadialGradient(
+      W * 0.5, H * 0.5, W * 0.2,
+      W * 0.5, H * 0.5, W * 0.8
+    );
+    applyAtmosphere._vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    applyAtmosphere._vigGrad.addColorStop(1, 'rgba(0, 0, 0, ' + vignetteAlpha + ')');
+    applyAtmosphere._vigW = W;
+    applyAtmosphere._vigH = H;
+    applyAtmosphere._vigA = alphaQ;
+  }
+  ctx.fillStyle = applyAtmosphere._vigGrad;
   ctx.fillRect(0, 0, W, H);
 }

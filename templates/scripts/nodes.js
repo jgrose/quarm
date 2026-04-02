@@ -47,6 +47,16 @@ var config = {
   hexNodes: false,
   taskArrows: true,
   activeIndicators: true,
+  // Performance settings
+  qualityPreset: 'high',
+  shadowQuality: 'high',
+  bloomQuality: 'low',
+  maxParticles: 50,
+  maxEffects: 30,
+  edgeDetail: 16,
+  lodEnabled: true,
+  idlePause: true,
+  viewportCulling: true,
 };
 
 function addNode(id, name, tier, label, parentId) {
@@ -99,6 +109,7 @@ function getNodeByAgent(agentName) {
 }
 
 function spawnParticle(fromId, toId, color, label) {
+  if (particles.length >= (config.maxParticles || 50)) return;
   particles.push({
     from: fromId,
     to: toId,
@@ -111,6 +122,7 @@ function spawnParticle(fromId, toId, color, label) {
 }
 
 function spawnEffect(x, y, color) {
+  if (effects.length >= (config.maxEffects || 30)) return;
   effects.push({
     type: 'spawn',
     x: x,
@@ -122,6 +134,7 @@ function spawnEffect(x, y, color) {
 }
 
 function spawnCompleteEffect(x, y, color) {
+  if (effects.length >= (config.maxEffects || 30)) return;
   effects.push({
     type: 'complete',
     x: x,

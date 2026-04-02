@@ -64,7 +64,7 @@ function bezierPoint(fromNode, toNode, t) {
 
 function _drawTaperedBezier(ctx, fx, fy, c1x, c1y, c2x, c2y, tx, ty, startW, endW, color, alpha) {
   if (alpha < 0.005) return;
-  var steps = _EDGE_SEGMENTS;
+  var steps = config.edgeDetail || _EDGE_SEGMENTS;
   ctx.beginPath();
   // Forward pass: left side
   for (var i = 0; i <= steps; i++) {
@@ -98,8 +98,13 @@ function _getActiveEdgeKeys(particleList) {
 
 // ─── Draw all edges ───
 
-function drawAllEdges(ctx, time) {
+function drawAllEdges(ctx, time, W, H) {
   var activeKeys = _getActiveEdgeKeys(particles);
+  var view = null;
+  var edgeMargin = 50;
+  if (config.viewportCulling && W && H) {
+    view = getVisibleRect(W, H);
+  }
 
   for (var i = 0; i < edges.length; i++) {
     var e = edges[i];
@@ -107,6 +112,16 @@ function drawAllEdges(ctx, time) {
     var toNode = nodes.get(e.to);
     if (!fromNode || !toNode) continue;
     if (fromNode.opacity < 0.05 || toNode.opacity < 0.05) continue;
+
+    // Viewport culling: skip edges fully outside visible area
+    if (view) {
+      var eMinX = Math.min(fromNode.x, toNode.x);
+      var eMaxX = Math.max(fromNode.x, toNode.x);
+      var eMinY = Math.min(fromNode.y, toNode.y);
+      var eMaxY = Math.max(fromNode.y, toNode.y);
+      if (eMaxX < view.x - edgeMargin || eMinX > view.x + view.w + edgeMargin ||
+          eMaxY < view.y - edgeMargin || eMinY > view.y + view.h + edgeMargin) continue;
+    }
 
     var cp = _computeCP(fromNode.x, fromNode.y, toNode.x, toNode.y);
     if (!cp) continue;

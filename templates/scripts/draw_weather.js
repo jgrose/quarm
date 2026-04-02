@@ -251,8 +251,8 @@ function drawWeather(ctx, W, H, time, dt) {
     ctx.globalAlpha = boltAlpha;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
-    ctx.shadowColor = C.holoBase;
-    ctx.shadowBlur = 20;
+    var _wSq = config.shadowQuality || 'high';
+    if (_wSq !== 'off') { ctx.shadowColor = C.holoBase; ctx.shadowBlur = _wSq === 'low' ? 8 : 20; }
 
     ctx.beginPath();
     ctx.moveTo(bolt.points[0].x, bolt.points[0].y);

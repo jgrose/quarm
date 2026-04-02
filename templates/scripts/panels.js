@@ -23,6 +23,40 @@ function toggleConfig(key) {
   syncConfigUI();
 }
 
+function setConfigValue(key, value) {
+  config[key] = value;
+  saveConfig();
+  syncConfigUI();
+}
+
+function switchConfigTab(tab, btn) {
+  document.querySelectorAll('.cfg-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.cfg-tab-content').forEach(function(s) { s.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var section = document.getElementById('cfgTab-' + tab);
+  if (section) section.classList.add('active');
+}
+
+var _qualityPresets = {
+  low:    { shadowQuality: 'off', bloomQuality: 'off', particles: false, maxParticles: 10, maxEffects: 5, edgeDetail: 4, weather: false, hexGrid: false, completionFx: false, lodEnabled: true, viewportCulling: true },
+  medium: { shadowQuality: 'low', bloomQuality: 'off', particles: true, maxParticles: 25, maxEffects: 15, edgeDetail: 8, weather: false, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
+  high:   { shadowQuality: 'high', bloomQuality: 'low', particles: true, maxParticles: 50, maxEffects: 30, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: true, viewportCulling: true },
+  ultra:  { shadowQuality: 'high', bloomQuality: 'high', particles: true, maxParticles: 100, maxEffects: 50, edgeDetail: 16, weather: true, hexGrid: true, completionFx: true, lodEnabled: false, viewportCulling: true },
+};
+
+function applyQualityPreset(preset) {
+  var p = _qualityPresets[preset];
+  if (!p) return;
+  config.qualityPreset = preset;
+  for (var k in p) {
+    if (p.hasOwnProperty(k)) config[k] = p[k];
+  }
+  // Sync bloom toggle with bloomQuality
+  config.bloom = config.bloomQuality !== 'off';
+  saveConfig();
+  syncConfigUI();
+}
+
 // ── Agent Detail Card ───────────────────────────────────────────────────────
 
 var selectedNode = null;
@@ -772,11 +806,36 @@ function toggleConfigOverlay() {
 }
 
 function syncConfigUI() {
+  // Boolean toggles
   document.querySelectorAll('.cfg-toggle').forEach(function(el) {
     var key = el.dataset.key;
     if (key && key in config) {
       if (config[key]) el.classList.add('on');
       else el.classList.remove('on');
+    }
+  });
+  // Button groups
+  document.querySelectorAll('.cfg-btn-group').forEach(function(group) {
+    var cfgKey = group.dataset.cfg;
+    if (!cfgKey || !(cfgKey in config)) return;
+    var val = String(config[cfgKey]);
+    group.querySelectorAll('.cfg-btn').forEach(function(btn) {
+      if (String(btn.dataset.val) === val) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+  });
+  // Range sliders
+  document.querySelectorAll('.cfg-range').forEach(function(range) {
+    var cfgKey = range.dataset.cfg;
+    if (cfgKey && cfgKey in config) {
+      range.value = config[cfgKey];
+    }
+  });
+  // Range value displays
+  document.querySelectorAll('[data-cfg-display]').forEach(function(el) {
+    var cfgKey = el.dataset.cfgDisplay;
+    if (cfgKey && cfgKey in config) {
+      el.textContent = config[cfgKey];
     }
   });
 }
