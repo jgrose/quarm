@@ -1,0 +1,83 @@
+<!-- Task Dependency DAG Panel — toggled via 'D' (shift+d) key -->
+<div id="dagPanelOverlay" class="hidden">
+  <div class="dag-panel-card glass-card" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="config-title" style="margin:0">TASK DEPENDENCY DAG</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">SHIFT+D / ESC</span>
+        <button class="close-btn" onclick="toggleDagPanel()">&times;</button>
+      </div>
+    </div>
+    <div class="dag-legend">
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#66ccff"></span>PENDING</span>
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#66ccff;box-shadow:0 0 6px #66ccff"></span>IN PROGRESS</span>
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#ffbb44"></span>IN REVIEW</span>
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#66ffaa"></span>DONE</span>
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#ff5566"></span>FAILED</span>
+      <span class="dag-legend-item"><span class="dag-legend-dot" style="background:#ff8800"></span>REVISION</span>
+    </div>
+    <div id="dagPanelBody">
+      <svg id="dagSvg" width="100%" height="400"></svg>
+    </div>
+  </div>
+</div>
+
+<style>
+#dagPanelOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+#dagPanelOverlay.hidden {
+  display: none !important;
+}
+
+.dag-panel-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 700px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 16px;
+}
+
+.dag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.dag-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+
+.dag-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+#dagSvg {
+  display: block;
+  min-height: 200px;
+}
+</style>

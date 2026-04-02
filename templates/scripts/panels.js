@@ -62,6 +62,7 @@ function applyQualityPreset(preset) {
 var selectedNode = null;
 
 function showAgentDetail(node) {
+  hideBuildingDetail(); // Mutual exclusion with building card
   selectedNode = node;
   var card = document.getElementById('agentDetailCard');
   card.classList.remove('hidden');
@@ -117,6 +118,139 @@ function showAgentDetail(node) {
 function hideAgentDetail() {
   selectedNode = null;
   document.getElementById('agentDetailCard').classList.add('hidden');
+}
+
+// ── Building Detail Card ───────────────────────────────────────────────────
+
+var _selectedBuilding = null;
+var _lastBuildingHash = '';
+
+function showBuildingDetail(loc, e) {
+  // Mutual exclusion with agent detail card
+  hideAgentDetail();
+
+  var card = document.getElementById('buildingDetailCard');
+  if (!card) return;
+  var wrap = document.getElementById('canvasWrap');
+  if (!wrap) return;
+  var rect = wrap.getBoundingClientRect();
+
+  var cardX = e.clientX - rect.left + 16;
+  var cardY = e.clientY - rect.top - 20;
+
+  var cardWidth = 280;
+  var cardHeight = 320;
+  if (cardX + cardWidth > rect.width) cardX = e.clientX - rect.left - cardWidth - 16;
+  if (cardY + cardHeight > rect.height) cardY = rect.height - cardHeight - 8;
+  if (cardY < 8) cardY = 8;
+  if (cardX < 8) cardX = 8;
+
+  card.style.left = cardX + 'px';
+  card.style.top = cardY + 'px';
+
+  _selectedBuilding = loc;
+  _lastBuildingHash = '';
+  _renderBuildingCardContent(card, loc);
+  card.classList.remove('hidden');
+}
+
+function hideBuildingDetail() {
+  _selectedBuilding = null;
+  _lastBuildingHash = '';
+  var card = document.getElementById('buildingDetailCard');
+  if (card) card.classList.add('hidden');
+}
+
+function _renderBuildingCardContent(card, loc) {
+  var html = '<button class="close-btn" onclick="hideBuildingDetail()">&times;</button>';
+
+  // Category + upgrade badge
+  var catLabel = loc.category === 'work' ? 'WORK STATION' : 'IDLE ZONE';
+  var upgLabel = loc.upgradeLevel > 0 ? 'LVL ' + loc.upgradeLevel : '';
+  html += '<div class="bld-header">';
+  html += '<span class="bld-category">' + catLabel + '</span>';
+  if (upgLabel) html += '<span class="bld-upgrade" style="color:' + loc.glowColor + '">' + upgLabel + '</span>';
+  html += '</div>';
+
+  // Building name
+  html += '<div class="bld-name" style="color:' + loc.glowColor + '">' + escapeHtml(loc.name) + '</div>';
+
+  // Occupancy bar
+  var occCount = loc.occupants ? loc.occupants.length : 0;
+  html += '<div class="bld-occupancy">';
+  html += '<span class="bld-category">OCCUPANCY</span>';
+  html += '<span class="bld-occ-count">' + occCount + '/' + loc.capacity + '</span>';
+  html += '</div>';
+  html += '<div class="bld-occ-bar">';
+  for (var i = 0; i < loc.capacity; i++) {
+    var filled = i < occCount;
+    var slotColor = filled ? loc.glowColor : 'rgba(100,200,255,0.1)';
+    html += '<div class="bld-occ-slot" style="background:' + slotColor +
+            (filled ? ';box-shadow:0 0 6px ' + loc.glowColor : '') + '"></div>';
+  }
+  html += '</div>';
+
+  // Status section (work buildings only)
+  if (loc.category === 'work') {
+    var stateLabel = loc.taskState ? loc.taskState.replace(/_/g, ' ').toUpperCase() : 'IDLE';
+    var stateColor = loc.taskState ? getStateColor(loc.taskState) : C.textDim;
+    html += '<div class="bld-section-label">STATUS</div>';
+    html += '<div class="bld-status">';
+    html += '<span class="state-dot" style="background:' + stateColor + ';width:8px;height:8px;border-radius:50%;display:inline-block"></span>';
+    html += '<span>' + stateLabel + '</span>';
+    html += '</div>';
+    html += '<div class="bld-stat-row"><span class="stat-label">COMPLETIONS</span><span class="stat-value">' + (loc.taskCompletions || 0) + '</span></div>';
+  }
+
+  // Occupants list
+  html += '<div class="bld-section-label">PROGRAMS' + (occCount > 0 ? ' (' + occCount + ')' : '') + '</div>';
+  if (occCount === 0) {
+    html += '<div class="bld-empty">No programs present</div>';
+  } else {
+    for (var j = 0; j < loc.occupants.length; j++) {
+      var p = loc.occupants[j];
+      var tierInfo = TIERS[p.tier] || TIERS.drone;
+      var name = p.displayName || p.agentName || ('Program ' + j);
+      var taskTitle = p.assignedTask ? p.assignedTask.title : null;
+      var taskStatus = p.assignedTask ? p.assignedTask.status : 'idle';
+      var taskColor = getStateColor(taskStatus);
+
+      html += '<div class="bld-occupant">';
+      html += '<div class="bld-occ-header">';
+      html += '<span class="bld-occ-icon" style="color:' + p.glow + '">' + tierInfo.icon + '</span>';
+      html += '<span class="bld-occ-name">' + escapeHtml(name) + '</span>';
+      html += '<span class="bld-occ-tier">' + (tierInfo.label || p.tier).toUpperCase() + '</span>';
+      html += '</div>';
+      if (taskTitle) {
+        html += '<div class="bld-occ-task">';
+        html += '<span style="background:' + taskColor + ';width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0"></span>';
+        html += '<span>' + escapeHtml(taskTitle.length > 30 ? taskTitle.slice(0, 30) + '\u2026' : taskTitle) + '</span>';
+        html += '</div>';
+      } else {
+        html += '<div class="bld-occ-task idle">IDLE</div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  card.innerHTML = html;
+}
+
+function _updateBuildingDetailIfNeeded() {
+  if (!_selectedBuilding) return;
+  var card = document.getElementById('buildingDetailCard');
+  if (!card || card.classList.contains('hidden')) { _selectedBuilding = null; return; }
+
+  var loc = _selectedBuilding;
+  var hash = (loc.occupants ? loc.occupants.length : 0) + '|' +
+    (loc.occupants || []).map(function(o) {
+      return (o.agentName || '') + ':' + (o.assignedTask ? o.assignedTask.status : 'x');
+    }).join(',') + '|' + (loc.upgradeLevel || 0) + '|' + (loc.taskCompletions || 0);
+
+  if (hash !== _lastBuildingHash) {
+    _lastBuildingHash = hash;
+    _renderBuildingCardContent(card, loc);
+  }
 }
 
 // ── Agent List Panel ────────────────────────────────────────────────────────
@@ -199,7 +333,7 @@ function _renderAgentRow(agent, tier, tasks) {
   var statusColor = getStateColor(status);
   var statusLabel = status.replace(/_/g, ' ').toUpperCase();
   var taskTitle = task ? (task.title || task.id || '') : '';
-  var name = agent.title || agent.name.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+  var name = agent.title || prettify(agent.name);
 
   var html = '<div class="al-agent">';
   html += '<span class="al-agent-icon" style="color:' + statusColor + '">' + icon + '</span>';
@@ -395,7 +529,7 @@ function getAgentTitle(agentKey) {
   var name = agentKey.toLowerCase();
   var all = _chatRosters.sub_agents.concat(_chatRosters.managers, _chatRosters.reviewers);
   for (var i = 0; i < all.length; i++) {
-    if (all[i].name === name) return all[i].title || name.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    if (all[i].name === name) return all[i].title || prettify(name);
   }
   if (name === 'master') return 'NEXUS';
   return agentKey.replace(/_/g, ' ');

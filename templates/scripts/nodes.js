@@ -59,6 +59,7 @@ var config = {
   lodEnabled: true,
   idlePause: true,
   viewportCulling: true,
+  thoughtBubbles: true,
 };
 
 function addNode(id, name, tier, label, parentId) {

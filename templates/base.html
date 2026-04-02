@@ -17,6 +17,7 @@
   <div id="canvasWrap">
     <canvas id="canvas"></canvas>
     <div id="agentDetailCard" class="glass-card hidden"></div>
+    <div id="buildingDetailCard" class="glass-card building-detail-card hidden"></div>
     {% include "components/event_log.html" %}
     {% include "components/panels/agent_list.html" %}
   </div>
@@ -58,6 +59,7 @@
     {% include "scripts/draw_discoveries.js" %}
     {% include "scripts/draw_programs.js" %}
     {% include "scripts/draw_locations.js" %}
+    {% include "scripts/draw_thought_bubbles.js" %}
     {% include "scripts/draw_atmosphere.js" %}
     {% include "scripts/draw_weather.js" %}
     {% include "scripts/draw_minimap.js" %}

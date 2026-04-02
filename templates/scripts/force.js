@@ -29,8 +29,8 @@ function tickForce(nodeArr, edgeArr, W, H, dt) {
   for (var i = 0; i < nodeArr.length; i++) {
     var n = nodeArr[i];
 
-    // 1. NEXUS pinned to top center
-    if (n.tier === 'nexus') {
+    // 1. NEXUS pinned to top center (zone mode only)
+    if (n.tier === 'nexus' && !config.flowMode) {
       n.x = W / 2;
       n.y = zoneH * 0.8;
       n.vx = 0;
@@ -38,14 +38,22 @@ function tickForce(nodeArr, edgeArr, W, H, dt) {
       continue;
     }
 
-    // 2. Zone attraction — pull toward zone's Y band
-    var targetY = zoneH * (n.zone + 1);
-    var dy = targetY - n.y;
-    n.vy += dy * FORCE_CFG.centerStrength * dt * 60;
+    if (!config.flowMode) {
+      // 2. Zone attraction — pull toward zone's Y band
+      var targetY = zoneH * (n.zone + 1);
+      var dy = targetY - n.y;
+      n.vy += dy * FORCE_CFG.centerStrength * dt * 60;
 
-    // Horizontal centering (mild)
-    var dx = (W / 2) - n.x;
-    n.vx += dx * FORCE_CFG.centerStrength * 0.3 * dt * 60;
+      // Horizontal centering (mild)
+      var dx = (W / 2) - n.x;
+      n.vx += dx * FORCE_CFG.centerStrength * 0.3 * dt * 60;
+    } else {
+      // Flow mode: gentle center attraction only
+      var dx = (W / 2) - n.x;
+      var dy = (H / 2) - n.y;
+      n.vx += dx * 0.01 * dt * 60;
+      n.vy += dy * 0.01 * dt * 60;
+    }
 
     // 3. Repulsion from other nodes (charge force, inverse-square)
     for (var j = 0; j < nodeArr.length; j++) {
@@ -78,11 +86,11 @@ function tickForce(nodeArr, edgeArr, W, H, dt) {
     var eDist = Math.sqrt(ex * ex + ey * ey) || 1;
     var stretch = (eDist - FORCE_CFG.linkDist) / eDist;
     var springF = stretch * FORCE_CFG.linkStrength * dt * 60;
-    if (a.tier !== 'nexus') {
+    if (a.tier !== 'nexus' || config.flowMode) {
       a.vx += ex * springF;
       a.vy += ey * springF;
     }
-    if (b.tier !== 'nexus') {
+    if (b.tier !== 'nexus' || config.flowMode) {
       b.vx -= ex * springF;
       b.vy -= ey * springF;
     }
@@ -91,7 +99,7 @@ function tickForce(nodeArr, edgeArr, W, H, dt) {
   // 5. Velocity damping and bounds
   for (var m = 0; m < nodeArr.length; m++) {
     var nd = nodeArr[m];
-    if (nd.tier === 'nexus') continue;
+    if (nd.tier === 'nexus' && !config.flowMode) continue;
     nd.vx *= (1 - FORCE_CFG.velDecay * dt * 60);
     nd.vy *= (1 - FORCE_CFG.velDecay * dt * 60);
     nd.x += nd.vx * dt;

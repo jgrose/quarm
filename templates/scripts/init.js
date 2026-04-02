@@ -65,6 +65,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // ── Periodic city state save (every 30 seconds) ──
   setInterval(_saveCityState, 30000);
 
+  // ── Building detail card live updates ──
+  if (typeof _updateBuildingDetailIfNeeded === 'function') {
+    setInterval(_updateBuildingDetailIfNeeded, 500);
+  }
+
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -124,10 +129,14 @@ document.addEventListener('DOMContentLoaded', function() {
         outputBrowser.classList.add('hidden'); return;
       }
 
-      // z:100 — Agent detail card
+      // z:100 — Agent detail card / Building detail card
       var agentCard = document.getElementById('agentDetailCard');
       if (agentCard && !agentCard.classList.contains('hidden')) {
         hideAgentDetail(); return;
+      }
+      var buildingCard = document.getElementById('buildingDetailCard');
+      if (buildingCard && !buildingCard.classList.contains('hidden')) {
+        if (typeof hideBuildingDetail === 'function') hideBuildingDetail(); return;
       }
 
       // z:80 — Perf overlay

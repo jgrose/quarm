@@ -143,6 +143,29 @@ function handleMessage(data) {
   applyStatus(data);
 }
 
+// ── Shared task→node property sync ──────────────────────────────────────────
+
+function _syncTaskToNode(node, task) {
+  node.state = task.status;
+  node.taskId = task.id;
+  node.taskTitle = task.title;
+  node.model = task.current_model || '';
+  node.tokens = task.task_tokens || 0;
+  node.toolCalls = (task.status === 'done' || task.status === 'failed') ? [] : (task.tool_calls || []);
+  node.resultPreview = task.result_preview || '';
+  node.revisionCount = task.revision_count || 0;
+  node.lastScore = task.last_score || 0;
+  node.dependsOn = task.depends_on || [];
+}
+
+function _applyTaskStates(tasks) {
+  for (var i = 0; i < tasks.length; i++) {
+    var task = tasks[i];
+    var node = getNodeByAgent(task.agent);
+    if (node) _syncTaskToNode(node, task);
+  }
+}
+
 // ── Core Status Application ─────────────────────────────────────────────────
 
 function applyStatus(data) {
@@ -197,16 +220,7 @@ function applyStatus(data) {
     if (!node) continue;
 
     var prevState = node.state;
-    node.state = task.status;
-    node.taskId = task.id;
-    node.taskTitle = task.title;
-    node.model = task.current_model || '';
-    node.tokens = task.task_tokens || 0;
-    node.toolCalls = (task.status === 'done' || task.status === 'failed') ? [] : (task.tool_calls || []);
-    node.resultPreview = task.result_preview || '';
-    node.revisionCount = task.revision_count || 0;
-    node.lastScore = task.last_score || 0;
-    node.dependsOn = task.depends_on || [];
+    _syncTaskToNode(node, task);
 
     // Spawn effects, audio, and bubbles on state transitions
     if (prevState !== task.status && !_isReplay) {
@@ -214,7 +228,9 @@ function applyStatus(data) {
       for (var pi = 0; pi < ambientPrograms.length; pi++) {
         var prog = ambientPrograms[pi];
         if (prog.agentName === task.agent) {
-          prog.assignedTask = { id: task.id, status: task.status, title: task.title };
+          prog.assignedTask = { id: task.id, status: task.status, title: task.title,
+            lastScore: task.last_score || 0, revisionCount: task.revision_count || 0,
+            managerNotes: task.manager_notes || '', reviewerNotes: task.reviewer_notes || '' };
           if (prog.bunkerState === 'inside') {
             prog.bunkerState = 'exiting';
             prog.exitProgress = 0;
@@ -238,11 +254,8 @@ function applyStatus(data) {
         if (config.sound && typeof playAgentComplete === 'function') playAgentComplete();
         if (typeof addBubble === 'function') addBubble(node.id, 'drone', 'Task complete');
       }
-      if (task.status === 'in_manager_review') {
-        if (config.sound && typeof playToolStart === 'function') playToolStart();
-      }
-      if (task.status === 'in_specialist_review') {
-        if (config.sound && typeof playToolStart === 'function') playToolStart();
+      if ((task.status === 'in_manager_review' || task.status === 'in_specialist_review') && config.sound && typeof playToolStart === 'function') {
+        playToolStart();
       }
       if (task.status === 'failed') {
         effects.push({ type: 'error', x: node.x, y: node.y, color: C.failed, age: 0, duration: 0.6 });
@@ -354,24 +367,8 @@ function switchSession(sessionId) {
     if (typeof updateChatRosters === 'function') updateChatRosters(d);
   }
 
-  // Apply task states
   var tasks = d.tasks || [];
-  for (var i = 0; i < tasks.length; i++) {
-    var task = tasks[i];
-    var node = getNodeByAgent(task.agent);
-    if (!node) continue;
-    node.state = task.status;
-    node.taskId = task.id;
-    node.taskTitle = task.title;
-    node.model = task.current_model || '';
-    node.tokens = task.task_tokens || 0;
-    node.toolCalls = (task.status === 'done' || task.status === 'failed') ? [] : (task.tool_calls || []);
-    node.resultPreview = task.result_preview || '';
-    node.revisionCount = task.revision_count || 0;
-    node.lastScore = task.last_score || 0;
-    node.dependsOn = task.depends_on || [];
-  }
-
+  _applyTaskStates(tasks);
   if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
   if (typeof updateDagPanel === 'function') updateDagPanel();
 

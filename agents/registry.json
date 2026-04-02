@@ -427,9 +427,9 @@
         "frontend"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:15:25.886852+00:00",
-      "runs": 13,
-      "avg_score": 6.99,
+      "updated_at": "2026-04-02T04:15:52.360167+00:00",
+      "runs": 14,
+      "avg_score": 7.06,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior UX/UI Designer",

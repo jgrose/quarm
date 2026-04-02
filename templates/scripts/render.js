@@ -62,22 +62,16 @@ function initCanvas() {
       if (typeof showAgentDetail === 'function') showAgentDetail(node);
       return;
     }
-    // Location click (bunker inspect)
+    // Location click (building detail panel)
     if (typeof getLocationAt === 'function') {
       var loc = getLocationAt(e);
       if (loc) {
-        // Show location occupant info in agent detail card
-        if (typeof showAgentDetail === 'function') {
-          var info = { name: loc.name, tier: 'location', state: loc.category, taskId: loc.taskState || 'idle',
-            model: loc.occupants.length + '/' + loc.capacity + ' programs', tokens: loc.taskCompletions || 0,
-            toolCalls: [], resultPreview: loc.occupants.map(function(o) { return o.glow; }).join(', '),
-            radius: 20, icon: '', label: loc.name };
-          showAgentDetail(info);
-        }
+        if (typeof showBuildingDetail === 'function') showBuildingDetail(loc, e);
         return;
       }
     }
     if (typeof hideAgentDetail === 'function') hideAgentDetail();
+    if (typeof hideBuildingDetail === 'function') hideBuildingDetail();
   });
 
   requestAnimationFrame(render);
