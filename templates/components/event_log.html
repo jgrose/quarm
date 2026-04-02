@@ -1,8 +1,18 @@
 <div id="eventLog" class="glass-card">
   <button id="chatToggle" onclick="toggleChat()" title="Toggle agent chat (C)">&#x25C0;</button>
+  <div id="plansListPanel" class="plans-list-panel plans-list-closed">
+    <div class="plans-list-inner">
+      <div class="plans-list-header">
+        <span>PLANS</span>
+        <span class="plans-list-count" id="plansListCount"></span>
+      </div>
+      <div id="plansListBody"></div>
+    </div>
+  </div>
   <div class="chat-inner">
-    <div class="panel-header">
-      <span>AGENT CHAT</span>
+    <div class="panel-header chat-header-bar">
+      <button id="plansListBtn" class="plans-list-btn" onclick="togglePlansList()" title="Plans list (P)">&#x2630;</button>
+      <span id="chatCurrentPlan" class="chat-current-plan">AGENT CHAT</span>
     </div>
     <div id="chatTabStrip" class="chat-tab-strip"></div>
     <div id="eventLogProgress"></div>

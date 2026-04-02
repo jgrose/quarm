@@ -362,59 +362,24 @@ function toggleChat() {
   var btn = document.getElementById('chatToggle');
   if (!panel) return;
   panel.classList.toggle('collapsed');
-  if (btn) btn.innerHTML = panel.classList.contains('collapsed') ? '&#x25B6;' : '&#x25C0;';
+  var isCollapsed = panel.classList.contains('collapsed');
+  if (btn) btn.innerHTML = isCollapsed ? '&#x25B6;' : '&#x25C0;';
+  if (isCollapsed) closePlansList();
 }
 
 // ── Chat Plan Tabs ─────────────────────────────────────────────────────────
 
 function renderChatTabs() {
-  var strip = document.getElementById('chatTabStrip');
-  if (!strip) return;
   if (typeof _sessions === 'undefined') return;
-
-  var sessionIds = Object.keys(_sessions);
-
-  // Hide tab strip when 0 or 1 sessions
-  if (sessionIds.length <= 1) {
-    strip.classList.remove('visible');
-    return;
-  }
-  strip.classList.add('visible');
 
   // Reset filter if filtered session disappeared
   if (_chatFilterId !== 'all' && !_sessions[_chatFilterId]) {
     _chatFilterId = 'all';
   }
 
-  var html = '';
-  // "ALL" tab
-  var allActive = (_chatFilterId === 'all');
-  html += '<button class="chat-tab' + (allActive ? ' active' : '') +
-          '" onclick="setChatFilter(\'all\')">ALL</button>';
-
-  // Per-session tabs
-  for (var i = 0; i < sessionIds.length; i++) {
-    var sid = sessionIds[i];
-    var sess = _sessions[sid];
-    var d = sess.data;
-    if (!d) continue;
-    var project = d.project || sid;
-    var phase = d.phase || 'idle';
-    var isActive = (_chatFilterId === sid);
-    var hasUnread = !!_chatUnread[sid];
-
-    var truncName = project.length > 18 ? project.slice(0, 18) + '..' : project;
-    var phaseLabel = phase.toUpperCase();
-    if (phaseLabel.length > 5) phaseLabel = phaseLabel.slice(0, 5);
-
-    html += '<button class="chat-tab' + (isActive ? ' active' : '') +
-            (hasUnread ? ' unread' : '') +
-            '" onclick="setChatFilter(\'' + sid + '\')">' +
-            escapeHtml(truncName) +
-            '<span class="chat-tab-phase">' + phaseLabel + '</span>' +
-            '</button>';
-  }
-  strip.innerHTML = html;
+  // Update plans list if open, and always update header indicator
+  if (_plansListOpen) renderPlansList();
+  updateChatHeaderIndicator();
 }
 
 function setChatFilter(filterId) {
@@ -426,6 +391,120 @@ function setChatFilter(filterId) {
   }
   renderChatTabs();
   _renderFilteredChat();
+}
+
+// ── Plans List Sub-Panel ──────────────────────────────────────────────────
+
+var _plansListOpen = false;
+
+function togglePlansList() {
+  var panel = document.getElementById('plansListPanel');
+  var btn = document.getElementById('plansListBtn');
+  if (!panel) return;
+  _plansListOpen = !_plansListOpen;
+  if (_plansListOpen) {
+    panel.classList.remove('plans-list-closed');
+    if (btn) btn.classList.add('open');
+    renderPlansList();
+  } else {
+    panel.classList.add('plans-list-closed');
+    if (btn) btn.classList.remove('open');
+  }
+}
+
+function closePlansList() {
+  if (!_plansListOpen) return;
+  _plansListOpen = false;
+  var panel = document.getElementById('plansListPanel');
+  var btn = document.getElementById('plansListBtn');
+  if (panel) panel.classList.add('plans-list-closed');
+  if (btn) btn.classList.remove('open');
+}
+
+function getPhaseColor(phase) {
+  var p = (phase || '').toLowerCase();
+  if (p === 'done' || p === 'complete') return C.done;
+  if (p === 'failed' || p === 'error') return C.failed;
+  if (p === 'review' || p === 'reviewing') return C.in_specialist_review;
+  if (p === 'revision') return C.revision;
+  if (p === 'running' || p === 'executing' || p === 'work') return C.in_progress;
+  return C.pending;
+}
+
+function renderPlansList() {
+  var body = document.getElementById('plansListBody');
+  var countEl = document.getElementById('plansListCount');
+  if (!body) return;
+  if (typeof _sessions === 'undefined') { body.innerHTML = ''; return; }
+
+  var sessionIds = Object.keys(_sessions);
+  if (countEl) countEl.textContent = sessionIds.length + ' session' + (sessionIds.length !== 1 ? 's' : '');
+
+  var html = '';
+
+  // "ALL PLANS" item
+  var totalUnread = Object.keys(_chatUnread).length;
+  html += '<div class="plan-item all-plans' + (_chatFilterId === 'all' ? ' active' : '') +
+          '" onclick="selectPlanFromList(\'all\')" tabindex="0" onkeydown="if(event.key===\'Enter\')selectPlanFromList(\'all\')">';
+  html += '<div class="plan-item-name">ALL PLANS</div>';
+  html += '<div class="plan-item-meta">';
+  html += '<span class="plan-item-progress">' + sessionIds.length + ' session' + (sessionIds.length !== 1 ? 's' : '') + '</span>';
+  if (totalUnread > 0) html += '<span class="plan-item-unread"></span>';
+  html += '</div></div>';
+
+  // Per-session items
+  for (var i = 0; i < sessionIds.length; i++) {
+    var sid = sessionIds[i];
+    var sess = _sessions[sid];
+    var d = sess.data;
+    if (!d) continue;
+    var project = d.project || sid;
+    var phase = d.phase || 'idle';
+    var done = d.results_count || 0;
+    var total = d.total_tasks || 0;
+    var hasUnread = !!_chatUnread[sid];
+    var phaseColor = getPhaseColor(phase);
+
+    html += '<div class="plan-item' + (_chatFilterId === sid ? ' active' : '') +
+            '" onclick="selectPlanFromList(\'' + sid + '\')" tabindex="0" onkeydown="if(event.key===\'Enter\')selectPlanFromList(\'' + sid + '\')">';
+    html += '<div class="plan-item-name">' + escapeHtml(project) + '</div>';
+    html += '<div class="plan-item-meta">';
+    html += '<span class="plan-item-phase" style="background:' + hexToRgba(phaseColor, 0.15) + ';color:' + phaseColor + '">' +
+            escapeHtml(phase.toUpperCase()) + '</span>';
+    if (total > 0) {
+      html += '<span class="plan-item-progress">' + done + '/' + total + '</span>';
+    }
+    if (hasUnread) html += '<span class="plan-item-unread"></span>';
+    html += '</div></div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function selectPlanFromList(filterId) {
+  setChatFilter(filterId);
+  closePlansList();
+  updateChatHeaderIndicator();
+}
+
+function updateChatHeaderIndicator() {
+  var el = document.getElementById('chatCurrentPlan');
+  if (!el) return;
+  if (typeof _sessions === 'undefined' || Object.keys(_sessions).length === 0) {
+    el.textContent = 'AGENT CHAT';
+    return;
+  }
+  if (_chatFilterId === 'all') {
+    var count = Object.keys(_sessions).length;
+    el.textContent = count > 1 ? 'ALL PLANS' : 'AGENT CHAT';
+  } else {
+    var sess = _sessions[_chatFilterId];
+    if (sess && sess.data && sess.data.project) {
+      el.textContent = sess.data.project;
+    } else {
+      el.textContent = _chatFilterId;
+    }
+  }
 }
 
 function _renderFilteredChat() {
@@ -464,14 +543,7 @@ function _renderAllChat() {
     }
   }
 
-  // Aggregate progress bar
-  if (progressEl) {
-    var pct = totalAll ? Math.round(totalDone / totalAll * 100) : 0;
-    var bar = '\u2588'.repeat(Math.floor(pct / 5)) + '\u2591'.repeat(20 - Math.floor(pct / 5));
-    progressEl.innerHTML = '<div class="chat-progress">' +
-      escapeHtml(projectNames.join(' + ')) + ' ' + bar + ' ' + pct + '% ' +
-      totalDone + '/' + totalAll + '</div>';
-  }
+  _renderProgressBar(progressEl, projectNames.join(' + '), totalDone, totalAll);
 
   // Render combined lines through existing pipeline
   var combined = allLines.slice(-60);
@@ -680,18 +752,18 @@ function buildChatHTML(groups) {
   return html;
 }
 
+function _renderProgressBar(el, label, done, total) {
+  if (!el) return;
+  var pct = total ? Math.round(done / total * 100) : 0;
+  var bar = '\u2588'.repeat(Math.floor(pct / 5)) + '\u2591'.repeat(20 - Math.floor(pct / 5));
+  el.innerHTML = '<div class="chat-progress">' + escapeHtml(label) + ' ' + bar + ' ' + pct + '% ' + done + '/' + total + '</div>';
+}
+
 function renderEventLog(lines, project, done, total) {
   var progressEl = document.getElementById('eventLogProgress');
   var bodyEl = document.getElementById('eventLogBody');
   if (!bodyEl) return;
-
-  // Progress bar (pinned header)
-  var pct = total ? Math.round(done / total * 100) : 0;
-  var bar = '\u2588'.repeat(Math.floor(pct / 5)) + '\u2591'.repeat(20 - Math.floor(pct / 5));
-  if (progressEl) {
-    progressEl.innerHTML = '<div class="chat-progress">' +
-      escapeHtml(project) + ' ' + bar + ' ' + pct + '% ' + done + '/' + total + '</div>';
-  }
+  _renderProgressBar(progressEl, project, done, total);
 
   // Parse, group, render
   var recent = lines.slice(-40);
@@ -1958,30 +2030,29 @@ function showOutputBrowserForPlan(planId) {
   loadOutputTree(planId);
 }
 
+function _downloadBlob(resp, filename, btn, okLabel, failLabel) {
+  if (!resp.ok) {
+    if (btn) { btn.textContent = failLabel || '\u2717'; setTimeout(function() { btn.disabled = false; btn.textContent = okLabel || '\u2B07'; }, 2000); }
+    return;
+  }
+  resp.blob().then(function(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var disp = resp.headers.get('Content-Disposition') || '';
+    var match = disp.match(/filename="?([^"]+)"?/);
+    a.download = match ? match[1] : filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (btn) { btn.disabled = false; btn.textContent = okLabel || '\u2B07'; }
+  });
+}
+
 function downloadOutputZip(planId, btnEl) {
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
   fetch('/output/' + planId + '/download')
-    .then(function(resp) {
-      if (!resp.ok) return fetch('/api/artifacts/' + planId + '/download');
-      return resp;
-    })
-    .then(function(resp) {
-      if (!resp.ok) {
-        if (btnEl) { btnEl.textContent = '\u2717'; setTimeout(function() { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }, 2000); }
-        return;
-      }
-      return resp.blob().then(function(blob) {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = planId + '_output.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        if (btnEl) { btnEl.textContent = '\u2713'; setTimeout(function() { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }, 2000); }
-      });
-    });
+    .then(function(resp) { return resp.ok ? resp : fetch('/api/artifacts/' + planId + '/download'); })
+    .then(function(resp) { _downloadBlob(resp, planId + '_output.zip', btnEl, '\u2B07', '\u2717'); });
 }
 
 function showOutputBrowser() {
@@ -2180,39 +2251,10 @@ function downloadArtifacts() {
   var planId = _outputPlanId || _activeSessionId || '';
   if (!planId) return;
   var btn = document.getElementById('outputDownloadBtn');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'PREPARING...';
-  }
+  if (btn) { btn.disabled = true; btn.textContent = 'PREPARING...'; }
   fetch('/api/artifacts/' + planId + '/download')
-    .then(function(resp) {
-      if (!resp.ok) {
-        if (btn) {
-          btn.textContent = 'NO ARTIFACTS';
-          setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000);
-        }
-        return;
-      }
-      return resp.blob().then(function(blob) {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        var disp = resp.headers.get('Content-Disposition') || '';
-        var match = disp.match(/filename="?([^"]+)"?/);
-        a.download = match ? match[1] : planId + '_artifacts.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        if (btn) { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }
-      });
-    })
-    .catch(function() {
-      if (btn) {
-        btn.textContent = 'DOWNLOAD FAILED';
-        setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000);
-      }
-    });
+    .then(function(resp) { _downloadBlob(resp, planId + '_artifacts.zip', btn, 'DOWNLOAD ZIP', 'NO ARTIFACTS'); })
+    .catch(function() { if (btn) { btn.textContent = 'DOWNLOAD FAILED'; setTimeout(function() { btn.disabled = false; btn.textContent = 'DOWNLOAD ZIP'; }, 2000); } });
 }
 
 // ── Review Analytics Panel ──────────────────────────────────────────────

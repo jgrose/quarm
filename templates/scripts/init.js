@@ -175,6 +175,12 @@ document.addEventListener('DOMContentLoaded', function() {
         timeline.classList.add('hidden'); return;
       }
 
+      // z:30 — Plans list sub-panel (close before chat panel)
+      if (typeof _plansListOpen !== 'undefined' && _plansListOpen) {
+        if (typeof closePlansList === 'function') closePlansList();
+        return;
+      }
+
       // z:30 — Side panels (event log, agent list) — close if open
       var eventLog = document.getElementById('eventLog');
       if (eventLog && !eventLog.classList.contains('collapsed')) {
@@ -202,6 +208,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (e.key === 'l' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       if (typeof toggleAgentList === 'function') toggleAgentList();
+    }
+    if (e.key === 'p' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      if (typeof togglePlansList === 'function') togglePlansList();
     }
     if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
       config.dependencies = !config.dependencies;
