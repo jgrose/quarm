@@ -1,176 +1,186 @@
-# Tier 2 Features: Cost Tracking + Dependency Visualization
+# Agent Status Dashboard — Agent-Flow Visual Style
 
 ## Context
 
-After completing Tier 1 stability work (30 tests, FPS profiling, WebSocket hardening, render optimizations), the user wants to tackle Tier 2 high-priority roadmap items. Three were selected:
+The user needs a way to see agent status clearly. The current NORT dashboard is an isometric city with buildings, walking programs, weather, and day/night — visually rich but agent status is buried across multiple panels. The `agent-flow/` directory contains a separate React/Canvas2D visualization with a clean holographic node-graph style focused on agent execution flow.
 
-1. **Cost tracking per agent** — dashboard panel showing overall plan token/cost AND per-agent breakdown
-2. **Task dependency visualization** — visual connections between dependent tasks, blocked indicators
-3. **Output browser + zip download** — **already implemented** (discovered during exploration: `output_browser.html`, `/api/artifacts/{plan_id}`, `/api/artifacts/{plan_id}/download` all exist)
+**Goal**: Create a new `/flow` route that renders an agent-flow-style dashboard using the same WebSocket data, reusing existing draw modules where possible. No isometric city — pure node graph focused on agent status.
 
-This plan covers Features 1 and 2 only. They can be built in parallel by two agents with minimal file conflicts.
+**Architecture decision**: New Jinja2 page with vanilla JS (not React). The NORT dashboard already ported ~80% of agent-flow's canvas rendering to vanilla JS (bloom, hex nodes, edges, particles, effects, tool cards, bubbles). The delta is small. Adding React/Vite would introduce a build toolchain the project doesn't use.
 
 ---
 
-## Feature 1: Cost Tracking Dashboard Panel
+## What Gets Reused (no modification needed)
 
-**Agent**: Cost Agent  
-**Goal**: Add a "COST TRACKER" panel with live per-plan and per-agent token/cost breakdown
+These existing NORT scripts already contain agent-flow's visual effects:
 
-### What Already Exists
-- `/api/analytics/costs` endpoint (`serve.py:660`) returns `{ total_tokens, recent_runs, by_agent, by_model }`
-- `tracking.py:110-130` — `get_cost_analytics()` with SQLite aggregation by agent
-- `task_scores` table has `run_id, task_id, agent, tokens, model` columns
-- Status bridge transmits `task_tokens` per task + `tokens_used` run total via WebSocket
-- `draw_cost.js` draws canvas-based cost pills (existing)
-- `_sessions[sid].data` in frontend has all live cost data
+| Module | Agent-Flow Equivalent | Notes |
+|--------|----------------------|-------|
+| `bloom.js` | `bloom-renderer.ts` | Same multi-pass blur, additive blend |
+| `draw_agents.js` | `draw-agents.ts` | Hex nodes, glows, state colors, badges |
+| `draw_edges.js` | `draw-edges.ts` | Tapered bezier curves, particle trails |
+| `draw_effects.js` | `draw-effects.ts` | Spawn/complete/error VFX |
+| `draw_tools.js` | `draw-tool-calls.ts` | Tool call cards |
+| `draw_bubbles.js` | `draw-bubbles.ts` | Message overlays |
+| `draw_context.js` | Context ring/bar | Token usage visualization |
+| `draw_cost.js` | `draw-cost.ts` | Cost pills per agent |
+| `draw_discoveries.js` | `draw-discoveries.ts` | Discovery cards |
+| `draw_dependencies.js` | N/A (NORT-only) | Task dependency lines |
+| `camera.js` | `use-canvas-camera.ts` | Pan/zoom with inertia |
+| `render_cache.js` | `render-cache.ts` | Glow sprite caching |
+| `colors.js` | `colors.ts` | Holographic palette |
+| `constants.js` | `canvas-constants.ts` | Animation config |
+| `nodes.js` | `agent-types.ts` | Node model + config |
+| `websocket.js` | N/A | WebSocket + applyStatus() |
+| `api.js` | N/A | API fetch helpers |
+| `panels.js` | N/A | Panel UI logic |
 
-### Backend Changes
-
-**`tracking.py`** — add `get_run_cost_breakdown(run_id)` function (after line 131):
-- Query `task_scores` grouped by agent and model for a specific run
-- Return `{ run: {...}, by_agent: [...], by_model: [...], by_task: [...] }`
-
-**`serve.py`** — add endpoint (after line 663):
-- `GET /api/analytics/costs/{run_id}` → calls `get_run_cost_breakdown()`
-
-### Frontend Changes
-
-**`templates/components/panels/cost_panel.html`** — NEW file (self-contained HTML + CSS + JS):
-- Glass-card panel, fixed position top-right, 380px wide
-- Two tabs: **LIVE** (from WebSocket `_sessions` data) and **HISTORY** (from API)
-- **LIVE tab**: Summary stats (total tokens, est. cost, task count) + per-agent bar chart aggregated from `data.tasks[].task_tokens` grouped by `data.tasks[].agent`
-- **HISTORY tab**: Recent runs list (clickable), drill into per-run agent/model breakdown via `/api/analytics/costs/{run_id}`
-- Auto-refreshes every 2s while visible
-- `_estimateCost(tokens)` helper using configurable rate per million tokens
-
-**`templates/base.html`** — add `{% include "components/panels/cost_panel.html" %}` (after line 38, after perf_panel)
-
-**`templates/components/top_bar.html`** — add COSTS button (after LEDGER at line 11):
-```html
-<button onclick="toggleCostPanel()">COSTS</button>
-```
-
-**`templates/scripts/init.js`** — add ESC dismiss for `costPanelOverlay` (in ESC block, line 87) + keyboard shortcut `$` (after line 106):
-```javascript
-if (e.key === '$' && ...) toggleCostPanel();
-```
-
-### Files Touched
-| File | Action |
-|------|--------|
-| `tracking.py` | Add 1 function (~25 lines) |
-| `serve.py` | Add 1 endpoint (~4 lines) |
-| `templates/components/panels/cost_panel.html` | CREATE (~200 lines) |
-| `templates/base.html` | Add 1 include line |
-| `templates/components/top_bar.html` | Add 1 button |
-| `templates/scripts/init.js` | Add ESC handler + shortcut (~5 lines) |
+**What gets dropped** (city-only, not included in flow.html):
+`draw_programs.js`, `draw_locations.js`, `draw_atmosphere.js`, `draw_weather.js`, `draw_minimap.js`, `draw_roster.js`, `draw_background.js` (isometric grid portion), `audio.js`
 
 ---
 
-## Feature 2: Task Dependency Visualization
+## New Files (4)
 
-**Agent**: Deps Agent  
-**Goal**: Draw dependency lines between programs and show blocked task indicators
+### 1. `templates/flow.html` (~80 lines)
 
-### What Already Exists
-- `node.dependsOn` already captured from WebSocket data (`websocket.js:209,368`)
-- Task flow arrows system in `draw_locations.js:1220-1281` (animated dashed lines between buildings)
-- Bezier edge drawing in `draw_edges.js:25-87` (tapered curves with control points)
-- Active building indicators in `draw_locations.js:1132-1159` (pulsing ring + badge)
-- `ambientPrograms[i].assignedTask = { id, status, title }` links programs to tasks
-- **No backend changes needed** — all data already transmitted
+Page shell modeled after `base.html` but focused on agent status:
 
-### Design Decisions
-- **Lines connect programs to programs** (not buildings), since dependencies are task-to-task and each task maps to an agent/program
-- **Lines shown** when a dependency exists AND is unresolved (prerequisite not `done`)
-- **Lines fade out** when prerequisite completes
-- **Blocked indicator**: lock badge + "BLOCKED" text above programs assigned to tasks with unmet deps
-- **New file** `draw_dependencies.js` (not extending draw_locations.js which is 1300+ lines)
+**Includes (HTML panels):**
+- `components/top_bar.html` — connection status, session tabs, stats
+- Agent detail card (inline glass-card)
+- `components/event_log.html` — agent chat
+- `components/panels/agent_list.html` — agent status sidebar
+- `components/panels/cost_panel.html` — token breakdown
+- `components/panels/config.html` — settings (display toggles)
+- `components/panels/perf_panel.html` — FPS monitoring
 
-### Frontend Changes
+**Does NOT include**: queue, thinking, completion, ledger, plan_viewer, model_config, tolerance_config, transcript, timeline, file_attention, roster, agents registry, output_browser, review_analytics, DAG panel
 
-**`templates/scripts/draw_dependencies.js`** — NEW file (~180 lines):
-- `rebuildDependencyState(tasks)` — called from websocket.js on status updates. Scans tasks for unmet `depends_on`, builds `_depLines[]` and `_blockedTasks{}` maps
-- `drawDependencyLines(ctx, time)` — draws animated dashed bezier curves between programs. Amber for active deps, green fade-out for resolved. Uses `_computeCP` pattern from draw_edges.js
-- `drawBlockedIndicators(ctx, time)` — draws lock badge + "BLOCKED" text above blocked programs with bob animation
-- `_findProgramForTask(taskId)` — scans `ambientPrograms` for matching `assignedTask.id`
+**Includes (JS scripts — ~20 of the 29):**
+- `colors.js`, `constants.js`, `render_cache.js`, `nodes.js`, `force.js`
+- `draw_agents.js`, `draw_edges.js`, `draw_effects.js`, `draw_tools.js`, `draw_bubbles.js`, `draw_context.js`, `draw_cost.js`, `draw_dependencies.js`, `draw_discoveries.js`
+- `bloom.js`, `camera.js`
+- `websocket.js`, `api.js`, `panels.js`
+- **NEW**: `flow_background.js`, `flow_render.js`, `flow_init.js`
 
-**`templates/scripts/websocket.js`** — add `rebuildDependencyState(tasks)` call:
-- After `routeProgramsToTasks(tasks)` at line 273
-- After session switch task processing at line 368
+### 2. `templates/scripts/flow_background.js` (~60 lines)
 
-**`templates/scripts/render.js`** — add draw calls in world-space section (after programs, ~line 170):
-```javascript
-if (config.dependencies && typeof drawDependencyLines === 'function') {
-  drawDependencyLines(ctx, currentTime);
-}
-if (config.dependencies && typeof drawBlockedIndicators === 'function') {
-  drawBlockedIndicators(ctx, currentTime);
+Stripped-down background with agent-flow's void aesthetic:
+- Background color: `#050510` (deep void)
+- Depth particles: reuse the `initDepthParticles()` / `drawDepthParticles()` functions from `draw_background.js` (copy the ~40 lines of depth particle code)
+- Hex grid: pulsing hexagonal grid from agent-flow (distance-based alpha with `Math.sin(time * 0.5 + dist * 0.005)`), NOT the isometric diamond grid
+- No isometric tiles, no offscreen canvas caching (those are city-only)
+
+### 3. `templates/scripts/flow_render.js` (~100 lines)
+
+Simplified render loop (vs the 250-line `render.js`):
+
+```
+function flowRender(timestamp) {
+  // dt, currentTime calculation
+  // FPS sampling (reuse _fps, _frameCount pattern)
+  // Clear to #050510
+  // Draw flow background (depth particles + hex grid)
+  // Apply camera transform
+  // Draw edges (drawAllEdges)
+  // Draw particles (drawAllParticles)
+  // Draw agents (drawAllAgents) 
+  // Draw context bars (drawAllContextBars)
+  // Draw tool cards (drawAllToolCards)
+  // Draw bubbles (drawAllBubbles)
+  // Draw discoveries (drawAllDiscoveries)
+  // Draw dependencies (drawDependencyLines, drawBlockedIndicators)
+  // Draw cost pills (drawAllCostPills)
+  // Draw effects (drawEffects)
+  // Tick force simulation (free mode)
+  // Apply bloom
+  // FPS badge (if perfOverlay)
+  // requestAnimationFrame(flowRender)
 }
 ```
 
-**`templates/scripts/nodes.js`** — add `dependencies: true` to config (after `activeIndicators` at line 49)
+Key difference from `render.js`: no buildings, programs, weather, atmosphere, minimap, roster badges. Just the agent node graph.
 
-**`templates/base.html`** — add `{% include "scripts/draw_dependencies.js" %}` (after draw_cost.js at line 54)
+### 4. `templates/scripts/flow_init.js` (~80 lines)
 
-**`templates/scripts/init.js`** — add keyboard shortcut `d` (after line 106):
-```javascript
-if (e.key === 'd' && ...) config.dependencies = !config.dependencies;
+Boot script for the flow page:
+- Initialize canvas + camera
+- Set `config.flowMode = true` (used by force.js to skip zone attraction)
+- Set background to void color
+- Connect WebSocket (reuses `connectWS()` from websocket.js)
+- Register keyboard shortcuts (subset: Q, C, L, A, P, $, ESC)
+- Add "CITY VIEW" button in top bar linking back to `/`
+- Start `flowRender()` loop
+
+---
+
+## Modified Files (4)
+
+### 1. `serve.py` — Add `/flow` route (3 lines)
+
+After the existing root route (around line 394):
+```python
+@app.get("/flow", response_class=HTMLResponse)
+async def flow_view(request: Request):
+    return templates.TemplateResponse(request, "flow.html", {"port": PORT})
 ```
 
-**`templates/components/panels/config.html`** — add DEPENDENCIES toggle row in DISPLAY tab
+### 2. `templates/scripts/force.js` — Add free layout mode (~6 lines)
 
-### Files Touched
-| File | Action |
-|------|--------|
-| `templates/scripts/draw_dependencies.js` | CREATE (~180 lines) |
-| `templates/scripts/websocket.js` | Add 2 function calls (~4 lines) |
-| `templates/scripts/render.js` | Add draw calls (~6 lines) |
-| `templates/scripts/nodes.js` | Add 1 config flag |
-| `templates/base.html` | Add 1 include line |
-| `templates/scripts/init.js` | Add 1 shortcut (~3 lines) |
-| `templates/components/panels/config.html` | Add 1 toggle row (~4 lines) |
+At lines 41-48 (zone attraction block), wrap in a config check:
+```javascript
+if (!config.flowMode) {
+  // Zone attraction — pull toward zone's Y band
+  var targetY = zoneH * (n.zone + 1);
+  ...
+}
+```
+When `config.flowMode` is true, nodes use pure charge/spring layout without zone banding — same physics as agent-flow's D3-force.
 
----
+### 3. `templates/scripts/draw_agents.js` — Add Claude spark logo (~25 lines)
 
-## File Conflict Analysis
+Port the `drawClaudeSpark()` function from `agent-flow/web/components/agent-visualizer/canvas/draw-agents.ts:16-27`:
+- Add `CLAUDE_SPARK_D` SVG path constant (from `draw-misc.ts:68`)
+- Add `_claudeSparkPath = null` lazy Path2D cache
+- Add `drawClaudeSpark(ctx, cx, cy, r, color)` function
+- In the main agent draw function, when `config.flowMode && node.tier === 'nexus'`, draw spark instead of current icon
 
-| File | Cost Agent | Deps Agent | Risk |
-|------|-----------|-----------|------|
-| `templates/base.html` | Add panel include (HTML section) | Add script include (JS section) | **NONE** — different sections |
-| `templates/scripts/init.js` | Add ESC + `$` shortcut | Add `d` shortcut | **LOW** — adjacent lines |
-| `templates/scripts/nodes.js` | — | Add config flag | **NONE** |
-| `templates/scripts/render.js` | — | Add draw calls | **NONE** |
-| `templates/scripts/websocket.js` | — | Add rebuildDependencyState | **NONE** |
-| `tracking.py` | Add 1 function | — | **NONE** |
-| `serve.py` | Add 1 endpoint | — | **NONE** |
+### 4. `templates/styles/base.css` — Add `.flow-page` styles (~30 lines)
 
-**Verdict**: Safe to parallelize in worktrees. The only shared file is `init.js` with adjacent line additions — trivial merge.
-
----
-
-## Execution Plan
-
-**Single wave, 2 agents in parallel** (worktree isolation):
-
-| Agent | Type | Files | Isolation |
-|-------|------|-------|-----------|
-| Cost Agent | Engineer | `tracking.py`, `serve.py`, `cost_panel.html` (new), `base.html`, `top_bar.html`, `init.js` | worktree |
-| Deps Agent | Engineer | `draw_dependencies.js` (new), `websocket.js`, `render.js`, `nodes.js`, `base.html`, `init.js`, `config.html` | worktree |
-
-### After merge
-1. Run `python3 -m pytest tests/ -v --ignore=tests/test_smoke.py` — verify no regressions
-2. Start `serve.py`, open dashboard
-3. Verify cost panel: press `$`, see LIVE and HISTORY tabs, check per-agent bars
-4. Verify dependency viz: press `d`, run a plan with dependencies, see lines between programs + blocked indicators
-5. Update `roadmap.md` — check off cost tracking, dependency visualization, output browser, and zip download
+```css
+.flow-page { background: #050510; }
+.flow-page #canvasWrap { background: transparent; }
+.flow-page .top-bar-actions button { /* agent-flow glass style */ }
+```
 
 ---
 
-## Roadmap Items to Mark Done After This
+## Parallelization
 
-- [x] Cost tracking per agent
-- [x] Task dependency visualization
-- [x] Output browser in dashboard (already implemented)
-- [x] Download output as zip (already implemented)
+**Two agents, single wave:**
+
+| Agent | Files | Scope |
+|-------|-------|-------|
+| **Flow-Shell** | `serve.py`, `flow.html`, `flow_init.js`, `flow_background.js` | Route, page shell, boot, background |
+| **Flow-Render** | `flow_render.js`, `force.js`, `draw_agents.js`, `base.css` | Render loop, force mode, spark logo, styles |
+
+**File conflict**: None. Each agent touches completely separate files.
+
+**Dependency**: Flow-Render needs to know that `flow_background.js` exports `drawFlowBackground(ctx, W, H, time)` and `initFlowParticles(W, H)` — just the function signatures.
+
+---
+
+## Verification
+
+1. Start `serve.py`, navigate to `http://localhost:8000/flow`
+2. See void background with depth particles and pulsing hex grid
+3. Run an orchestrator plan — agents appear as hexagonal nodes with state colors
+4. NEXUS node shows Claude spark logo
+5. Edges connect managers to agents with particle trails
+6. Tool cards appear near active agents
+7. Nodes use free-form layout (no zone banding)
+8. Press `C` for chat, `L` for agent list, `$` for costs — panels work
+9. Press `P` — FPS badge appears
+10. Click "CITY VIEW" to return to main dashboard at `/`
+11. Run `python3 -m pytest tests/ -v --ignore=tests/test_smoke.py` — no regressions

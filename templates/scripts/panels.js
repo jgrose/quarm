@@ -640,6 +640,20 @@ function renderQueue(plans) {
       actions.appendChild(runBtn);
     }
 
+    if (p.status === 'done') {
+      var dlBtn = document.createElement('button');
+      dlBtn.textContent = '\u2B07';
+      dlBtn.title = 'Download output ZIP';
+      dlBtn.className = 'queue-dl-btn';
+      dlBtn.onclick = (function(planId) { return function(e) { e.stopPropagation(); downloadOutputZip(planId, e.currentTarget); }; })(p.id);
+      actions.appendChild(dlBtn);
+      var browseBtn = document.createElement('button');
+      browseBtn.textContent = '\uD83D\uDCC2';
+      browseBtn.title = 'Browse output files';
+      browseBtn.onclick = (function(planId) { return function(e) { e.stopPropagation(); showOutputBrowserForPlan(planId); }; })(p.id);
+      actions.appendChild(browseBtn);
+    }
+
     if (p.status === 'running' || p.status === 'generating') {
       var stopBtn = document.createElement('button');
       stopBtn.textContent = 'STOP';
@@ -1785,6 +1799,56 @@ function updateAgentToleranceLabel(el) {
 // ── Output Browser ──────────────────────────────────────────────────────────
 
 var _outputPlanId = null;
+var _outputSource = 'artifacts'; // 'artifacts' or 'output'
+
+function _updateSourceToggle() {
+  var togArt = document.getElementById('srcArtifacts');
+  var togOut = document.getElementById('srcOutput');
+  if (togArt) togArt.classList.toggle('active', _outputSource === 'artifacts');
+  if (togOut) togOut.classList.toggle('active', _outputSource === 'output');
+}
+
+function switchOutputSource(source) {
+  _outputSource = source;
+  _updateSourceToggle();
+  if (_outputPlanId) loadOutputTree(_outputPlanId);
+}
+
+function showOutputBrowserForPlan(planId) {
+  _outputPlanId = planId;
+  _outputSource = 'output';
+  var overlay = document.getElementById('outputBrowserOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  _updateSourceToggle();
+  loadOutputTree(planId);
+}
+
+function downloadOutputZip(planId, btnEl) {
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+  fetch('/output/' + planId + '/download')
+    .then(function(resp) {
+      if (!resp.ok) return fetch('/api/artifacts/' + planId + '/download');
+      return resp;
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (btnEl) { btnEl.textContent = '\u2717'; setTimeout(function() { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }, 2000); }
+        return;
+      }
+      return resp.blob().then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = planId + '_output.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        if (btnEl) { btnEl.textContent = '\u2713'; setTimeout(function() { btnEl.disabled = false; btnEl.textContent = '\u2B07'; }, 2000); }
+      });
+    });
+}
 
 function showOutputBrowser() {
   var overlay = document.getElementById('outputBrowserOverlay');
@@ -1804,7 +1868,10 @@ function loadOutputTree(planId) {
   _outputPlanId = planId;
   var treeEl = document.getElementById('outputFileTree');
   if (treeEl) treeEl.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
-  fetch('/api/artifacts/' + planId)
+  var endpoint = _outputSource === 'output'
+    ? '/api/output/' + planId + '/files'
+    : '/api/artifacts/' + planId;
+  fetch(endpoint)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       renderFileTree(data.tree || {}, data.files || []);

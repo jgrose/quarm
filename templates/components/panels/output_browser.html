@@ -1,7 +1,13 @@
 <div id="outputBrowserOverlay" class="hidden" onclick="this.classList.add('hidden')">
   <div class="output-browser-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div class="config-title" style="margin:0">OUTPUT BROWSER</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="config-title" style="margin:0">OUTPUT BROWSER</div>
+        <div class="source-toggle">
+          <button id="srcArtifacts" class="src-btn active" onclick="switchOutputSource('artifacts')">ARTIFACTS</button>
+          <button id="srcOutput" class="src-btn" onclick="switchOutputSource('output')">OUTPUT</button>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-sm" id="outputDownloadBtn" onclick="downloadArtifacts()" style="font-size:9px;padding:4px 10px">DOWNLOAD ZIP</button>
         <span style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">ESC</span>

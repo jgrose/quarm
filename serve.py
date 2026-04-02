@@ -980,6 +980,96 @@ async def list_revisions(plan_id: str, task_id: str):
     return {"revisions": revisions}
 
 
+# ── Output Directory API ───────────────────────────────────────────────────
+
+OUTPUT_DIR = STATIC_DIR / "output"
+
+
+def _find_output_dir(plan_id: str) -> Path | None:
+    """Locate the output folder for a plan_id (named {plan_id}_{slug})."""
+    if not OUTPUT_DIR.is_dir():
+        return None
+    for d in OUTPUT_DIR.iterdir():
+        if d.is_dir() and d.name.startswith(plan_id):
+            return d
+    return None
+
+
+@app.get("/api/output/{plan_id}/files")
+async def list_output_files(plan_id: str):
+    """Return a JSON tree of files in the assembled output directory."""
+    _validate_plan_id(plan_id)
+    out_dir = _find_output_dir(plan_id)
+    if out_dir is None:
+        return {"files": [], "tree": {}}
+    files = []
+    tree = {}
+    for f in sorted(out_dir.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(out_dir)
+            parts = rel.parts
+            st_size = f.stat().st_size
+            ext = f.suffix.lstrip(".")
+            files.append({"path": str(rel), "size": st_size, "name": f.name, "ext": ext})
+            node = tree
+            for part in parts[:-1]:
+                node = node.setdefault(part, {})
+            node[f.name] = {"file": True, "path": str(rel), "size": st_size, "ext": ext}
+    return {"files": files, "tree": tree}
+
+
+@app.get("/api/output/{plan_id}/file")
+async def get_output_file(plan_id: str, path: str = ""):
+    """Return the content of a specific file from the output directory."""
+    _validate_plan_id(plan_id)
+    if not path:
+        raise HTTPException(status_code=400, detail="path parameter required")
+    out_dir = _find_output_dir(plan_id)
+    if out_dir is None:
+        raise HTTPException(status_code=404, detail="Output directory not found")
+    resolved_dir = out_dir.resolve()
+    target = (resolved_dir / path).resolve()
+    try:
+        target.relative_to(resolved_dir)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    binary_exts = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf", ".zip", ".tar", ".gz"}
+    if target.suffix.lower() in binary_exts:
+        return {"path": path, "binary": True, "size": target.stat().st_size}
+    try:
+        content = target.read_text(errors="replace")
+        return {"path": path, "binary": False, "content": content, "size": target.stat().st_size}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/output/{plan_id}/download")
+async def download_output(plan_id: str):
+    """Download the assembled output folder for a plan as a ZIP."""
+    _validate_plan_id(plan_id)
+    out_dir = _find_output_dir(plan_id)
+    if out_dir is None:
+        raise HTTPException(status_code=404, detail="No output found for this plan")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(out_dir.rglob("*")):
+            if f.is_file():
+                zf.write(f, arcname=str(f.relative_to(out_dir)))
+    buf.seek(0)
+    zip_size = buf.getbuffer().nbytes
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]", "", out_dir.name)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}.zip"',
+            "Content-Length": str(zip_size),
+        },
+    )
+
+
 # ── Agent Registry API ──────────────────────────────────────────────────────
 
 # ── Agent Import/Export ────────────────────────────────────────────────────

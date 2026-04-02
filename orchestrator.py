@@ -782,6 +782,7 @@ def manager_review_node(state):
         log_event(f"[{manager['name'].upper()}] Max revisions — force-approving {tid}")
         results = {**results, tid: task["result"]}
         tasks   = upd(tasks, tid, status="done")
+        _record_specialization(task)
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
@@ -859,6 +860,7 @@ def manager_review_node(state):
             print(f"  {skip_msg}"); log_event(skip_msg)
             results = {**results, tid: task["result"]}
             tasks = upd(tasks, tid, status="done", manager_notes="", last_score=score)
+            _record_specialization(task, score_override=score)
             _auto_ingest(task, results)
             s = {**state, "tasks": tasks, "results": results,
                  "phase": "dispatch", "active_task_id": None,
@@ -939,6 +941,7 @@ def specialist_review_node(state):
         set_active_reviewer(None)
         results = {**results, tid: task["result"]}
         tasks   = upd(tasks, tid, status="done")
+        _record_specialization(task)
         _auto_ingest(task, results)
         s = {**state, "tasks": tasks, "results": results,
              "phase": "dispatch", "active_task_id": None}
@@ -1020,6 +1023,7 @@ def specialist_review_node(state):
     print(f"  {msg}"); log_event(msg)
     results = {**results, tid: task["result"]}
     tasks   = upd(tasks, tid, status="done", reviewer_notes="")
+    _record_specialization(task)
     _auto_ingest(task, results)
     s = {**state, "tasks": tasks, "results": results,
          "phase": "dispatch", "active_task_id": None}
