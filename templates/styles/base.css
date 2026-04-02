@@ -2632,3 +2632,27 @@ a:focus-visible {
   color: var(--text-dim);
   font-weight: 400;
 }
+
+/* ═══ FLOW PAGE STYLES ═══ */
+.flow-page {
+  background: #050510;
+}
+.flow-page #canvasWrap {
+  background: transparent;
+}
+.flow-page #topBar {
+  background: rgba(10, 15, 30, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(100, 200, 255, 0.1);
+}
+.flow-page .top-bar-actions button {
+  background: rgba(100, 200, 255, 0.08);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  color: rgba(200, 230, 255, 0.8);
+  transition: all 0.2s;
+}
+.flow-page .top-bar-actions button:hover {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: rgba(100, 200, 255, 0.3);
+  color: #fff;
+}
