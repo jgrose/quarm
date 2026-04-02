@@ -18,6 +18,12 @@
     <button class="agents-tab" onclick="showAgentTab('reviewers', this)">REVIEWERS</button>
     <button class="agents-tab" onclick="showAgentTab('teams', this)">TEAMS</button>
   </div>
+  <div class="agent-sort-bar" id="agentSortBar">
+    <span style="font-size:8px;color:var(--text-dim);letter-spacing:0.5px;margin-right:4px">SORT:</span>
+    <button class="agent-sort-btn active" onclick="setAgentsSort('score', this)">SCORE</button>
+    <button class="agent-sort-btn" onclick="setAgentsSort('runs', this)">RUNS</button>
+    <button class="agent-sort-btn" onclick="setAgentsSort('rejection', this)">REJECT</button>
+  </div>
   <div id="agentsList"></div>
   <div id="agentsActions" style="padding:6px 8px;display:flex;gap:6px">
     <button class="agents-create-btn" onclick="showCreateAgentForm()">+ CREATE AGENT</button>

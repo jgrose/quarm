@@ -1402,6 +1402,30 @@ var _agentsActiveTab = 'sub_agents';
 var _agentsData = null;
 var _teamsData = null;
 var _showRetired = false;
+var _agentsSortBy = 'score';
+
+function setAgentsSort(metric, btn) {
+  _agentsSortBy = metric;
+  var btns = document.querySelectorAll('.agent-sort-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  if (btn) btn.classList.add('active');
+  renderAgentsList();
+}
+
+function _relativeTime(ts) {
+  if (!ts) return 'never';
+  var diff = Date.now() - new Date(ts).getTime();
+  if (diff < 0) diff = 0;
+  var sec = Math.floor(diff / 1000);
+  if (sec < 60) return sec + 's ago';
+  var min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm ago';
+  var hr = Math.floor(min / 60);
+  if (hr < 24) return hr + 'h ago';
+  var d = Math.floor(hr / 24);
+  if (d < 30) return d + 'd ago';
+  return Math.floor(d / 30) + 'mo ago';
+}
 
 function toggleAgentsPanel() {
   var el = document.getElementById('agentsOverlay');
@@ -1464,6 +1488,18 @@ function renderAgentsList() {
     filtered = filtered.filter(function(a) { return !a.retired; });
   }
 
+  // Sort by selected metric
+  filtered.sort(function(a, b) {
+    if (_agentsSortBy === 'score') return (b.avg_score || 0) - (a.avg_score || 0);
+    if (_agentsSortBy === 'runs') return (b.runs || 0) - (a.runs || 0);
+    if (_agentsSortBy === 'rejection') {
+      var ra = (a.runs || 0) > 0 ? ((a.rejections || 0) / a.runs) : 0;
+      var rb = (b.runs || 0) > 0 ? ((b.rejections || 0) / b.runs) : 0;
+      return rb - ra;
+    }
+    return 0;
+  });
+
   var html = '';
   if (filtered.length === 0) {
     html = '<div style="padding:12px;color:' + C.textMuted + ';font-size:9px">No agents in this category</div>';
@@ -1471,7 +1507,7 @@ function renderAgentsList() {
 
   for (var i = 0; i < filtered.length; i++) {
     var a = filtered[i];
-    var scoreColor = (a.avg_score || 0) >= 7 ? '#66ffaa' : (a.avg_score || 0) >= 4 ? '#ffbb44' : '#ff5566';
+    var scoreColor = (a.avg_score || 0) >= 7 ? '#66ffaa' : (a.avg_score || 0) >= 5 ? '#ffbb44' : '#ff5566';
     var builtinBadge = a.builtin ? '<span style="color:' + C.textMuted + ';font-size:7px;margin-left:4px">BUILTIN</span>' : '';
     var retiredBadge = a.retired ? '<span style="color:#ff5566;font-size:7px;margin-left:4px;border:1px solid #ff556644;padding:0 3px;border-radius:2px">RETIRED</span>' : '';
     var warningBadge = '';
@@ -1502,6 +1538,32 @@ function renderAgentsList() {
       }
       html += '</div>';
     }
+
+    // Performance stats
+    if (a.runs > 0) {
+      var rejPct = a.runs > 0 ? Math.round(((a.rejections || 0) / a.runs) * 100) : 0;
+      var rejColor = rejPct < 20 ? '#66ffaa' : rejPct <= 40 ? '#ffbb44' : '#ff5566';
+      var scorePct = Math.min(((a.avg_score || 0) / 10) * 100, 100);
+      var passCount = (a.runs || 0) - (a.rejections || 0);
+
+      html += '<div class="agent-perf">';
+      html += '<div class="agent-perf-row">';
+      html += '<span class="agent-perf-val" style="color:' + scoreColor + '">SCORE ' + (a.avg_score || 0).toFixed(1) + '/10</span>';
+      html += '<div class="agent-perf-bar"><div class="agent-perf-fill" style="width:' + scorePct + '%;background:' + scoreColor + '"></div></div>';
+      html += '</div>';
+      html += '<div class="agent-perf-row">';
+      html += '<span class="agent-perf-val" style="color:' + rejColor + '">REJECT ' + rejPct + '%</span>';
+      html += '<div class="agent-perf-bar"><div class="agent-perf-fill" style="width:' + rejPct + '%;background:' + rejColor + '"></div></div>';
+      html += '</div>';
+      html += '<div class="agent-perf-row">';
+      html += '<span class="agent-perf-val">' + passCount + ' pass / ' + (a.rejections || 0) + ' fail / ' + a.runs + ' total</span>';
+      html += '<span class="agent-perf-val">' + _relativeTime(a.last_used) + '</span>';
+      html += '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="agent-perf"><div class="agent-perf-empty">No performance data yet</div></div>';
+    }
+
     html += '</div>';
   }
 
