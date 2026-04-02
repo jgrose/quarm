@@ -1487,41 +1487,86 @@ function createNewAgent() {
 
 // ── Teams Tab ──────────────────────────────────────────────────────────────
 
+var _presetsData = null;
+
 function loadTeamsData() {
-  fetchTeams().then(function(teams) {
-    _teamsData = teams;
+  Promise.all([fetchTeams(), fetchTeamPresets()]).then(function(results) {
+    _teamsData = results[0];
+    _presetsData = results[1];
     renderTeamsList();
   });
 }
 
 function renderTeamsList() {
   var list = document.getElementById('agentsList');
-  if (!_teamsData || _teamsData.length === 0) {
-    list.innerHTML = '<div style="padding:12px;color:' + C.textMuted + ';font-size:9px">No team presets defined</div>';
-    return;
-  }
-
   var html = '';
-  for (var i = 0; i < _teamsData.length; i++) {
-    var team = _teamsData[i];
-    var agentCount = (team.agents || []).length;
-    html += '<div class="agent-item" onclick="showTeamDetail(\'' + escapeHtml(team.name) + '\')">';
-    html += '<div class="agent-item-header">';
-    html += '<span class="agent-item-name">' + escapeHtml(team.title || team.name) + '</span>';
-    html += '<span class="agent-item-score" style="color:' + C.textMuted + '">' + agentCount + ' agents</span>';
-    html += '</div>';
-    html += '<div class="agent-item-desc">' + escapeHtml((team.description || '').slice(0, 80)) + '</div>';
-    if (team.agents && team.agents.length > 0) {
-      html += '<div class="agent-item-tags">';
-      for (var a = 0; a < Math.min(team.agents.length, 6); a++) {
-        html += '<span class="agent-tag">' + escapeHtml(team.agents[a].name || team.agents[a]) + '</span>';
+
+  // ── Built-in Presets section ──
+  if (_presetsData && _presetsData.length > 0) {
+    html += '<div style="font-size:7px;color:' + C.textDim + ';letter-spacing:1.5px;padding:8px 8px 4px;border-bottom:1px solid rgba(100,200,255,0.08)">BUILT-IN PRESETS</div>';
+    for (var p = 0; p < _presetsData.length; p++) {
+      var preset = _presetsData[p];
+      var agentCount = (preset.agents || []).length;
+      html += '<div class="agent-item" style="border-left:2px solid rgba(100,200,255,0.25);margin-left:4px">';
+      html += '<div class="agent-item-header">';
+      html += '<span class="agent-item-name">' + escapeHtml(preset.title || preset.name) + ' <span style="color:' + C.textMuted + ';font-size:7px;margin-left:4px">PRESET</span></span>';
+      html += '<span class="agent-item-score" style="color:' + C.textMuted + '">' + agentCount + ' agents</span>';
+      html += '</div>';
+      html += '<div class="agent-item-desc">' + escapeHtml((preset.description || '').slice(0, 100)) + '</div>';
+      if (preset.agents && preset.agents.length > 0) {
+        html += '<div class="agent-item-tags">';
+        for (var a = 0; a < preset.agents.length; a++) {
+          html += '<span class="agent-tag">' + escapeHtml(preset.agents[a].name || preset.agents[a]) + '</span>';
+        }
+        html += '</div>';
       }
-      if (team.agents.length > 6) html += '<span class="agent-tag">+' + (team.agents.length - 6) + '</span>';
+      html += '<div style="margin-top:4px">';
+      html += '<button class="agent-save-btn" style="font-size:7px;padding:2px 8px" onclick="event.stopPropagation(); promptApplyPreset(\'' + escapeHtml(preset.name) + '\')">APPLY</button>';
+      html += '</div>';
       html += '</div>';
     }
-    html += '</div>';
   }
+
+  // ── Custom Teams section ──
+  html += '<div style="font-size:7px;color:' + C.textDim + ';letter-spacing:1.5px;padding:8px 8px 4px;border-bottom:1px solid rgba(100,200,255,0.08)">CUSTOM TEAMS</div>';
+  if (!_teamsData || _teamsData.length === 0) {
+    html += '<div style="padding:12px;color:' + C.textMuted + ';font-size:9px">No custom teams defined</div>';
+  } else {
+    for (var i = 0; i < _teamsData.length; i++) {
+      var team = _teamsData[i];
+      var teamAgentCount = (team.agents || []).length;
+      html += '<div class="agent-item" onclick="showTeamDetail(\'' + escapeHtml(team.name) + '\')">';
+      html += '<div class="agent-item-header">';
+      html += '<span class="agent-item-name">' + escapeHtml(team.title || team.name) + '</span>';
+      html += '<span class="agent-item-score" style="color:' + C.textMuted + '">' + teamAgentCount + ' agents</span>';
+      html += '</div>';
+      html += '<div class="agent-item-desc">' + escapeHtml((team.description || '').slice(0, 80)) + '</div>';
+      if (team.agents && team.agents.length > 0) {
+        html += '<div class="agent-item-tags">';
+        for (var ta = 0; ta < Math.min(team.agents.length, 6); ta++) {
+          html += '<span class="agent-tag">' + escapeHtml(team.agents[ta].name || team.agents[ta]) + '</span>';
+        }
+        if (team.agents.length > 6) html += '<span class="agent-tag">+' + (team.agents.length - 6) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
+
   list.innerHTML = html;
+}
+
+function promptApplyPreset(presetName) {
+  var teamName = prompt('Team name for this preset:', presetName + '-team');
+  if (!teamName) return;
+  teamName = teamName.trim().toLowerCase().replace(/\s+/g, '_');
+  applyTeamPreset(presetName, teamName).then(function(result) {
+    if (result && result.ok) {
+      loadTeamsData();
+    } else {
+      alert('Failed to apply preset: ' + (result && result.detail ? result.detail : 'unknown error'));
+    }
+  });
 }
 
 function showTeamDetail(name) {

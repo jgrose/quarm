@@ -113,6 +113,120 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "game_developer": {
+      "name": "game_developer",
+      "description": "Core game logic specialist responsible for implementing checkers rules, board state management, move validation, king promotion, multi-jump chains, and mandatory capture enforcement. Outputs clean Python modules.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "execute_code",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "read_file",
+        "execute_code",
+        "web_search",
+        "write_file",
+        "python"
+      ],
+      "created_at": "2026-04-02T04:05:17.353205+00:00",
+      "updated_at": "2026-04-02T04:05:17.353205+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "ui_artist": {
+      "name": "ui_artist",
+      "description": "Pygame rendering and visual design specialist responsible for the synthwave aesthetic \u2014 neon grid lines, glowing pieces, gradient backgrounds, animated highlights, retro fonts, and all visual polish. Outputs Pygame rendering code and asset generation.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "execute_code",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "design",
+        "read_file",
+        "web_search",
+        "execute_code",
+        "write_file"
+      ],
+      "created_at": "2026-04-02T04:05:17.354122+00:00",
+      "updated_at": "2026-04-02T04:05:17.354122+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "integration_developer": {
+      "name": "integration_developer",
+      "description": "Integration specialist who combines game logic and rendering into a cohesive main application with game loop, event handling, turn management, win detection, and a start/end screen. Outputs the final runnable main.py and ensures all modules work together.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "execute_code",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "read_file",
+        "web_search",
+        "execute_code",
+        "write_file"
+      ],
+      "created_at": "2026-04-02T04:05:17.354892+00:00",
+      "updated_at": "2026-04-02T04:05:17.354892+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "creative_writer": {
+      "name": "creative_writer",
+      "description": "Expert fiction writer specializing in short stories. Produces polished prose narratives with strong character development, dialogue, pacing, and emotional resonance. Output is a complete short story in markdown format.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "read_file",
+        "web_search",
+        "write_file"
+      ],
+      "created_at": "2026-04-02T04:05:18.502481+00:00",
+      "updated_at": "2026-04-02T04:05:18.502481+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "story_architect": {
+      "name": "story_architect",
+      "description": "Narrative design specialist who creates story outlines, character profiles, thematic frameworks, and plot structures. Output is a detailed story blueprint document covering premise, character arcs, key scenes, tone, and thematic throughlines.",
+      "tools": [
+        "write_file",
+        "read_file",
+        "web_search"
+      ],
+      "model": "",
+      "tags": [
+        "design",
+        "read_file",
+        "web_search",
+        "write_file"
+      ],
+      "created_at": "2026-04-02T04:05:18.503024+00:00",
+      "updated_at": "2026-04-02T04:05:18.503024+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "managers": {
@@ -250,6 +364,22 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "narrative_director": {
+      "name": "narrative_director",
+      "title": "Narrative & Creative Director",
+      "description": "Owns the overall quality of the story \u2014 judges narrative structure, emotional impact, character authenticity, prose quality, originality of the AI-friendship concept, and whether the story feels genuinely moving rather than clich\u00e9d. Ensures all creative outputs work together as a cohesive whole.",
+      "expertise_blend": [],
+      "oversees": [],
+      "model": "",
+      "tolerance": 0,
+      "tags": [],
+      "created_at": "2026-04-02T04:05:18.503396+00:00",
+      "updated_at": "2026-04-02T04:05:18.503396+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "reviewers": {
@@ -262,9 +392,9 @@
         "infrastructure"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:18:16.665090+00:00",
-      "runs": 43,
-      "avg_score": 6.32,
+      "updated_at": "2026-04-02T04:02:15.503072+00:00",
+      "runs": 44,
+      "avg_score": 6.38,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior Security Engineer",
@@ -297,9 +427,9 @@
         "frontend"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:18:23.679407+00:00",
-      "runs": 10,
-      "avg_score": 6.69,
+      "updated_at": "2026-04-02T04:00:31.212070+00:00",
+      "runs": 11,
+      "avg_score": 6.81,
       "total_revisions": 0,
       "builtin": true,
       "title": "Senior UX/UI Designer",
@@ -331,9 +461,9 @@
         "documentation"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:35:27.323832+00:00",
-      "runs": 13,
-      "avg_score": 5.99,
+      "updated_at": "2026-04-02T04:01:12.920405+00:00",
+      "runs": 14,
+      "avg_score": 6.13,
       "total_revisions": 0,
       "builtin": true,
       "title": "End-User Representative",
@@ -363,9 +493,9 @@
         "elegance"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:35:37.659193+00:00",
-      "runs": 22,
-      "avg_score": 5.85,
+      "updated_at": "2026-04-02T04:02:01.106458+00:00",
+      "runs": 23,
+      "avg_score": 5.94,
       "total_revisions": 0,
       "builtin": true,
       "title": "Creative Director",
@@ -400,9 +530,9 @@
         "review"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:35:53.120732+00:00",
-      "runs": 50,
-      "avg_score": 6.03,
+      "updated_at": "2026-04-02T04:02:26.629736+00:00",
+      "runs": 51,
+      "avg_score": 5.95,
       "total_revisions": 0,
       "builtin": true,
       "title": "Devil's Advocate",
@@ -438,9 +568,9 @@
         "optimization"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-01T23:22:05.240180+00:00",
-      "runs": 40,
-      "avg_score": 5.92,
+      "updated_at": "2026-04-02T04:02:42.827867+00:00",
+      "runs": 41,
+      "avg_score": 5.87,
       "total_revisions": 0,
       "builtin": true,
       "title": "Performance Engineer",
@@ -479,5 +609,6 @@
       "total_revisions": 0,
       "builtin": false
     }
-  }
+  },
+  "teams": {}
 }

@@ -685,6 +685,15 @@ async def review_stats():
     return get_review_stats()
 
 
+# ── Specialization endpoint ──────────────────────────────────────────────────
+
+@app.get("/api/specializations")
+async def api_specializations():
+    """Return the current agent specialization matrix."""
+    from specialization import get_specialization_matrix
+    return get_specialization_matrix()
+
+
 # ── Webhook config endpoint ─────────────────────────────────────────────────
 
 @app.get("/api/config")
@@ -1107,6 +1116,25 @@ async def api_create_team(request: Request):
     spec = await request.json()
     try:
         team = create_team(spec)
+        return {"ok": True, "team": team}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# NOTE: Preset routes must be registered BEFORE parameterized /api/teams/{name}
+@app.get("/api/teams/presets")
+async def api_list_presets():
+    from agent_registry import list_presets
+    return {"presets": list_presets()}
+
+@app.post("/api/teams/presets/{preset_name}/apply")
+async def api_apply_preset(preset_name: str, request: Request):
+    from agent_registry import apply_preset
+    body = await request.json()
+    team_name = body.get("team_name", "").strip()
+    if not team_name:
+        raise HTTPException(status_code=400, detail="team_name is required")
+    try:
+        team = apply_preset(preset_name, team_name)
         return {"ok": True, "team": team}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

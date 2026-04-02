@@ -517,7 +517,92 @@ def format_agent_catalog() -> str:
     return "\n".join(lines)
 
 
-# ── Team presets ────────────────────────────────────────────────────────────
+# ── Built-in team presets ──────────────────────────────────────────────────
+
+TEAM_PRESETS = {
+    "security-focused": {
+        "title": "Security-Focused Team",
+        "description": "Backend development with strong security review. Ideal for auth systems, APIs handling sensitive data, and infrastructure.",
+        "agents": [
+            {"type": "sub_agents", "name": "backend_developer"},
+            {"type": "reviewers", "name": "security_engineer"},
+            {"type": "reviewers", "name": "performance_engineer"},
+            {"type": "managers", "name": "tech_lead"},
+        ],
+    },
+    "full-stack": {
+        "title": "Full-Stack Team",
+        "description": "Frontend and backend developers with DevOps support. Covers the full delivery pipeline from UI to deployment.",
+        "agents": [
+            {"type": "sub_agents", "name": "frontend_developer"},
+            {"type": "sub_agents", "name": "backend_developer"},
+            {"type": "sub_agents", "name": "general_developer"},
+            {"type": "managers", "name": "tech_lead"},
+            {"type": "reviewers", "name": "ux_designer"},
+        ],
+    },
+    "review-heavy": {
+        "title": "Review-Heavy Team",
+        "description": "One developer backed by multiple specialist reviewers. Maximizes review coverage for high-risk deliverables.",
+        "agents": [
+            {"type": "sub_agents", "name": "general_developer"},
+            {"type": "managers", "name": "tech_lead"},
+            {"type": "reviewers", "name": "security_engineer"},
+            {"type": "reviewers", "name": "performance_engineer"},
+            {"type": "reviewers", "name": "devils_advocate"},
+            {"type": "reviewers", "name": "creative_director"},
+        ],
+    },
+    "minimal": {
+        "title": "Minimal Team",
+        "description": "Lightweight setup with one developer and one reviewer. Good for quick prototypes and small tasks.",
+        "agents": [
+            {"type": "sub_agents", "name": "general_developer"},
+            {"type": "reviewers", "name": "user_tester"},
+        ],
+    },
+}
+
+
+def list_presets() -> list[dict]:
+    """Return available built-in team presets."""
+    result = []
+    for key, preset in TEAM_PRESETS.items():
+        result.append({
+            "name": key,
+            "title": preset["title"],
+            "description": preset["description"],
+            "agents": preset["agents"],
+        })
+    return result
+
+
+def apply_preset(preset_name: str, team_name: str) -> dict:
+    """Create a team from a built-in preset.
+
+    Args:
+        preset_name: Key in TEAM_PRESETS.
+        team_name: Name for the new team (will be slugified).
+
+    Returns:
+        The created team dict.
+
+    Raises:
+        ValueError: If preset_name is unknown or team_name is empty.
+    """
+    if preset_name not in TEAM_PRESETS:
+        raise ValueError(f"Unknown preset: {preset_name}")
+    preset = TEAM_PRESETS[preset_name]
+    spec = {
+        "name": team_name,
+        "title": preset["title"] + " — " + team_name.replace("_", " ").title(),
+        "description": preset["description"],
+        "agents": list(preset["agents"]),  # copy so callers can't mutate the preset
+    }
+    return create_team(spec)
+
+
+# ── Team CRUD ─────────────────────────────────────────────────────────────
 
 
 def get_teams() -> list[dict]:

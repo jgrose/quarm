@@ -107,6 +107,10 @@ document.addEventListener('DOMContentLoaded', function() {
       if (agentsOvl && !agentsOvl.classList.contains('hidden')) {
         agentsOvl.classList.add('hidden'); return;
       }
+      var dagPanel = document.getElementById('dagPanelOverlay');
+      if (dagPanel && !dagPanel.classList.contains('hidden')) {
+        dagPanel.classList.add('hidden'); return;
+      }
       var toleranceCfg = document.getElementById('toleranceConfigOverlay');
       if (toleranceCfg && !toleranceCfg.classList.contains('hidden')) {
         toleranceCfg.classList.add('hidden'); return;

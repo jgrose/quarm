@@ -274,6 +274,7 @@ function applyStatus(data) {
 
   // Rebuild dependency visualization
   if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
+  if (typeof updateDagPanel === 'function') updateDagPanel();
 
   // 3. Update edges based on active task flow
   rebuildEdges(data);
@@ -372,6 +373,7 @@ function switchSession(sessionId) {
   }
 
   if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
+  if (typeof updateDagPanel === 'function') updateDagPanel();
 
   rebuildEdges(d);
 

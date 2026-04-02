@@ -59,6 +59,39 @@ def _infer_tags(description: str, extras: list) -> list:
             found.append(e.lower().replace(" ", "_"))
     return list(set(found))[:10]  # cap at 10 tags
 
+
+def _record_specialization(task: dict, score_override: int = None):
+    """Record specialization outcome for a completed task."""
+    try:
+        from specialization import record_outcome
+        agent_name = task.get("agent", "")
+        description = task.get("description", "") + " " + task.get("title", "")
+        tags = _infer_tags(description, [])
+        score = score_override if score_override is not None else task.get("last_score", 7)
+        revision_count = task.get("revision_count", 0)
+        if agent_name and tags:
+            record_outcome(agent_name, tags, score, revision_count)
+    except Exception as e:
+        print(f"[DEBUG] Specialization record: {e}")
+
+
+def _log_specialization_suggestion(task: dict):
+    """Log which agents the specialization system would suggest for a task."""
+    try:
+        from specialization import suggest_specialist
+        description = task.get("description", "") + " " + task.get("title", "")
+        tags = _infer_tags(description, [])
+        if not tags:
+            return
+        suggestions = suggest_specialist(tags)
+        if suggestions:
+            top = suggestions[:3]
+            names = ", ".join(f"{s['agent_name']}({s['avg_score']:.1f})" for s in top)
+            log_event(f"[SPECIALIZATION] Tags {tags} → suggested: {names} (assigned: {task.get('agent', '?')})")
+    except Exception:
+        pass
+
+
 # ── Model discovery & auto-selection ─────────────────────────────────────────
 
 AVAILABLE_MODELS: list[str] = []

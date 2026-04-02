@@ -354,6 +354,32 @@ async function deleteTeam(name) {
   }
 }
 
+async function fetchTeamPresets() {
+  try {
+    var res = await fetch('/api/teams/presets');
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.presets || [];
+  } catch (e) {
+    console.error('fetchTeamPresets:', e);
+    return [];
+  }
+}
+
+async function applyTeamPreset(presetName, teamName) {
+  try {
+    var res = await fetch('/api/teams/presets/' + presetName + '/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_name: teamName })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('applyTeamPreset:', e);
+    return null;
+  }
+}
+
 async function exportAgentsData() {
   try {
     var res = await fetch('/api/agents/export');
