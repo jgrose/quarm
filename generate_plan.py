@@ -152,22 +152,40 @@ Tasks with no dependencies (depends_on: []) run IN PARALLEL automatically.
 Tasks that depend on other tasks wait for those to finish first.
 
 MAXIMIZE parallelism by minimizing unnecessary depends_on:
-- Only add a dependency when a task truly NEEDS the output of another task.
+- Only add a dependency when a task truly NEEDS the output of another task as input.
 - Do NOT chain tasks sequentially just because they are numbered in order.
 - If two tasks can be done independently, they MUST have depends_on: [].
+- Ask: "Does this task literally need the OUTPUT of the other task to start?" If no, remove the dependency.
 
-Good example (3 tasks run in parallel, 1 waits):
-  TASK-001: Build API endpoints          depends_on: []
-  TASK-002: Build frontend components    depends_on: []
-  TASK-003: Write security policies      depends_on: []
-  TASK-004: Integration testing          depends_on: [TASK-001, TASK-002]
+BAD — linear chain (executes in 4 serial steps, ~4x slower):
+  TASK-001: Design database schema       depends_on: []
+  TASK-002: Build API endpoints          depends_on: [TASK-001]
+  TASK-003: Build frontend components    depends_on: [TASK-002]  ← doesn't need API output!
+  TASK-004: Write documentation          depends_on: [TASK-003]  ← doesn't need frontend output!
+  Parallelism score: 1/4 = 0.25 (terrible)
 
-Bad example (all sequential, wastes time):
-  TASK-001: Build API endpoints          depends_on: []
-  TASK-002: Build frontend components    depends_on: [TASK-001]  ← unnecessary!
-  TASK-003: Write security policies      depends_on: [TASK-002]  ← unnecessary!
+GOOD — fan-out with final merge (executes in 2 steps, ~4x faster):
+  TASK-001: Design database schema       depends_on: []
+  TASK-002: Build API endpoints          depends_on: []
+  TASK-003: Build frontend components    depends_on: []
+  TASK-004: Write documentation          depends_on: []
+  TASK-005: Integration testing          depends_on: [TASK-001, TASK-002, TASK-003]
+  Parallelism score: 4/5 = 0.80 (excellent)
 
-Aim for a WIDE dependency graph (many parallel tasks) not a TALL one (long chain).
+Scoring: parallelism_score = tasks_in_first_parallel_batch / total_tasks. Aim for >= 0.50.
+
+SELF-CHECK: After writing the plan, review every depends_on field. For each dependency ask:
+"Does this task need the COMPLETED OUTPUT of the dependency to begin work?"
+If not, REMOVE that dependency. More parallel batches = faster total execution.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VALIDATION (self-check before output)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Before finalizing the plan, verify:
+1. Every task's "agent:" field matches a defined sub-agent name exactly.
+2. Every depends_on reference is a valid TASK-NNN that exists in the plan.
+3. No circular dependencies (A depends on B depends on A).
+4. Parallelism score >= 0.50 (at least half of tasks have depends_on: []).
 """
 
 
@@ -187,9 +205,11 @@ def generate_plan_streaming(description: str, output_path: str = "plan.md"):
     if catalog:
         agent_hint = (
             "\n\n## Agent Catalog\n"
-            "The following agents are available in the registry. "
-            "PREFER reusing these agents (especially high-scoring ones) over creating new ones. "
-            "You may create new agent definitions if none of the existing ones fit the project needs.\n"
+            "The following agents are available in the registry with performance scores.\n"
+            "RULES FOR AGENT SELECTION:\n"
+            "1. PREFERRED: Reuse existing agents from the catalog, especially those with high scores (avg_score > 7).\n"
+            "2. Only create new agent definitions when NO existing agent's description covers the required expertise.\n"
+            "3. When reusing an agent, use the EXACT name from the catalog (e.g. 'backend_developer', not 'backend_dev').\n"
             + catalog
         )
     else:
@@ -272,9 +292,11 @@ def generate_plan(description: str, output_path: str = "plan.md") -> str:
     if catalog:
         agent_hint = (
             "\n\n## Agent Catalog\n"
-            "The following agents are available in the registry. "
-            "PREFER reusing these agents (especially high-scoring ones) over creating new ones. "
-            "You may create new agent definitions if none of the existing ones fit the project needs.\n"
+            "The following agents are available in the registry with performance scores.\n"
+            "RULES FOR AGENT SELECTION:\n"
+            "1. PREFERRED: Reuse existing agents from the catalog, especially those with high scores (avg_score > 7).\n"
+            "2. Only create new agent definitions when NO existing agent's description covers the required expertise.\n"
+            "3. When reusing an agent, use the EXACT name from the catalog (e.g. 'backend_developer', not 'backend_dev').\n"
             + catalog
         )
     else:
