@@ -225,21 +225,23 @@ function applyStatus(data) {
     // Spawn effects, audio, and bubbles on state transitions
     if (prevState !== task.status && !_isReplay) {
       // Find program matching this agent and force re-route
-      for (var pi = 0; pi < ambientPrograms.length; pi++) {
-        var prog = ambientPrograms[pi];
-        if (prog.agentName === task.agent) {
-          prog.assignedTask = { id: task.id, status: task.status, title: task.title,
-            lastScore: task.last_score || 0, revisionCount: task.revision_count || 0,
-            managerNotes: task.manager_notes || '', reviewerNotes: task.reviewer_notes || '' };
-          if (prog.bunkerState === 'inside') {
-            prog.bunkerState = 'exiting';
-            prog.exitProgress = 0;
-            prog.visible = true;
-          } else if (prog.bunkerState === 'walking' || prog.bunkerState === 'leaving_door') {
-            _releaseLocation(prog);
-            _pickTarget(prog, 0, 0);
+      if (typeof ambientPrograms !== 'undefined') {
+        for (var pi = 0; pi < ambientPrograms.length; pi++) {
+          var prog = ambientPrograms[pi];
+          if (prog.agentName === task.agent) {
+            prog.assignedTask = { id: task.id, status: task.status, title: task.title,
+              lastScore: task.last_score || 0, revisionCount: task.revision_count || 0,
+              managerNotes: task.manager_notes || '', reviewerNotes: task.reviewer_notes || '' };
+            if (prog.bunkerState === 'inside') {
+              prog.bunkerState = 'exiting';
+              prog.exitProgress = 0;
+              prog.visible = true;
+            } else if (prog.bunkerState === 'walking' || prog.bunkerState === 'leaving_door') {
+              _releaseLocation(prog);
+              _pickTarget(prog, 0, 0);
+            }
+            break;
           }
-          break;
         }
       }
       if (task.status === 'in_progress' && prevState === 'pending') {

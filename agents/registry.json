@@ -386,6 +386,95 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "backend_engineer": {
+      "name": "backend_engineer",
+      "description": "Python/FastAPI backend engineer. Builds REST APIs with type hints and error handling.",
+      "tools": [
+        "execute_code",
+        "write_file",
+        "read_file"
+      ],
+      "model": "",
+      "tags": [
+        "backend",
+        "execute_code",
+        "read_file",
+        "write_file"
+      ],
+      "created_at": "2026-04-02T04:50:08.842954+00:00",
+      "updated_at": "2026-04-02T04:52:01.440110+00:00",
+      "runs": 8,
+      "avg_score": 6.0,
+      "total_revisions": 6,
+      "builtin": false,
+      "versions": [
+        {
+          "name": "backend_engineer",
+          "description": "Builds backend services with FastAPI.",
+          "tools": [
+            "execute_code",
+            "write_file"
+          ],
+          "model": "",
+          "tags": [
+            "backend",
+            "write_file",
+            "execute_code"
+          ],
+          "created_at": "2026-04-02T04:50:08.842954+00:00",
+          "updated_at": "2026-04-02T04:50:08.842954+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "version": 1,
+          "timestamp": "2026-04-02T04:50:08.872957+00:00"
+        }
+      ],
+      "tasks_passed": 4,
+      "rejection_rate": 0.5,
+      "last_task_at": "2026-04-02T04:52:01.440106+00:00",
+      "tasks_failed": 2,
+      "tasks_force_accepted": 2
+    },
+    "real_agent": {
+      "name": "real_agent",
+      "description": "A real agent.",
+      "tools": [
+        "execute_code"
+      ],
+      "model": "",
+      "tags": [
+        "execute_code"
+      ],
+      "created_at": "2026-04-02T04:50:08.854526+00:00",
+      "updated_at": "2026-04-02T04:50:08.854526+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "frontend_engineer": {
+      "name": "frontend_engineer",
+      "description": "React/TypeScript frontend engineer. Builds accessible, responsive UI components.",
+      "tools": [
+        "write_file",
+        "design_ui"
+      ],
+      "model": "",
+      "tags": [
+        "write_file",
+        "frontend",
+        "ui",
+        "design_ui"
+      ],
+      "created_at": "2026-04-02T04:50:08.885216+00:00",
+      "updated_at": "2026-04-02T04:50:08.885216+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "managers": {
@@ -594,6 +683,109 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "engineering_director": {
+      "name": "engineering_director",
+      "title": "Engineering Architecture Director",
+      "description": "Senior engineering leader who reviews backend code for correctness and scalability.",
+      "expertise_blend": [
+        "API_design"
+      ],
+      "oversees": [
+        "backend_engineer"
+      ],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "api_design",
+        "backend",
+        "data_modeling",
+        "python_architecture"
+      ],
+      "created_at": "2026-04-02T04:50:08.848194+00:00",
+      "updated_at": "2026-04-02T04:52:01.434757+00:00",
+      "runs": 2,
+      "avg_score": 5.0,
+      "total_revisions": 0,
+      "builtin": false,
+      "versions": [
+        {
+          "name": "engineering_director",
+          "title": "Engineering Director",
+          "description": "Senior engineering leader.",
+          "expertise_blend": [
+            "API_design"
+          ],
+          "oversees": [
+            "backend_engineer"
+          ],
+          "model": "",
+          "tolerance": 0,
+          "tags": [
+            "api_design"
+          ],
+          "created_at": "2026-04-02T04:50:08.848194+00:00",
+          "updated_at": "2026-04-02T04:50:08.848194+00:00",
+          "runs": 0,
+          "avg_score": 0,
+          "total_revisions": 0,
+          "builtin": false,
+          "version": 1,
+          "timestamp": "2026-04-02T04:50:08.878520+00:00"
+        }
+      ],
+      "tasks_force_accepted": 2,
+      "rejection_rate": 1.0,
+      "last_task_at": "2026-04-02T04:52:01.434750+00:00"
+    },
+    "mgr": {
+      "name": "mgr",
+      "title": "Manager",
+      "description": "A manager.",
+      "expertise_blend": [
+        "testing"
+      ],
+      "oversees": [
+        "real_agent"
+      ],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "testing"
+      ],
+      "created_at": "2026-04-02T04:50:08.859744+00:00",
+      "updated_at": "2026-04-02T04:50:08.859744+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
+    },
+    "product_director": {
+      "name": "product_director",
+      "title": "Product and Delivery Director",
+      "description": "Product leader who reviews user-facing outputs for alignment with user needs.",
+      "expertise_blend": [
+        "product_management",
+        "UX_strategy",
+        "technical_communication"
+      ],
+      "oversees": [
+        "frontend_engineer",
+        "technical_writer"
+      ],
+      "model": "",
+      "tolerance": 0,
+      "tags": [
+        "product_management",
+        "ux_strategy",
+        "technical_communication"
+      ],
+      "created_at": "2026-04-02T04:50:08.890359+00:00",
+      "updated_at": "2026-04-02T04:50:08.890359+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
   "reviewers": {
@@ -641,10 +833,10 @@
         "frontend"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:41:11.623505+00:00",
-      "runs": 18,
-      "avg_score": 5.72,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:53:20.270383+00:00",
+      "runs": 21,
+      "avg_score": 5.43,
+      "total_revisions": 2,
       "builtin": true,
       "title": "Senior UX/UI Designer",
       "description": "Review for WCAG 2.1 AA, visual hierarchy, information architecture, cognitive load, interaction quality.",
@@ -665,9 +857,9 @@
         "form",
         "user_flow"
       ],
-      "tasks_failed": 4,
+      "tasks_failed": 7,
       "rejection_rate": 1.0,
-      "last_task_at": "2026-04-02T04:41:11.623494+00:00"
+      "last_task_at": "2026-04-02T04:53:20.270376+00:00"
     },
     "user_tester": {
       "name": "user_tester",
@@ -678,10 +870,10 @@
         "documentation"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:41:54.911748+00:00",
-      "runs": 21,
-      "avg_score": 5.8,
-      "total_revisions": 1,
+      "updated_at": "2026-04-02T04:52:21.862755+00:00",
+      "runs": 25,
+      "avg_score": 5.95,
+      "total_revisions": 3,
       "builtin": true,
       "title": "End-User Representative",
       "description": "Review as a non-technical first-time user: clarity, plain language, workflow intuitiveness, value delivered.",
@@ -700,10 +892,10 @@
         "api",
         "frontend"
       ],
-      "tasks_passed": 3,
-      "rejection_rate": 0.4,
-      "last_task_at": "2026-04-02T04:41:54.911741+00:00",
-      "tasks_failed": 2
+      "tasks_passed": 6,
+      "rejection_rate": 0.3333,
+      "last_task_at": "2026-04-02T04:52:21.862750+00:00",
+      "tasks_failed": 3
     },
     "creative_director": {
       "name": "creative_director",
@@ -714,10 +906,10 @@
         "elegance"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:42:36.394645+00:00",
-      "runs": 36,
-      "avg_score": 5.42,
-      "total_revisions": 1,
+      "updated_at": "2026-04-02T04:53:30.562987+00:00",
+      "runs": 41,
+      "avg_score": 5.4,
+      "total_revisions": 4,
       "builtin": true,
       "title": "Creative Director",
       "description": "Challenge conventional thinking. Is this the obvious boring solution or something genuinely clever? Push for innovation, elegance, and delight. Ask: what would make someone say 'that's brilliant'? FLAG safe, generic, or copy-paste solutions that lack originality or miss creative opportunities.",
@@ -741,10 +933,10 @@
         "backend",
         "documentation"
       ],
-      "tasks_failed": 4,
-      "rejection_rate": 0.5,
-      "last_task_at": "2026-04-02T04:42:36.394635+00:00",
-      "tasks_passed": 4
+      "tasks_failed": 8,
+      "rejection_rate": 0.6154,
+      "last_task_at": "2026-04-02T04:53:30.562980+00:00",
+      "tasks_passed": 5
     },
     "devils_advocate": {
       "name": "devils_advocate",
@@ -755,10 +947,10 @@
         "review"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:42:09.618702+00:00",
-      "runs": 59,
-      "avg_score": 5.61,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:52:34.469059+00:00",
+      "runs": 62,
+      "avg_score": 5.43,
+      "total_revisions": 1,
       "builtin": true,
       "title": "Devil's Advocate",
       "description": "Assume everything is wrong. Find the hidden assumptions, logical flaws, unstated dependencies, and failure modes nobody mentioned. Ask: what happens when this breaks at 3am? What did they forget? What looks right but is subtly wrong? Be ruthless but specific \u2014 vague skepticism is useless.",
@@ -783,9 +975,9 @@
         "frontend",
         "user_flow"
       ],
-      "tasks_failed": 4,
+      "tasks_failed": 7,
       "rejection_rate": 1.0,
-      "last_task_at": "2026-04-02T04:42:09.618694+00:00"
+      "last_task_at": "2026-04-02T04:52:34.469055+00:00"
     },
     "performance_engineer": {
       "name": "performance_engineer",
@@ -796,10 +988,10 @@
         "optimization"
       ],
       "created_at": "2026-04-01T21:15:27.226860+00:00",
-      "updated_at": "2026-04-02T04:40:45.154910+00:00",
-      "runs": 49,
-      "avg_score": 5.71,
-      "total_revisions": 0,
+      "updated_at": "2026-04-02T04:53:46.672153+00:00",
+      "runs": 53,
+      "avg_score": 5.61,
+      "total_revisions": 1,
       "builtin": true,
       "title": "Performance Engineer",
       "description": "Review for scalability, efficiency, and production readiness. Find N+1 queries, unbounded loops, memory leaks, missing indexes, chatty APIs, blocking calls in async paths, missing caching, and anything that will fall over at 10x traffic. Think in terms of p99 latency and cost per request.",
@@ -820,10 +1012,10 @@
         "infrastructure",
         "config"
       ],
-      "tasks_passed": 1,
+      "tasks_passed": 2,
       "rejection_rate": 0.75,
-      "last_task_at": "2026-04-02T04:40:45.154902+00:00",
-      "tasks_failed": 3
+      "last_task_at": "2026-04-02T04:53:46.672146+00:00",
+      "tasks_failed": 6
     },
     "code_reviewer": {
       "name": "code_reviewer",
@@ -840,7 +1032,66 @@
       "avg_score": 0,
       "total_revisions": 0,
       "builtin": false
+    },
+    "api_standards_reviewer": {
+      "name": "api_standards_reviewer",
+      "title": "API Standards Reviewer",
+      "description": "Reviews API designs for RESTful best practices, consistent naming, proper status codes, and versioning.",
+      "focus_areas": [
+        "REST conventions",
+        "naming consistency",
+        "status codes",
+        "versioning",
+        "pagination"
+      ],
+      "applies_to": [
+        "code",
+        "api",
+        "backend"
+      ],
+      "model": "",
+      "tolerance": 5,
+      "tags": [
+        "code",
+        "api",
+        "backend",
+        "REST conventions",
+        "naming consistency",
+        "status codes"
+      ],
+      "created_at": "2026-04-02T04:50:08.893722+00:00",
+      "updated_at": "2026-04-02T04:50:08.893722+00:00",
+      "runs": 0,
+      "avg_score": 0,
+      "total_revisions": 0,
+      "builtin": false
     }
   },
-  "teams": {}
+  "teams": {
+    "security-focused-team": {
+      "name": "security-focused-team",
+      "title": "Security-Focused Team \u2014 Security-Focused-Team",
+      "description": "Backend development with strong security review. Ideal for auth systems, APIs handling sensitive data, and infrastructure.",
+      "agents": [
+        {
+          "type": "sub_agents",
+          "name": "backend_developer"
+        },
+        {
+          "type": "reviewers",
+          "name": "security_engineer"
+        },
+        {
+          "type": "reviewers",
+          "name": "performance_engineer"
+        },
+        {
+          "type": "managers",
+          "name": "tech_lead"
+        }
+      ],
+      "created_at": "2026-04-02T04:45:48.225212+00:00",
+      "updated_at": "2026-04-02T04:45:48.225212+00:00"
+    }
+  }
 }
