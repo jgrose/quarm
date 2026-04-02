@@ -46,16 +46,55 @@ def save_checkpoint(plan_id: str, state: dict):
     tmp.rename(path)  # atomic on POSIX
 
 
+_REQUIRED_KEYS = {"tasks", "results"}
+
+
+def _validate_checkpoint(data: dict) -> list[str]:
+    """Check that a loaded checkpoint has all required top-level keys.
+    Returns a list of error messages (empty = valid)."""
+    errors = []
+    for key in _REQUIRED_KEYS:
+        if key not in data:
+            errors.append(f"Missing required key: '{key}'")
+    return errors
+
+
 def load_checkpoint(plan_id: str) -> dict | None:
-    """Load a checkpoint if one exists. Returns None if no checkpoint."""
+    """Load a checkpoint if one exists. Returns None if no checkpoint or if
+    the checkpoint is corrupted/invalid. Corrupted files are renamed to
+    .json.corrupted for debugging."""
     path = _checkpoint_path(plan_id)
     if not path.exists():
         return None
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError):
+        # Rename corrupted file for debugging
+        corrupted = path.with_suffix(".json.corrupted")
+        try:
+            path.rename(corrupted)
+            print(f"[WARN] Corrupted checkpoint renamed: {path} → {corrupted}")
+        except OSError:
+            pass
         return None
+
+    # Validate structure
+    errors = _validate_checkpoint(data)
+    if errors:
+        print(f"[WARN] Checkpoint {path} failed integrity check:")
+        for e in errors:
+            print(f"  - {e}")
+        # Rename invalid checkpoint for debugging
+        corrupted = path.with_suffix(".json.corrupted")
+        try:
+            path.rename(corrupted)
+            print(f"[WARN] Invalid checkpoint renamed: {path} → {corrupted}")
+        except OSError:
+            pass
+        return None
+
+    return data
 
 
 def has_checkpoint(plan_id: str) -> bool:
