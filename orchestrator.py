@@ -16,7 +16,7 @@ Run:
   http://localhost:8000/
 """
 
-import re, json, os, shutil
+import re, json, os, shutil, time
 from dataclasses import dataclass, field
 from typing import Annotated, TypedDict, Sequence, Optional
 from pathlib import Path
@@ -342,13 +342,29 @@ def llm(model: str = ""):
     m = model or DEFAULT_MODEL
     return ChatOpenAI(model=m, temperature=0.2)
 
+
+def _invoke_with_retry(llm_instance, messages, max_retries=3, base_delay=2.0):
+    """Invoke LLM with exponential backoff retry on transient failures."""
+    for attempt in range(max_retries):
+        try:
+            return llm_instance.invoke(messages)
+        except Exception as e:
+            err_name = type(e).__name__
+            if attempt == max_retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            log_event(f"[RETRY] LLM call failed ({err_name}), attempt {attempt + 1}/{max_retries}, retrying in {delay:.1f}s")
+            time.sleep(delay)
+
+
 def extract_tokens(resp) -> int:
     """Extract total token count from a LangChain response."""
     try:
         meta = resp.response_metadata or {}
         usage = meta.get("usage", meta.get("token_usage", {}))
         return usage.get("total_tokens", 0)
-    except Exception:
+    except Exception as e:
+        log_event(f"[ERROR] Failed to extract token count: {e}")
         return 0
 
 def get_task(tid, tasks):
@@ -375,7 +391,8 @@ def _load_orchestrator_config() -> dict:
             _config_cache = json.load(f)
         _config_mtime = mt
         return _config_cache
-    except Exception:
+    except Exception as e:
+        log_event(f"[ERROR] Failed to load config.json: {e}")
         return {}
 
 def _resolve_tolerance(agent_name: str, agent_dict: dict, task_tolerance: int = 0) -> int:
@@ -415,8 +432,8 @@ def _resolve_tolerance(agent_name: str, agent_dict: dict, task_tolerance: int = 
                 if bonus > base:
                     log_event(f"[TOLERANCE] {agent_name} earned +1 bonus (score>8, 5+ runs): {base} → {bonus}")
                 return bonus
-    except Exception:
-        pass
+    except Exception as e:
+        log_event(f"[ERROR] Earned tolerance check failed for {agent_name}: {e}")
 
     return base
 
@@ -574,8 +591,8 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
             )
             if rag_context:
                 ctx.append(f"\n--- RELEVANT KNOWLEDGE ---\n{rag_context}")
-    except Exception:
-        pass
+    except Exception as e:
+        log_event(f"[ERROR] RAG context injection failed for {tid}: {e}")
 
     set_tool_context(plan_id=_plan_id, task_id=tid, agent=task["agent"])
     agent_tools = get_tools(agent.get("tools", []))
@@ -591,7 +608,7 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         llm_with_tools = llm(model).bind_tools(agent_tools)
         max_iterations = 5
         for _iter in range(max_iterations):
-            resp = llm_with_tools.invoke(messages)
+            resp = _invoke_with_retry(llm_with_tools, messages)
             total_toks += extract_tokens(resp)
             if not resp.tool_calls:
                 break
@@ -613,11 +630,11 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
                 content="You've completed your tool calls. Now produce your final written output for this task. "
                         "Synthesize everything you learned from the tools into your deliverable."
             ))
-            resp = llm(model).invoke(messages)
+            resp = _invoke_with_retry(llm(model), messages)
             total_toks += extract_tokens(resp)
             draft = resp.content or "(No output generated)"
     else:
-        resp = llm(model).invoke(messages)
+        resp = _invoke_with_retry(llm(model), messages)
         total_toks = extract_tokens(resp)
         draft = resp.content
 
@@ -758,7 +775,7 @@ def manager_review_node(state):
         f"\n{d}:\n{results[d][:400]}...\n"
         for d in task.get("depends_on", []) if d in results
     )
-    resp = llm(model).invoke([
+    resp = _invoke_with_retry(llm(model), [
         SystemMessage(content=system),
         HumanMessage(content=f"Task:{task['title']}\nReqs:{task['description']}"
                               + (f"\nContext:{prior}" if prior else "")
@@ -768,8 +785,9 @@ def manager_review_node(state):
     total_tokens = state.get("tokens_used", 0) + toks
     try:
         v = json.loads(resp.content.strip().replace("```json","").replace("```",""))
-    except Exception:
-        v = {"verdict":"PASS","score":7,"issues":[],"feedback":""}
+    except (json.JSONDecodeError, Exception) as e:
+        log_event(f"[ERROR] Manager review JSON parse failed for {tid}: {e}")
+        v = {"verdict":"FAIL","score":1,"issues":["LLM response was not valid JSON"],"feedback":str(e)}
 
     verdict = v.get("verdict","PASS")
     score   = v.get("score",7)
@@ -792,8 +810,8 @@ def manager_review_node(state):
     try:
         from agent_registry import record_agent_performance
         record_agent_performance("sub_agents", task["agent"], score, task.get("revision_count", 0))
-    except Exception:
-        pass
+    except Exception as e:
+        log_event(f"[ERROR] Failed to record agent performance for {task['agent']}: {e}")
 
     if verdict == "PASS":
         # Check for conditional specialist review skipping
@@ -908,7 +926,7 @@ def specialist_review_node(state):
         tolerance = _resolve_tolerance(reviewer["name"], reviewer, task_tolerance)
         log_event(f"[TOLERANCE] {reviewer['name']} effective tolerance={tolerance} for {tid} (task={task_tolerance}, plan={reviewer.get('tolerance', 0)})")
         system = _build_reviewer_prompt(reviewer, tolerance)
-        resp = llm(model).invoke([
+        resp = _invoke_with_retry(llm(model), [
             SystemMessage(content=system),
             HumanMessage(content=f"Task:{task['title']}\nReqs:{task['description']}"
                                   f"\n\n---\n{task['result']}"),
@@ -917,9 +935,10 @@ def specialist_review_node(state):
         total_tokens = state.get("tokens_used", 0) + toks
         try:
             v = json.loads(resp.content.strip().replace("```json","").replace("```",""))
-        except Exception:
-            v = {"reviewer": reviewer["name"], "verdict":"PASS","score":8,
-                 "issues":[],"feedback":""}
+        except (json.JSONDecodeError, Exception) as e:
+            log_event(f"[ERROR] Specialist review JSON parse failed for {tid} ({reviewer['name']}): {e}")
+            v = {"reviewer": reviewer["name"], "verdict":"FAIL","score":1,
+                 "issues":["LLM response was not valid JSON"],"feedback":str(e)}
 
         verdict = v.get("verdict","PASS")
         score   = v.get("score",8)
@@ -941,8 +960,8 @@ def specialist_review_node(state):
         try:
             from agent_registry import record_agent_performance
             record_agent_performance("reviewers", reviewer["name"], score, 0)
-        except Exception:
-            pass
+        except Exception as e:
+            log_event(f"[ERROR] Failed to record reviewer performance for {reviewer['name']}: {e}")
         if verdict == "FLAG" and v.get("feedback"):
             flags.append(f"[{reviewer['title']}]\n{v['feedback']}")
         # Update score to latest reviewer score
@@ -979,7 +998,7 @@ def synthesis_node(state):
     summaries = "\n\n".join(
         f"[{tid}]\n{res[:800]}" for tid, res in state["results"].items()
     )
-    resp = llm(model).invoke([HumanMessage(content=(
+    resp = _invoke_with_retry(llm(model), [HumanMessage(content=(
         f"Project: {state['objective']}\n\nOutputs:\n{summaries}\n\n"
         "Write a concise final executive report: accomplishments, key outputs, "
         "quality signals (revision counts), risks, and next steps."
@@ -1017,8 +1036,8 @@ def composition_node(state):
                     content = f.read_text(errors="replace")
                     if len(content) < 10000:
                         file_contents[rel] = content
-                except Exception:
-                    pass
+                except Exception as e:
+                    log_event(f"[ERROR] Failed to read artifact file {rel}: {e}")
 
     if not all_files:
         log_event("[COMPOSITION] No files to check")
@@ -1049,7 +1068,7 @@ def composition_node(state):
     )
 
     try:
-        resp = llm(model).invoke([HumanMessage(content=prompt)])
+        resp = _invoke_with_retry(llm(model), [HumanMessage(content=prompt)])
         toks = extract_tokens(resp)
         total_tokens = state.get("tokens_used", 0) + toks
 
@@ -1058,7 +1077,8 @@ def composition_node(state):
         if json_match:
             report = json.loads(json_match.group())
         else:
-            report = {"coherent": True, "issues": [], "summary": text[:500]}
+            log_event(f"[ERROR] Composition coherence JSON parse failed, no JSON found in response")
+            report = {"coherent": False, "issues": [{"file": "N/A", "type": "parse_error", "description": "LLM response was not valid JSON"}], "summary": text[:500]}
 
         log_event(f"[COMPOSITION] {'Coherent' if report.get('coherent') else 'Issues found'}: {report.get('summary', '')[:100]}")
 
@@ -1128,8 +1148,8 @@ def _send_webhook(data: dict):
         try:
             with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
                 url = json.load(f).get("webhook_url", "")
-        except Exception:
-            pass
+        except Exception as e:
+            log_event(f"[ERROR] Failed to read webhook URL from config.json: {e}")
     if not url:
         return
     def _post():

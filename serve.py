@@ -71,7 +71,8 @@ def _load_queue() -> list[dict]:
     _ensure_plans_dir()
     try:
         return json.loads(QUEUE_FILE.read_text())
-    except Exception:
+    except Exception as e:
+        log.warning(f"Failed to load queue file: {e}")
         return []
 
 
@@ -87,7 +88,8 @@ def _load_config() -> dict:
     if CONFIG_FILE.exists():
         try:
             return json.loads(CONFIG_FILE.read_text())
-        except Exception:
+        except Exception as e:
+            log.warning(f"Failed to load config file: {e}")
             return {}
     return {}
 
@@ -175,14 +177,14 @@ class ConnectionManager:
         if queue_payload:
             try:
                 await ws.send_json(queue_payload)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Failed to send queue state to new WS client: {e}")
         # Send all active session states
         for session_id, status in self._sessions.items():
             try:
                 await ws.send_json(status)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Failed to send session {session_id} state to new WS client: {e}")
 
     async def disconnect(self, ws: WebSocket):
         async with self._lock:
@@ -204,7 +206,8 @@ class ConnectionManager:
         for ws in clients:
             try:
                 await ws.send_json(payload)
-            except Exception:
+            except Exception as e:
+                log.debug(f"WS send failed (marking dead): {e}")
                 dead.append(ws)
         for ws in dead:
             await self.disconnect(ws)
@@ -626,7 +629,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 pass
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
-    except Exception:
+    except Exception as e:
+        log.warning(f"WebSocket error (disconnecting): {e}")
         await manager.disconnect(websocket)
 
 
