@@ -281,9 +281,10 @@ class TestRetryQueueOnPostFailure(unittest.TestCase):
         """A failed _post call should add the payload to _retry_queue."""
         payload = {"test": "data", "session_id": "retry-test"}
         # Make the actual HTTP call fail
+        mock_req = MagicMock()
+        mock_req.post.side_effect = Exception("Connection refused")
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.side_effect = Exception("Connection refused")
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._post(payload)
 
         self.assertEqual(len(status_bridge._retry_queue), 1)
@@ -294,9 +295,10 @@ class TestRetryQueueOnPostFailure(unittest.TestCase):
     def test_successful_post_not_queued(self):
         """A successful _post call should NOT add anything to _retry_queue."""
         payload = {"test": "data"}
+        mock_req = MagicMock()
+        mock_req.post.return_value = MagicMock(status_code=200)
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.return_value = MagicMock(status_code=200)
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._post(payload)
 
         self.assertEqual(len(status_bridge._retry_queue), 0)
@@ -304,9 +306,10 @@ class TestRetryQueueOnPostFailure(unittest.TestCase):
     def test_posts_sent_counter_incremented_on_success(self):
         """_posts_sent counter should increment on successful POST."""
         payload = {"test": "data"}
+        mock_req = MagicMock()
+        mock_req.post.return_value = MagicMock(status_code=200)
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.return_value = MagicMock(status_code=200)
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._post(payload)
 
         self.assertEqual(status_bridge._posts_sent, 1)
@@ -314,9 +317,10 @@ class TestRetryQueueOnPostFailure(unittest.TestCase):
     def test_posts_failed_counter_incremented_on_failure(self):
         """_posts_failed counter should increment on failed POST."""
         payload = {"test": "data"}
+        mock_req = MagicMock()
+        mock_req.post.side_effect = Exception("Connection refused")
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.side_effect = Exception("Connection refused")
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._post(payload)
 
         self.assertEqual(status_bridge._posts_failed, 1)
@@ -345,9 +349,10 @@ class TestRetryThreadDrains(unittest.TestCase):
             "payload": {"test": "retry-data"},
             "attempts": 1,
         })
+        mock_req = MagicMock()
+        mock_req.post.return_value = MagicMock(status_code=200)
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.return_value = MagicMock(status_code=200)
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._drain_retry_queue()
 
         self.assertEqual(len(status_bridge._retry_queue), 0)
@@ -359,9 +364,10 @@ class TestRetryThreadDrains(unittest.TestCase):
             "payload": {"test": "retry-data"},
             "attempts": 1,
         })
+        mock_req = MagicMock()
+        mock_req.post.side_effect = Exception("Still down")
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.side_effect = Exception("Still down")
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._drain_retry_queue()
 
         self.assertEqual(len(status_bridge._retry_queue), 1)
@@ -373,9 +379,10 @@ class TestRetryThreadDrains(unittest.TestCase):
             "payload": {"test": "retry-data"},
             "attempts": 3,
         })
+        mock_req = MagicMock()
+        mock_req.post.side_effect = Exception("Still down")
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.side_effect = Exception("Still down")
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._drain_retry_queue()
 
         # Should be discarded, not requeued
@@ -388,9 +395,10 @@ class TestRetryThreadDrains(unittest.TestCase):
                 "payload": {"index": i},
                 "attempts": 1,
             })
+        mock_req = MagicMock()
+        mock_req.post.return_value = MagicMock(status_code=200)
         with patch.object(status_bridge, "_HAS_REQUESTS", True), \
-             patch("status_bridge._req") as mock_req:
-            mock_req.post.return_value = MagicMock(status_code=200)
+             patch.object(status_bridge, "_req", mock_req):
             status_bridge._drain_retry_queue()
 
         self.assertEqual(len(status_bridge._retry_queue), 0)
