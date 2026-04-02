@@ -48,6 +48,11 @@ def seed_registry():
             "runs": 0,
             "avg_score": 0,
             "total_revisions": 0,
+            "tasks_passed": 0,
+            "tasks_failed": 0,
+            "tasks_force_accepted": 0,
+            "rejection_rate": 0.0,
+            "last_task_at": None,
             "builtin": builtin,
             **kw,
         }
@@ -319,6 +324,51 @@ def create_agent(agent_type: str, spec: dict) -> dict:
     return agent
 
 
+def merge_agent_from_plan(agent_type: str, spec: dict) -> dict | None:
+    """Merge an agent definition from a plan into an existing registry entry.
+
+    Only merges if the incoming description is longer than the existing one
+    (heuristic: more detailed spec is better). Merges tags as a union.
+    Uses update_agent() which auto-snapshots versions.
+
+    Returns the updated agent, or None if no merge was needed.
+    """
+    name = spec.get("name", "").lower().replace(" ", "_")
+    if not name:
+        return None
+    agent = get_agent(agent_type, name)
+    if not agent:
+        return None
+
+    incoming_desc = spec.get("description", "")
+    existing_desc = agent.get("description", "")
+    if len(incoming_desc) <= len(existing_desc):
+        return None  # existing description is already as detailed or more
+
+    updates = {}
+    updates["description"] = incoming_desc
+
+    incoming_title = spec.get("title", "")
+    if incoming_title and incoming_title != agent.get("title", ""):
+        updates["title"] = incoming_title
+
+    incoming_tools = spec.get("tools")
+    if incoming_tools is not None and incoming_tools != agent.get("tools"):
+        updates["tools"] = incoming_tools
+
+    # Merge tags as union
+    existing_tags = set(agent.get("tags", []))
+    incoming_tags = set(spec.get("tags", []))
+    merged_tags = sorted(existing_tags | incoming_tags)
+    if merged_tags != sorted(existing_tags):
+        updates["tags"] = merged_tags
+
+    if not updates:
+        return None
+
+    return update_agent(agent_type, name, updates)
+
+
 def update_agent(agent_type: str, name: str, updates: dict) -> dict | None:
     """Update an existing agent. Cannot change name or builtin status."""
     reg = load_registry()
@@ -440,8 +490,10 @@ def retire_agent(agent_type: str, name: str, retired: bool = True) -> dict | Non
 # ── Performance tracking ─────────────────────────────────────────────────────
 
 
-def record_agent_performance(agent_type: str, name: str, score: int, revisions: int = 0):
-    """Update running average score and revision count after a task run."""
+def record_agent_performance(agent_type: str, name: str, score: int,
+                             revisions: int = 0, verdict: str = "PASS",
+                             force_accepted: bool = False):
+    """Update running average score, revision count, and outcome counters after a task run."""
     reg = load_registry()
     agent = reg.get(agent_type, {}).get(name)
     if not agent:
@@ -452,6 +504,23 @@ def record_agent_performance(agent_type: str, name: str, score: int, revisions: 
     agent["runs"] = runs
     agent["avg_score"] = round(new_avg, 2)
     agent["total_revisions"] = agent.get("total_revisions", 0) + revisions
+
+    # Outcome counter updates
+    if force_accepted:
+        agent["tasks_force_accepted"] = agent.get("tasks_force_accepted", 0) + 1
+    elif verdict == "PASS":
+        agent["tasks_passed"] = agent.get("tasks_passed", 0) + 1
+    else:
+        agent["tasks_failed"] = agent.get("tasks_failed", 0) + 1
+
+    # Compute rejection rate
+    passed = agent.get("tasks_passed", 0)
+    failed = agent.get("tasks_failed", 0)
+    forced = agent.get("tasks_force_accepted", 0)
+    total_outcomes = passed + failed + forced
+    agent["rejection_rate"] = round((failed + forced) / total_outcomes, 4) if total_outcomes > 0 else 0.0
+
+    agent["last_task_at"] = datetime.now(timezone.utc).isoformat()
     agent["updated_at"] = datetime.now(timezone.utc).isoformat()
     reg[agent_type][name] = agent
     save_registry(reg)
@@ -494,6 +563,15 @@ def format_agent_catalog() -> str:
     reg = load_registry()
     lines = []
 
+    # Try to load specialization data for strength display
+    spec_matrix = {}
+    try:
+        from specialization import get_specialization_matrix
+        matrix = get_specialization_matrix()
+        spec_matrix = matrix.get("agents", {})
+    except Exception:
+        pass
+
     for atype, label in [("sub_agents", "Sub-Agents"), ("managers", "Managers"), ("reviewers", "Reviewers")]:
         agents = list(reg.get(atype, {}).values())
         if not agents:
@@ -504,7 +582,11 @@ def format_agent_catalog() -> str:
                 continue
             score_info = ""
             if a.get("runs", 0) > 0:
-                score_info = f" [score: {a['avg_score']:.1f}, runs: {a['runs']}]"
+                rej = a.get("rejection_rate", 0.0)
+                score_info = (
+                    f" [score: {a['avg_score']:.1f}, runs: {a['runs']}, "
+                    f"rej: {rej:.0%}]"
+                )
             lines.append(
                 f"- **{a['name']}**: {a.get('title', a['name'])} "
                 f"-- {a.get('description', '')[:120]}{score_info}"
@@ -513,6 +595,17 @@ def format_agent_catalog() -> str:
                 lines.append(f"  tags: {', '.join(a['tags'])}")
             if atype == "sub_agents" and a.get("tools"):
                 lines.append(f"  tools: {', '.join(a['tools'])}")
+            # Show top 3 specialization strengths if available
+            agent_spec = spec_matrix.get(a["name"], {})
+            if agent_spec:
+                strengths = sorted(
+                    agent_spec.items(), key=lambda x: x[1], reverse=True
+                )[:3]
+                if strengths:
+                    strength_str = ", ".join(
+                        f"{tag}({score:.1f})" for tag, score in strengths
+                    )
+                    lines.append(f"  strengths: {strength_str}")
 
     return "\n".join(lines)
 
@@ -706,6 +799,120 @@ def import_agents(data: dict, overwrite: bool = False) -> dict:
     return summary
 
 
+def export_single_agent(agent_type: str, name: str) -> dict | None:
+    """Return a self-contained export dict for a single agent."""
+    agent = get_agent(agent_type, name)
+    if not agent:
+        return None
+    clean = {k: v for k, v in agent.items() if k != "versions"}
+    return {
+        "nort_agent_export": True,
+        "version": 1,
+        "agent_type": agent_type,
+        "agent": clean,
+    }
+
+
+def export_agent_as_claude_code(agent_type: str, name: str) -> str | None:
+    """Produce a markdown file compatible with .claude/agents/*.md.
+
+    Generates YAML frontmatter and a body with title, description,
+    expertise/focus areas, performance stats, tags, and origin note.
+    """
+    agent = get_agent(agent_type, name)
+    if not agent:
+        return None
+
+    # PascalCase name
+    pascal_name = "".join(
+        word.capitalize() for word in agent.get("name", name).split("_")
+    )
+
+    desc = agent.get("description", "")
+    truncated_desc = desc[:120] + ("..." if len(desc) > 120 else "")
+
+    # Map NORT tools to Claude Code permissions
+    tool_map = {
+        "write_file": ["Edit(*)", "Write(*)"],
+        "read_file": ["Read(*)", "Grep(*)", "Glob(*)"],
+        "execute_code": ["Bash(*)"],
+        "web_search": ["WebSearch(*)", "WebFetch(*)"],
+    }
+    nort_tools = agent.get("tools", [])
+    permissions = []
+    for tool in nort_tools:
+        permissions.extend(tool_map.get(tool, []))
+    # Deduplicate while preserving order
+    seen = set()
+    unique_permissions = []
+    for p in permissions:
+        if p not in seen:
+            seen.add(p)
+            unique_permissions.append(p)
+
+    # Build YAML frontmatter
+    lines = ["---"]
+    lines.append(f"name: {pascal_name}")
+    lines.append(f"description: {truncated_desc}")
+    lines.append("model: sonnet")
+    if unique_permissions:
+        lines.append("permissions:")
+        for perm in unique_permissions:
+            lines.append(f"  - {perm}")
+    lines.append("---")
+    lines.append("")
+
+    # Body
+    title = agent.get("title", pascal_name)
+    lines.append(f"# {title}")
+    lines.append("")
+    lines.append(desc)
+    lines.append("")
+
+    # Expertise / focus areas
+    focus = agent.get("focus_areas")
+    expertise = agent.get("expertise_blend")
+    if focus:
+        lines.append("## Focus Areas")
+        for area in focus:
+            lines.append(f"- {area}")
+        lines.append("")
+    if expertise:
+        lines.append("## Expertise")
+        for area in expertise:
+            lines.append(f"- {area}")
+        lines.append("")
+
+    # Performance history
+    runs = agent.get("runs", 0)
+    if runs > 0:
+        lines.append("## Performance History")
+        lines.append(f"- Runs: {runs}")
+        lines.append(f"- Average Score: {agent.get('avg_score', 0):.1f}")
+        lines.append(f"- Total Revisions: {agent.get('total_revisions', 0)}")
+        passed = agent.get("tasks_passed", 0)
+        failed = agent.get("tasks_failed", 0)
+        forced = agent.get("tasks_force_accepted", 0)
+        lines.append(f"- Tasks Passed: {passed}")
+        lines.append(f"- Tasks Failed: {failed}")
+        lines.append(f"- Tasks Force-Accepted: {forced}")
+        rej = agent.get("rejection_rate", 0.0)
+        lines.append(f"- Rejection Rate: {rej:.0%}")
+        lines.append("")
+
+    # Tags
+    tags = agent.get("tags", [])
+    if tags:
+        lines.append("## Tags")
+        lines.append(", ".join(tags))
+        lines.append("")
+
+    lines.append("---")
+    lines.append(f"*Exported from NORT agent registry ({agent_type}/{name})*")
+
+    return "\n".join(lines)
+
+
 # ── Earned tolerance ────────────────────────────────────────────────────────
 
 
@@ -715,4 +922,6 @@ def check_earned_tolerance(agent_type: str, name: str) -> bool:
     agent = reg.get(agent_type, {}).get(name)
     if not agent:
         return False
-    return agent.get("runs", 0) >= 5 and agent.get("avg_score", 0) > 8
+    return (agent.get("runs", 0) >= 5
+            and agent.get("avg_score", 0) > 8
+            and agent.get("rejection_rate", 0) < 0.3)
