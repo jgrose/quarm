@@ -31,6 +31,7 @@ _bridge_stub.set_project = MagicMock()
 _bridge_stub.set_active_reviewer = MagicMock()
 _bridge_stub.register_rosters = MagicMock()
 _bridge_stub.record_file_touch = MagicMock()
+_bridge_stub.set_session_id = MagicMock()
 sys.modules.setdefault("status_bridge", _bridge_stub)
 
 _model_cfg_stub = ModuleType("model_config")

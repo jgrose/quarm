@@ -110,7 +110,12 @@ class TestToleranceOverrideTracking(unittest.TestCase):
         os.unlink(self._tmp.name)
 
     def test_tolerance_override_tracking(self):
+        import importlib
+        # Force-load the real tracking module (conftest.py may have stubbed it)
+        if "tracking" in sys.modules and not hasattr(sys.modules["tracking"], "DB_PATH"):
+            del sys.modules["tracking"]
         import tracking
+        importlib.reload(tracking)
 
         # Redirect DB_PATH to a temp file
         orig_path = tracking.DB_PATH

@@ -15,9 +15,14 @@ from collections import deque
 from unittest.mock import patch, MagicMock
 
 import sys, os
+import importlib
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Force-load the real status_bridge (conftest.py may have stubbed it)
+if "status_bridge" in sys.modules:
+    del sys.modules["status_bridge"]
 import status_bridge
+importlib.reload(status_bridge)
 
 
 def _reset_bridge():
