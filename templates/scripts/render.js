@@ -166,6 +166,15 @@ function render(timestamp) {
   if (typeof drawAllBubbles === 'function') drawAllBubbles(ctx, currentTime);
   if (config.toolCards) drawAllToolCards(ctx, currentTime);
   if (typeof drawAllDiscoveries === 'function') drawAllDiscoveries(ctx, currentTime, dt);
+
+  // Dependency lines between programs
+  if (config.dependencies && typeof drawDependencyLines === 'function') {
+    drawDependencyLines(ctx, currentTime);
+  }
+  if (config.dependencies && typeof drawBlockedIndicators === 'function') {
+    drawBlockedIndicators(ctx, currentTime);
+  }
+
   drawEffects(ctx, dt);
 
   ctx.restore();

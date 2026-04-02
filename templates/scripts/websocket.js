@@ -272,6 +272,9 @@ function applyStatus(data) {
   // 2b. Route ambient programs to work locations
   if (typeof routeProgramsToTasks === 'function') routeProgramsToTasks(tasks);
 
+  // Rebuild dependency visualization
+  if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
+
   // 3. Update edges based on active task flow
   rebuildEdges(data);
 
@@ -367,6 +370,8 @@ function switchSession(sessionId) {
     node.lastScore = task.last_score || 0;
     node.dependsOn = task.depends_on || [];
   }
+
+  if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
 
   rebuildEdges(d);
 
