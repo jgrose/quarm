@@ -589,6 +589,81 @@ def master_node(state):
     write_status(s); return s
 
 
+# ── Fallback code-block extractor ────────────────────────────────────────────
+
+# Map language hints to file extensions
+_LANG_EXT = {
+    "html": ".html", "css": ".css", "javascript": ".js", "js": ".js",
+    "python": ".py", "py": ".py", "typescript": ".ts", "ts": ".ts",
+    "tsx": ".tsx", "jsx": ".jsx", "json": ".json", "yaml": ".yaml",
+    "yml": ".yaml", "sql": ".sql", "sh": ".sh", "bash": ".sh",
+    "markdown": ".md", "md": ".md", "xml": ".xml", "svg": ".svg",
+}
+
+
+def _extract_code_blocks_to_files(tid: str, draft: str):
+    """Extract fenced code blocks from draft text and save as files.
+
+    Heuristic: looks for ```lang ... ``` blocks. If a filename comment is on the
+    first line (e.g., // filename: app.js or <!-- index.html -->), uses that name.
+    Otherwise, generates sequential names from the language hint.
+    """
+    from tools import _artifacts_path
+    import re as _re
+
+    blocks = _re.findall(r"```(\w*)\n(.*?)```", draft, _re.DOTALL)
+    if not blocks:
+        return
+
+    artifacts = _artifacts_path()
+    saved = 0
+    counters = {}
+
+    for lang, content in blocks:
+        lang = lang.lower().strip()
+        if not content.strip() or len(content.strip()) < 20:
+            continue
+
+        # Try to detect filename from first line comments
+        first_line = content.strip().split("\n")[0]
+        filename = None
+        # // filename: app.js  or  # filename: main.py  or  <!-- index.html -->
+        fname_match = _re.search(
+            r"(?://|#|<!--|/\*)\s*(?:filename|file):\s*(\S+)", first_line, _re.IGNORECASE
+        )
+        if fname_match:
+            filename = fname_match.group(1).rstrip("-->").rstrip("*/").strip()
+
+        if not filename:
+            ext = _LANG_EXT.get(lang, ".txt" if lang else None)
+            if ext is None:
+                continue  # skip unlabeled blocks
+            counters[ext] = counters.get(ext, 0) + 1
+            idx = counters[ext]
+            # Use conventional names for common single-file types
+            if ext == ".html" and idx == 1:
+                filename = "index.html"
+            elif ext == ".css" and idx == 1:
+                filename = "styles.css"
+            elif ext == ".js" and idx == 1:
+                filename = "app.js"
+            elif ext == ".py" and idx == 1:
+                filename = "main.py"
+            else:
+                filename = f"output_{idx}{ext}"
+
+        target = artifacts / filename
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
+            saved += 1
+        except Exception:
+            pass
+
+    if saved:
+        log_event(f"  [EXTRACT] Auto-extracted {saved} code block(s) from {tid} draft to artifacts")
+
+
 def _execute_single_task(tid, tasks, results, sub_agents_list):
     """Run a single sub-agent task. Returns (tid, draft, toks, tool_calls_log, model).
     Thread-safe — called from ThreadPoolExecutor for parallel execution."""
@@ -600,7 +675,11 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
     system = (
         f"You are the '{task['agent']}' specialist. {agent.get('description','')}\n"
         "Produce thorough, production-quality work. "
-        "Address all reviewer feedback explicitly and specifically."
+        "Address all reviewer feedback explicitly and specifically.\n"
+        "IMPORTANT: When your task requires creating code, HTML, CSS, configuration files, "
+        "or any other file-based deliverables, you MUST use the write_file tool to save each "
+        "file. Do not just include code in your response text — actually write it to files. "
+        "Use clear filenames and organize files logically (e.g., index.html, styles.css, app.js)."
     )
 
     ctx = [f"Output from {d}:\n{results[d]}"
@@ -686,6 +765,12 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         draft = resp.content
 
     tools_used = len(tool_calls_log)
+
+    # ── Fallback: extract code blocks to files if agent didn't use write_file ──
+    wrote_files = any(tc["name"] == "write_file" for tc in tool_calls_log)
+    if not wrote_files and draft and "```" in draft:
+        _extract_code_blocks_to_files(tid, draft)
+
     done_msg = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
     print(f"  {done_msg}"); log_event(done_msg)
 
