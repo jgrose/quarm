@@ -2757,6 +2757,88 @@ a:focus-visible {
   outline: none;
 }
 
+.agent-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(100, 200, 255, 0.03);
+  border: 1px solid rgba(100, 200, 255, 0.08);
+  border-radius: 2px;
+}
+
+.agent-sort-btn {
+  background: rgba(100, 200, 255, 0.05);
+  border: 1px solid rgba(100, 200, 255, 0.12);
+  color: var(--text-dim);
+  padding: 2px 8px;
+  font-size: 8px;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agent-sort-btn:hover {
+  background: rgba(100, 200, 255, 0.1);
+  color: #aaeeff;
+}
+
+.agent-sort-btn.active {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: rgba(100, 200, 255, 0.35);
+  color: #aaeeff;
+}
+
+.agent-perf {
+  margin-top: 6px;
+  padding: 5px 6px;
+  background: rgba(10, 15, 30, 0.4);
+  border: 1px solid rgba(100, 200, 255, 0.06);
+  border-radius: 2px;
+}
+
+.agent-perf-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.agent-perf-row:last-child {
+  margin-bottom: 0;
+}
+
+.agent-perf-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(100, 200, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.agent-perf-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.agent-perf-val {
+  font-size: 8px;
+  font-family: monospace;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.agent-perf-empty {
+  font-size: 8px;
+  font-family: monospace;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .agent-save-btn, .agent-delete-btn, .agent-cancel-btn {
   padding: 4px 12px;
   font-size: 9px;
