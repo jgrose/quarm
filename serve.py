@@ -397,6 +397,10 @@ app = FastAPI(title="NORT HQ", lifespan=lifespan)
 async def root(request: Request):
     return templates.TemplateResponse(request, "base.html", {"port": PORT})
 
+@app.get("/flow", response_class=HTMLResponse)
+async def flow_view(request: Request):
+    return templates.TemplateResponse(request, "flow.html", {"port": PORT})
+
 
 # ── Orchestrator bridge route (existing) ─────────────────────────────────────
 
