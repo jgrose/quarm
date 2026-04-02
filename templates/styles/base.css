@@ -970,92 +970,80 @@ a:hover { color: var(--holo-bright); }
   overflow-x: hidden;
 }
 
-/* Chat message group: avatar + body */
-.chat-group {
-  display: flex;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.chat-group.continuation {
-  padding-left: 32px;
-}
-
-/* Agent avatar circle */
-.chat-avatar {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  flex-shrink: 0;
+/* Chat message cards */
+.chat-card {
+  border-radius: 8px;
   border: 1px solid;
-  margin-top: 2px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
 }
 
-/* Message body column */
-.chat-body {
-  min-width: 0;
-  flex: 1;
-}
-
-/* Agent name label */
-.chat-name {
+.chat-card-header {
   font-size: 10px;
   font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  margin-bottom: 2px;
-  opacity: 0.9;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* Chat bubble */
-.chat-bubble {
-  border-left: 2px solid;
-  border-radius: 0 6px 6px 6px;
-  padding: 4px 8px;
+.chat-card-icon {
+  font-size: 8px;
+}
+
+.chat-card-body {
   font-size: 11px;
   font-family: 'Courier New', monospace;
   line-height: 1.5;
   color: var(--text-primary);
   word-wrap: break-word;
-  margin-bottom: 2px;
 }
 
-.chat-group.continuation .chat-bubble {
-  border-radius: 6px;
+.chat-card-body + .chat-card-body {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 200, 255, 0.06);
 }
 
-/* System message (MASTER, PARALLEL, etc.) */
-.chat-system {
-  font-size: 10px;
-  font-family: 'Courier New', monospace;
-  color: var(--text-dim);
+/* System messages — minimal centered card */
+.chat-card.system {
+  background: rgba(100, 200, 255, 0.03);
+  border-color: rgba(100, 200, 255, 0.08);
   text-align: center;
-  padding: 3px 8px;
-  border-bottom: 1px solid rgba(100, 200, 255, 0.04);
+  padding: 6px 10px;
 }
 
-.chat-system.master {
+.chat-card.system .chat-card-body {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Master messages — gold accent */
+.chat-card.master {
+  background: rgba(255, 215, 0, 0.06);
+  border-color: rgba(255, 215, 0, 0.15);
+}
+
+.chat-card.master .chat-card-body {
   color: #ffd700;
 }
 
 /* Metadata sub-lines (TOOL, MODEL) */
-.chat-meta {
+.chat-card-meta {
   font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-muted);
-  padding: 1px 0 1px 10px;
-  border-left: 1px solid rgba(100, 200, 255, 0.1);
-  margin-top: 2px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(100, 200, 255, 0.06);
   word-wrap: break-word;
 }
 
 /* Reviewer issue sub-items */
-.chat-issue {
+.chat-card-issue {
   font-size: 9px;
   font-family: 'Courier New', monospace;
   color: var(--text-dim);
@@ -1063,7 +1051,7 @@ a:hover { color: var(--holo-bright); }
   line-height: 1.5;
 }
 
-.chat-issue::before {
+.chat-card-issue::before {
   content: '\21B3 ';
   color: var(--text-muted);
 }
@@ -3434,15 +3422,15 @@ a:focus-visible {
     letter-spacing: 1.5px;
   }
 
-  .chat-bubble {
+  .chat-card-body {
     font-size: 9px;
   }
 
-  .chat-name {
+  .chat-card-header {
     font-size: 8px;
   }
 
-  .chat-meta {
+  .chat-card-meta {
     font-size: 8px;
   }
 
