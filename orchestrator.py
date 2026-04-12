@@ -721,7 +721,12 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         log_event(f"[ERROR] RAG context injection failed for {tid}: {e}")
 
     set_tool_context(plan_id=_plan_id, task_id=tid, agent=task["agent"])
-    agent_tools = get_tools(agent.get("tools", []))
+    # write_file is always available — the system prompt tells every agent to use it
+    # for file-based deliverables, and it only writes into the task's own artifacts dir.
+    requested = list(agent.get("tools", []))
+    if requested != ["none"] and "write_file" not in [t.strip().lower() for t in requested]:
+        requested.append("write_file")
+    agent_tools = get_tools(requested)
     messages = [
         SystemMessage(content=system),
         HumanMessage(content=f"Task: {task['title']}\nDescription: {task['description']}"
@@ -766,8 +771,18 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
 
     tools_used = len(tool_calls_log)
 
-    # ── Fallback: extract code blocks to files if agent didn't use write_file ──
-    wrote_files = any(tc["name"] == "write_file" for tc in tool_calls_log)
+    # ── Fallback: extract code blocks to files if agent didn't successfully write files ──
+    # A tool call counts as "wrote" only if the call actually succeeded. Failed calls
+    # (e.g., agent tried write_file but it wasn't in their tool list) leave result_preview
+    # starting with "Unknown tool:" or a "Tool error (...)" prefix — treat those as not-written
+    # so the code-block fallback still runs and produces artifacts.
+    def _tool_succeeded(tc):
+        r = tc.get("result_preview", "") or ""
+        return not (r.startswith("Unknown tool:") or r.startswith("Tool error (")
+                    or r.startswith("Access denied:") or "is not in this agent's allowed tools list" in r
+                    or r.startswith("Tool call rejected"))
+
+    wrote_files = any(tc["name"] == "write_file" and _tool_succeeded(tc) for tc in tool_calls_log)
     if not wrote_files and draft and "```" in draft:
         _extract_code_blocks_to_files(tid, draft)
 
