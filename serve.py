@@ -1074,6 +1074,26 @@ async def download_output(plan_id: str):
     )
 
 
+# ── Results API ────────────────────────────────────────────────────────────
+
+
+@app.get("/api/results/{plan_id}")
+async def get_plan_results(plan_id: str):
+    """Return the task results for a plan (text output from agents)."""
+    _validate_plan_id(plan_id)
+    results_file = PLANS_DIR / f"{plan_id}_results.json"
+    if not results_file.exists():
+        raise HTTPException(status_code=404, detail="No results found")
+    try:
+        data = json.loads(results_file.read_text())
+        return {
+            "task_results": data.get("task_results", {}),
+            "summary": data.get("summary", ""),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Agent Registry API ──────────────────────────────────────────────────────
 
 # ── Agent Import/Export ────────────────────────────────────────────────────
