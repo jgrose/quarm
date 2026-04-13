@@ -13,6 +13,7 @@
 ## Table of Contents
 
 - [What is NORT?](#what-is-nort)
+- [Tech Stack](#tech-stack)
 - [Quickstart](#quickstart)
 - [Architecture](#architecture)
 - [Plan Format](#plan-format)
@@ -41,6 +42,50 @@ NORT takes a markdown plan, dispatches tasks to specialist sub-agents, runs each
 - **Dynamic model selection** -- queries your LLM provider's `/models` endpoint at startup, auto-selects opus-tier for execution and sonnet-tier for reviews
 - **Real agent tools** -- web search, code execution, file I/O, RAG knowledge base, and URL browsing with human-in-the-loop approval for dangerous operations
 - **Output assembly** -- merges per-task artifacts into a single deliverable folder with MANIFEST.md, post-assembly validation, artifact versioning across revisions, and downloadable ZIP
+
+---
+
+## Tech Stack
+
+### Backend (Python 3.11+)
+
+| Layer | Technology |
+|---|---|
+| Agent graph | `langgraph` (`StateGraph`, conditional routing), `langchain-core` messages/tools |
+| LLM clients | `openai` SDK, `langchain-openai` (`ChatOpenAI`), `langchain-anthropic` |
+| Web server | `fastapi` + `uvicorn` (ASGI), WebSockets, `python-multipart` |
+| Templating | `jinja2` with `{% include %}` partial composition |
+| RAG vector store | `qdrant-client` + `sentence-transformers` for embeddings |
+| Web tools | `playwright` (headless Chromium) for `browse_url`; `duckduckgo-search` for `web_search` |
+| External tools | `mcp` Python SDK -- stdio subprocess + SSE transports for MCP servers |
+| Validation | `pydantic` v2 |
+| Config | `python-dotenv` (`.env`) + `config.json` |
+| Persistence | SQLite (stdlib) for run/score tracking; atomic-write JSON for plans, checkpoints, and agent registry |
+
+### Frontend (no build step)
+
+| Layer | Technology |
+|---|---|
+| Rendering | Vanilla JavaScript (ES modules, no framework); HTML5 Canvas 2D across 17 `draw_*.js` modules |
+| Layout | Custom force simulation (`force.js`) for the flow view; hand-authored isometric grid for the city view |
+| Post-processing | Custom bloom pass (`bloom.js`) with offscreen canvas caching |
+| Transport | Native browser `WebSocket` to `/ws`; `fetch` for REST endpoints |
+| Styling | Plain CSS (glass-morphism palette in `styles/base.css`); no CSS framework |
+| Templating | Server-rendered Jinja2 shells (`base.html`, `flow.html`) composing 20 panel partials |
+
+### Dev & testing
+
+| Purpose | Technology |
+|---|---|
+| Unit / integration tests | `pytest` with `conftest.py` module stubbing -- no LLM or network needed |
+| Smoke tests | `pytest-playwright` (Chromium) against a live `serve.py` |
+| Mocking | `unittest.mock` (stdlib) |
+
+### External services / runtime
+
+- OpenAI-compatible HTTP API (OpenAI, Anthropic via proxy, local models via `OPENAI_BASE_URL`)
+- Optional Qdrant instance for the RAG knowledge base
+- Optional MCP servers (local stdio subprocesses or remote SSE endpoints) for additional agent tools
 
 ---
 
