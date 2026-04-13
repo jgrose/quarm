@@ -132,7 +132,122 @@ function showAgentDetail(node) {
     html += '<div class="result-preview">' + escapeHtml(node.resultPreview) + '</div>';
   }
 
+  // Operator guidance: only offered when we know the plan + task and the plan is running.
+  var planId = _activeSessionId;
+  if (planId && node.taskId && _sessionIsRunning(planId)) {
+    var pending = _guidancePending[planId + ':' + node.taskId] || 0;
+    html += '<div style="margin-top:10px;font-size:8px;color:' + C.textDim + ';letter-spacing:1px">OPERATOR GUIDANCE';
+    if (pending) html += ' <span class="nudge-badge">' + pending + ' pending</span>';
+    html += '</div>';
+    html += '<textarea id="agentGuidanceText" class="guidance-input" rows="2" placeholder="Type a nudge the agent will see on its next turn\u2026"></textarea>';
+    html += '<button class="btn-sm" onclick="sendGuidanceFromAgentCard(\'' + escapeHtml(planId) + '\', \'' + escapeHtml(node.taskId) + '\')" style="margin-top:4px;width:100%">SEND GUIDANCE</button>';
+  }
+
   card.innerHTML = html;
+}
+
+function _sessionIsRunning(planId) {
+  try {
+    var items = document.querySelectorAll('.queue-item[data-id="' + planId + '"]');
+    for (var i = 0; i < items.length; i++) {
+      var badge = items[i].querySelector('.queue-status');
+      if (badge && /RUNNING/i.test(badge.textContent || '')) return true;
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+var _guidancePending = {}; // "planId:taskId" → pending count (updated via websocket broadcast)
+
+function handleGuidanceEvent(data) {
+  var key = (data.plan_id || '') + ':' + (data.task_id || '');
+  if (data.type === 'guidance_queued') {
+    _guidancePending[key] = data.pending || 1;
+  } else if (data.type === 'guidance_consumed') {
+    delete _guidancePending[key];
+  }
+  // If the agent card is open for this task, refresh pending badge
+  if (typeof selectedNode !== 'undefined' && selectedNode &&
+      selectedNode.taskId === data.task_id &&
+      typeof showAgentDetail === 'function') {
+    showAgentDetail(selectedNode);
+  }
+}
+
+function sendGuidance(planId, taskId, message, statusEl) {
+  if (!planId || !taskId || !message) return Promise.resolve(false);
+  return fetch('/api/tasks/' + encodeURIComponent(planId) + '/' + encodeURIComponent(taskId) + '/guidance', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: message}),
+  })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      if (statusEl) {
+        statusEl.textContent = 'SENT (\u00d7' + data.pending + ')';
+        setTimeout(function() { statusEl.textContent = ''; }, 3000);
+      }
+      return true;
+    })
+    .catch(function() {
+      if (statusEl) {
+        statusEl.textContent = 'FAILED';
+        setTimeout(function() { statusEl.textContent = ''; }, 3000);
+      }
+      return false;
+    });
+}
+
+function sendGuidanceFromAgentCard(planId, taskId) {
+  var ta = document.getElementById('agentGuidanceText');
+  if (!ta) return;
+  var msg = ta.value.trim();
+  if (!msg) return;
+  var btn = ta.nextElementSibling;
+  if (btn) { btn.disabled = true; btn.textContent = 'SENDING\u2026'; }
+  sendGuidance(planId, taskId, msg).then(function(ok) {
+    if (ok) ta.value = '';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = ok ? 'SENT \u2713' : 'SEND GUIDANCE';
+      if (ok) setTimeout(function() { btn.textContent = 'SEND GUIDANCE'; }, 2000);
+    }
+  });
+}
+
+function _activeTaskIdForPlan(planId) {
+  try {
+    var sess = (typeof _sessions !== 'undefined') ? _sessions[planId] : null;
+    var tasks = (sess && sess.data && sess.data.tasks) || [];
+    // Prefer in_progress; fall back to revision, manager/specialist review
+    var stages = ['in_progress', 'revision', 'in_manager_review', 'in_specialist_review'];
+    for (var s = 0; s < stages.length; s++) {
+      for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i].status === stages[s]) return tasks[i].id;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function sendGuidanceFromQueueRow(planId, inputId, statusId) {
+  var input = document.getElementById(inputId);
+  var status = document.getElementById(statusId);
+  if (!input) return;
+  var msg = (input.value || '').trim();
+  if (!msg) return;
+  var taskId = _activeTaskIdForPlan(planId);
+  if (!taskId) {
+    if (status) {
+      status.textContent = 'NO ACTIVE TASK';
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    }
+    return;
+  }
+  if (status) status.textContent = 'SENDING\u2026';
+  sendGuidance(planId, taskId, msg, status).then(function(ok) {
+    if (ok) input.value = '';
+  });
 }
 
 function hideAgentDetail() {
@@ -926,9 +1041,15 @@ function renderQueue(plans) {
       dlBtn.className = 'queue-dl-btn';
       dlBtn.onclick = (function(planId) { return function(e) { e.stopPropagation(); downloadOutputZip(planId, e.currentTarget); }; })(p.id);
       actions.appendChild(dlBtn);
+    }
+    // Browse is available as soon as any artifacts exist — running, failed, done.
+    // Download is kept gated to 'done' only (partial zip would be misleading).
+    if (p.status === 'done' || p.status === 'running' || p.status === 'failed') {
       var browseBtn = document.createElement('button');
       browseBtn.textContent = '\uD83D\uDCC2';
-      browseBtn.title = 'Browse output files';
+      browseBtn.title = (p.status === 'running')
+        ? 'Browse in-flight artifacts (live)'
+        : 'Browse output files';
       browseBtn.onclick = (function(planId) { return function(e) { e.stopPropagation(); showOutputBrowserForPlan(planId); }; })(p.id);
       actions.appendChild(browseBtn);
     }
@@ -946,6 +1067,19 @@ function renderQueue(plans) {
     }
 
     item.appendChild(actions);
+
+    if (p.status === 'running') {
+      var nudgeRow = document.createElement('div');
+      nudgeRow.className = 'nudge-row';
+      var inputId = 'nudge_' + p.id;
+      var statusId = 'nudgeStatus_' + p.id;
+      nudgeRow.innerHTML =
+        '<input id="' + inputId + '" class="guidance-input" placeholder="Nudge active task\u2026">' +
+        '<button class="btn-sm" onclick="sendGuidanceFromQueueRow(\'' + p.id + '\', \'' + inputId + '\', \'' + statusId + '\')">NUDGE</button>' +
+        '<span id="' + statusId + '" class="nudge-status"></span>';
+      nudgeRow.onclick = function(e) { e.stopPropagation(); };
+      item.appendChild(nudgeRow);
+    }
 
     // Drag events
     item.addEventListener('dragstart', onDragStart);
@@ -2204,9 +2338,65 @@ function updateAgentToleranceLabel(el) {
 
 // ── Output Browser ──────────────────────────────────────────────────────────
 
-var _outputPlanId = null;
+var _outputPlanId = (function() {
+  try { return localStorage.getItem('quarm_outputPlanId') || null; } catch (e) { return null; }
+})();
 var _outputSource = 'artifacts'; // 'artifacts' or 'output'
 var _cachedResults = null;
+
+function _persistOutputPlanId(planId) {
+  _outputPlanId = planId || null;
+  try {
+    if (planId) localStorage.setItem('quarm_outputPlanId', planId);
+    else localStorage.removeItem('quarm_outputPlanId');
+  } catch (e) { /* ignore */ }
+}
+
+function _statusLabel(status) {
+  if (status === 'running') return '\u25CF RUNNING';
+  if (status === 'done') return '\u2713 DONE';
+  if (status === 'failed') return '\u2717 FAILED';
+  if (status === 'queued') return '\u25CB QUEUED';
+  if (status === 'generating') return '\u2699 GENERATING';
+  return status || '?';
+}
+
+function _populatePlanSelect(selectedId) {
+  var sel = document.getElementById('outputPlanSelect');
+  if (!sel) return Promise.resolve();
+  return fetch('/api/plans/summary')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      var plans = (data.plans || []).filter(function(p) {
+        return p.has_artifacts || p.has_output || p.status === 'running';
+      });
+      // Most recently created first
+      plans.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+      var chosen = selectedId || _outputPlanId || '';
+      var html = '<option value="">Select a plan\u2026</option>';
+      for (var i = 0; i < plans.length; i++) {
+        var p = plans[i];
+        var label = _statusLabel(p.status) + ' \u2014 ' + (p.title || p.id) + ' (' + p.task_count + ' tasks)';
+        var sel_attr = (p.id === chosen) ? ' selected' : '';
+        html += '<option value="' + escapeHtml(p.id) + '"' + sel_attr + '>' + escapeHtml(label) + '</option>';
+      }
+      sel.innerHTML = html;
+    })
+    .catch(function() { /* silently leave placeholder */ });
+}
+
+function onOutputPlanChange(planId) {
+  if (!planId) {
+    _persistOutputPlanId(null);
+    var tree = document.getElementById('outputFileTree');
+    var prev = document.getElementById('outputFilePreview');
+    if (tree) tree.innerHTML = '<div style="color:var(--text-dim);padding:12px">Select a plan from the dropdown to view its artifacts.</div>';
+    if (prev) prev.innerHTML = '<div class="output-preview-placeholder">Select a file to preview</div>';
+    return;
+  }
+  _persistOutputPlanId(planId);
+  showOutputBrowserForPlan(planId);
+}
 
 function _updateSourceToggle() {
   var togArt = document.getElementById('srcArtifacts');
@@ -2222,11 +2412,12 @@ function switchOutputSource(source) {
 }
 
 function showOutputBrowserForPlan(planId) {
-  _outputPlanId = planId;
+  _persistOutputPlanId(planId);
   _cachedResults = null;
   var overlay = document.getElementById('outputBrowserOverlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
+  _populatePlanSelect(planId);
   // Probe output first; fall back to artifacts if empty
   fetch('/api/output/' + planId + '/files')
     .then(function(r) { return r.json(); })
@@ -2293,18 +2484,21 @@ function showOutputBrowser() {
   var overlay = document.getElementById('outputBrowserOverlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  // Determine plan_id from active session or queue
-  var planId = _outputPlanId || _activeSessionId || '';
-  if (!planId) {
-    // Try to get from queue
-    var queueItems = document.querySelectorAll('.queue-item[data-id]');
-    if (queueItems.length) planId = queueItems[queueItems.length - 1].dataset.id;
-  }
-  if (planId) loadOutputTree(planId);
+  // Populate the dropdown every time the browser opens so new plans appear.
+  // Prefer persisted selection; otherwise fall back to the running session.
+  var preferred = _outputPlanId || _activeSessionId || '';
+  _populatePlanSelect(preferred).then(function() {
+    if (preferred) {
+      showOutputBrowserForPlan(preferred);
+    } else {
+      var tree = document.getElementById('outputFileTree');
+      if (tree) tree.innerHTML = '<div style="color:var(--text-dim);padding:12px">Select a plan from the dropdown to view its artifacts.</div>';
+    }
+  });
 }
 
 function loadOutputTree(planId) {
-  _outputPlanId = planId;
+  _persistOutputPlanId(planId);
   var treeEl = document.getElementById('outputFileTree');
   if (treeEl) treeEl.innerHTML = '<div style="color:var(--text-dim);padding:12px">Loading...</div>';
   var endpoint = _outputSource === 'output'

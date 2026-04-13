@@ -109,6 +109,80 @@ def get_pending_approvals() -> list[dict]:
     ]
 
 
+# ── Operator guidance (push nudges into a running task) ─────────────────────
+#
+# Inverse of the ask_human pattern: the operator pushes a message that the
+# running agent will see on its next LLM turn. Keyed by (plan_id, task_id) so
+# guidance doesn't leak across plans.
+
+_guidance_lock = threading.Lock()
+_guidance_queue: dict[str, list[str]] = {}  # "{plan_id}:{task_id}" → [messages]
+
+
+def _guidance_key(plan_id: str, task_id: str) -> str:
+    return f"{plan_id or ''}:{task_id or ''}"
+
+
+def _broadcast_guidance(payload: dict) -> None:
+    import json as _json
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
+            data=_json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass
+
+
+def queue_guidance(plan_id: str, task_id: str, message: str) -> int:
+    """Append operator guidance for the agent working on this task.
+    Returns the new pending count. Safe to call even if the task is no longer running —
+    the message simply stays queued until drained (or forever)."""
+    message = (message or "").strip()
+    if not message:
+        return 0
+    key = _guidance_key(plan_id, task_id)
+    with _guidance_lock:
+        _guidance_queue.setdefault(key, []).append(message)
+        pending = len(_guidance_queue[key])
+    log.info(f"[GUIDANCE] queued for {key}: {message[:100]}")
+    _broadcast_guidance({
+        "type": "guidance_queued",
+        "plan_id": plan_id,
+        "task_id": task_id,
+        "pending": pending,
+        "message_preview": message[:200],
+    })
+    return pending
+
+
+def drain_guidance(plan_id: str, task_id: str) -> list[str]:
+    """Pop all pending guidance messages for a task. Orchestrator calls this
+    between LLM turns to fold operator nudges into the next agent invocation."""
+    key = _guidance_key(plan_id, task_id)
+    with _guidance_lock:
+        msgs = _guidance_queue.pop(key, [])
+    if msgs:
+        _broadcast_guidance({
+            "type": "guidance_consumed",
+            "plan_id": plan_id,
+            "task_id": task_id,
+            "count": len(msgs),
+        })
+    return msgs
+
+
+def peek_guidance(plan_id: str, task_id: str) -> list[str]:
+    """Non-destructive read of pending guidance — for the UI's 'N nudges pending' badge."""
+    key = _guidance_key(plan_id, task_id)
+    with _guidance_lock:
+        return list(_guidance_queue.get(key, []))
+
+
 # ── Human-input (ask_human) system ──────────────────────────────────────────
 #
 # Parallel to the approval system: an agent calls `ask_human(question)`, which

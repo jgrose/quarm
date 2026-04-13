@@ -147,6 +147,10 @@ function handleMessage(data) {
     hideQuestion();
     return;
   }
+  if (data.type === 'guidance_queued' || data.type === 'guidance_consumed') {
+    handleGuidanceEvent(data);
+    return;
+  }
   // Default: orchestrator status update
   applyStatus(data);
 }

@@ -1,8 +1,11 @@
 <div id="outputBrowserOverlay" class="hidden" onclick="this.classList.add('hidden')">
   <div class="output-browser-card glass-card" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="display:flex;gap:12px;align-items:center">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <div class="config-title" style="margin:0">OUTPUT BROWSER</div>
+        <select id="outputPlanSelect" class="plan-select" onchange="onOutputPlanChange(this.value)">
+          <option value="">Select a plan…</option>
+        </select>
         <div class="source-toggle">
           <button id="srcArtifacts" class="src-btn active" onclick="switchOutputSource('artifacts')">ARTIFACTS</button>
           <button id="srcOutput" class="src-btn" onclick="switchOutputSource('output')">OUTPUT</button>

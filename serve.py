@@ -451,6 +451,32 @@ async def api_list_plans():
         return _load_queue()
 
 
+@app.get("/api/plans/summary")
+async def api_plans_summary():
+    """Return every plan with cheap disk-state flags so the output browser's
+    plan picker can populate in one round-trip. has_artifacts/has_output tell the
+    UI whether there's anything worth showing for each plan."""
+    with _queue_lock:
+        queue = _load_queue()
+    summary = []
+    for entry in queue:
+        pid = entry["id"]
+        art_dir = ARTIFACTS_DIR / pid
+        task_count = 0
+        if art_dir.is_dir():
+            task_count = sum(1 for d in art_dir.iterdir() if d.is_dir() and d.name.startswith("TASK-"))
+        summary.append({
+            "id": pid,
+            "title": entry.get("title", ""),
+            "status": entry.get("status", ""),
+            "created_at": entry.get("created_at", ""),
+            "has_artifacts": art_dir.is_dir() and task_count > 0,
+            "has_output": _find_output_dir(pid) is not None,
+            "task_count": task_count,
+        })
+    return {"plans": summary}
+
+
 @app.get("/api/plans/{plan_id}")
 async def api_get_plan(plan_id: str):
     """Return a single plan's metadata and content."""
@@ -903,6 +929,37 @@ async def resolve_question_endpoint(tool_call_id: str, request: Request):
     from tools import resolve_question
     resolve_question(tool_call_id, str(data.get("answer", "")))
     return {"ok": True}
+
+
+# ── Operator guidance injection ─────────────────────────────────────────────
+
+def _validate_task_id(task_id: str):
+    if not re.match(r'^[a-zA-Z0-9_.\-]+$', task_id):
+        raise HTTPException(status_code=400, detail="Invalid task_id")
+
+
+@app.post("/api/tasks/{plan_id}/{task_id}/guidance")
+async def post_task_guidance(plan_id: str, task_id: str, request: Request):
+    """Queue an operator nudge that the agent will see on its next LLM turn."""
+    _validate_plan_id(plan_id)
+    _validate_task_id(task_id)
+    data = await request.json()
+    message = str(data.get("message", "")).strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+    from tools import queue_guidance
+    pending = queue_guidance(plan_id, task_id, message)
+    return {"ok": True, "pending": pending}
+
+
+@app.get("/api/tasks/{plan_id}/{task_id}/guidance")
+async def get_task_guidance(plan_id: str, task_id: str):
+    """Return pending (not-yet-consumed) guidance for a task, for the UI badge."""
+    _validate_plan_id(plan_id)
+    _validate_task_id(task_id)
+    from tools import peek_guidance
+    msgs = peek_guidance(plan_id, task_id)
+    return {"plan_id": plan_id, "task_id": task_id, "pending": len(msgs), "messages": msgs}
 
 
 @app.post("/api/plans/{plan_id}/human_policy")

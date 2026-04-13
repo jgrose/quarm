@@ -33,7 +33,7 @@ from status_bridge import (
 )
 from model_config import load_allowed_models
 from tracking import track_run_start, track_score, track_run_end
-from tools import get_tools, execute_tool_call, set_tool_context, init_mcp_tools
+from tools import get_tools, execute_tool_call, set_tool_context, init_mcp_tools, drain_guidance
 from checkpoint import save_checkpoint, load_checkpoint, clear_checkpoint
 
 try:
@@ -742,6 +742,19 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         HumanMessage(content=f"Task: {task['title']}\nDescription: {task['description']}"
                               + ("\n\n" + "\n\n".join(ctx) if ctx else "")),
     ]
+
+    def _fold_guidance():
+        """Drain any operator-sent guidance and splice it into the conversation."""
+        nudges = drain_guidance(_plan_id, tid)
+        if nudges:
+            joined = "\n\n".join(f"- {n}" for n in nudges)
+            log_event(f"  [GUIDANCE] {len(nudges)} operator nudge(s) folded into {tid}")
+            messages.append(HumanMessage(
+                content=f"[OPERATOR GUIDANCE]\nThe human operator has sent the following "
+                        f"guidance. Apply it to the rest of this task:\n{joined}"
+            ))
+
+    _fold_guidance()
     total_toks = 0
     tool_calls_log = []
 
@@ -749,6 +762,7 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         llm_with_tools = llm(model).bind_tools(agent_tools)
         max_iterations = 5
         for _iter in range(max_iterations):
+            _fold_guidance()
             resp = _invoke_with_retry(llm_with_tools, messages)
             total_toks += extract_tokens(resp)
             if not resp.tool_calls:
