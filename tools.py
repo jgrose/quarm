@@ -5,6 +5,8 @@ Supports hybrid approval: read-only tools auto-execute, write tools require huma
 """
 
 import os
+import json
+import time
 import subprocess
 import logging
 import threading
@@ -22,6 +24,7 @@ log = logging.getLogger("nort.tools")
 
 PROJECT_DIR = Path(__file__).parent
 ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
+QUESTIONS_LOG_DIR = Path("plans")
 
 SANDBOX_MODE = os.environ.get("NORT_SANDBOX_MODE", "subprocess").lower()
 _SENSITIVE_ENV_PATTERNS = {"API_KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "OPENAI", "ANTHROPIC", "AWS_"}
@@ -199,6 +202,19 @@ _question_details: dict[str, dict] = {}
 _plan_policies: dict[str, dict] = {}
 
 
+def _append_question_log(plan_id: str, entry: dict) -> None:
+    """Atomic-append one JSON line to plans/{plan_id}_questions.jsonl."""
+    if not plan_id:
+        return
+    try:
+        QUESTIONS_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        path = QUESTIONS_LOG_DIR / f"{plan_id}_questions.jsonl"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        log.debug(f"[ask_human] JSONL log write failed: {exc}")
+
+
 def set_plan_policy(plan_id: str, policy: str = "block", timeout_s: int = 900) -> None:
     """Set the human-input policy for a plan. Called at plan submission and on runtime edits."""
     if policy not in ("block", "timeout"):
@@ -220,6 +236,14 @@ def request_question(tc_id: str, question: str, context: str = "",
         "question": question, "context": context,
         "agent": agent, "task_id": task_id, "plan_id": plan_id,
     }
+    _append_question_log(plan_id, {
+        "ts": int(time.time()),
+        "type": "request",
+        "id": tc_id,
+        "agent": agent,
+        "task_id": task_id,
+        "question": question,
+    })
     log.info(f"[ASK_HUMAN] Waiting for human answer: {question[:120]}")
     # Broadcast to UI via serve.py
     import json as _json
@@ -255,6 +279,11 @@ def request_question(tc_id: str, question: str, context: str = "",
     _pending_questions.pop(tc_id, None)
     _question_details.pop(tc_id, None)
     if not got or answer is None:
+        _append_question_log(plan_id, {
+            "ts": int(time.time()),
+            "type": "timeout",
+            "id": tc_id,
+        })
         return QUESTION_TIMEOUT_SENTINEL
     return answer
 
@@ -262,6 +291,13 @@ def request_question(tc_id: str, question: str, context: str = "",
 def resolve_question(tc_id: str, answer: str) -> None:
     """Called from serve.py when the human submits an answer."""
     _question_answers[tc_id] = answer
+    details = _question_details.get(tc_id, {})
+    _append_question_log(details.get("plan_id", ""), {
+        "ts": int(time.time()),
+        "type": "resolve",
+        "id": tc_id,
+        "answer": answer,
+    })
     event = _pending_questions.get(tc_id)
     if event:
         event.set()
