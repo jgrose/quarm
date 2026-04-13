@@ -156,6 +156,18 @@ var selectedNode = null;
 function showAgentDetail(node) {
   hideBuildingDetail(); // Mutual exclusion with building card
   selectedNode = node;
+  // If this agent has a pending ask_human question, also open its banner entry.
+  if (typeof _pendingQuestions !== 'undefined' && _pendingQuestions.size > 0) {
+    var target = null;
+    var name = (node.agent || node.label || '').toLowerCase();
+    _pendingQuestions.forEach(function (q) {
+      if (!target && q.agent && q.agent.toLowerCase() === name) target = q.id;
+    });
+    if (target) {
+      _activeQuestionId = target;
+      refreshActiveBanner();
+    }
+  }
   var card = document.getElementById('agentDetailCard');
   card.classList.remove('hidden');
   var tierInfo = TIERS[node.tier] || TIERS.drone;
