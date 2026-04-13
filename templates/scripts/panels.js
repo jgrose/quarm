@@ -1616,7 +1616,7 @@ function renderAsks() {
     var caret = collapsed ? '&#9656;' : '&#9662;';
     html += '<div class="asks-group">';
     html += '<div class="asks-group-header" onclick="toggleAsksPlanGroup(' +
-            JSON.stringify(pid) + ')">' +
+            escapeHtml(JSON.stringify(pid)) + ')">' +
             '<span class="caret">' + caret + '</span> PLAN ' +
             escapeHtml(pid) + ' (' + items.length + ')</div>';
     if (!collapsed) {
@@ -1625,7 +1625,7 @@ function renderAsks() {
         var ago = _formatAgo(nowSec - (q.received_at || nowSec));
         var activeCls = (q.id === _activeQuestionId) ? ' active' : '';
         html += '<div class="asks-item' + activeCls + '" onclick="selectAsk(' +
-                JSON.stringify(q.id) + ')">';
+                escapeHtml(JSON.stringify(q.id)) + ')">';
         html += '<div class="asks-item-head">';
         html += '<span>' + escapeHtml(q.agent || 'agent') +
                 (q.task_id ? ' &middot; ' + escapeHtml(q.task_id) : '') + '</span>';
