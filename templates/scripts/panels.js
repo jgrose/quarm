@@ -1505,6 +1505,10 @@ function hideQuestion() {
   if (input) input.value = '';
 }
 
+// Stubs — real implementations land in Task 7.
+function carouselPrev() { /* Task 7 */ }
+function carouselNext() { /* Task 7 */ }
+
 function dismissQuestion() {
   // User closed the banner without answering — question stays in the queue.
   var banner = document.getElementById('questionBanner');
@@ -1512,16 +1516,6 @@ function dismissQuestion() {
   _activeQuestionId = null;
   _rerenderQuestionUI();
 }
-
-// Escape dismisses the banner if it's visible.
-document.addEventListener('keydown', function (e) {
-  if (e.key !== 'Escape') return;
-  var banner = document.getElementById('questionBanner');
-  if (banner && !banner.classList.contains('hidden')) {
-    e.preventDefault();
-    dismissQuestion();
-  }
-});
 
 function refreshActiveBanner() {
   var banner = document.getElementById('questionBanner');

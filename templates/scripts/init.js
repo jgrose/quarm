@@ -79,6 +79,14 @@ document.addEventListener('DOMContentLoaded', function() {
       // z:200 — Approval banner (highest interactive layer)
       // (Approval banner has no close-on-escape — it requires explicit action)
 
+      // z:200 — Question banner (ask_human) — dismissible via Escape
+      var questionBanner = document.getElementById('questionBanner');
+      if (questionBanner && !questionBanner.classList.contains('hidden')) {
+        if (typeof dismissQuestion === 'function') dismissQuestion();
+        else questionBanner.classList.add('hidden');
+        return;
+      }
+
       // z:150 — Modal overlays (completion, plan viewer)
       var completionOvl = document.getElementById('completionOverlay');
       if (completionOvl && !completionOvl.classList.contains('hidden')) {
