@@ -165,3 +165,49 @@ def test_broadcast_called_on_request_and_resolve(monkeypatch):
     final = snapshots[-1]
     ids = [p.get("id") for p in final["pending"]]
     assert "tc-bc-1" not in ids
+
+
+def test_multi_question_preserves_request_order():
+    """get_pending_questions returns entries in insertion order."""
+    import tools
+
+    threads = []
+    for i in range(3):
+        tc = f"tc-order-{i}"
+        def caller(tc=tc, i=i):
+            tools.request_question(tc, f"Q{i}?", plan_id="plan-order",
+                                   agent=f"a{i}", task_id=f"T{i}")
+        t = threading.Thread(target=caller, daemon=True)
+        t.start()
+        threads.append((tc, t))
+
+    import time; time.sleep(0.1)
+    try:
+        pending = tools.get_pending_questions()
+        ids = [p["id"] for p in pending if p["id"].startswith("tc-order-")]
+        assert ids == ["tc-order-0", "tc-order-1", "tc-order-2"]
+    finally:
+        for tc, t in threads:
+            tools.resolve_question(tc, "")
+            t.join(timeout=1.0)
+
+
+def test_resolve_nonactive_question_leaves_others_pending():
+    """Resolving one of many pending questions must not disturb the rest."""
+    import tools
+
+    for i in range(2):
+        tc = f"tc-leave-{i}"
+        def caller(tc=tc, i=i):
+            tools.request_question(tc, f"Q{i}?", plan_id="plan-leave",
+                                   agent=f"a{i}", task_id=f"T{i}")
+        threading.Thread(target=caller, daemon=True).start()
+
+    import time; time.sleep(0.05)
+    tools.resolve_question("tc-leave-0", "ok")
+    time.sleep(0.05)
+    remaining = {p["id"] for p in tools.get_pending_questions()}
+    assert "tc-leave-1" in remaining
+    assert "tc-leave-0" not in remaining
+
+    tools.resolve_question("tc-leave-1", "ok")
