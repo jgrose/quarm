@@ -66,7 +66,7 @@
       var costPanel = document.getElementById('costPanelOverlay');
       if (costPanel) costPanel.classList.add('hidden');
     }
-    if (e.ctrlKey || e.metaKey || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+    if (e.ctrlKey || e.metaKey || _isTyping()) return;
     if (e.key === 'c' && typeof toggleChat === 'function') toggleChat();
     if (e.key === 'l' && typeof toggleAgentList === 'function') toggleAgentList();
     if (e.key === 'a' && typeof toggleAgentsPanel === 'function') toggleAgentsPanel();

@@ -1,6 +1,16 @@
 // ═══ NORT PANEL LOGIC ═══
 // UI panels: config, agent detail, event log, queue, thinking, overlays
 
+// Returns true when the user is actively typing into a text input so global
+// keyboard shortcuts should yield (e.g. typing 'a' into an answer textarea
+// must not open the agents panel).
+function _isTyping() {
+  var el = document.activeElement;
+  if (!el) return false;
+  var tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+}
+
 // ── Per-plan human-input policy cache (client-side mirror) ─────────────────
 var _planPolicyCache = {};
 
@@ -339,7 +349,7 @@ function _renderAgentRow(agent, tier, tasks) {
   var taskTitle = task ? (task.title || task.id || '') : '';
   var name = agent.title || prettify(agent.name);
 
-  var html = '<div class="al-agent">';
+  var html = '<div class="al-agent" data-agent-name="' + escapeHtml(agent.name) + '">';
   html += '<span class="al-agent-icon" style="color:' + statusColor + '">' + icon + '</span>';
   html += '<div class="al-agent-info">';
   html += '<div class="al-agent-name">' + escapeHtml(name) + '</div>';
@@ -350,6 +360,54 @@ function _renderAgentRow(agent, tier, tasks) {
   html += '<span class="al-agent-status" style="color:' + statusColor + '">' + statusLabel + '</span>';
   html += '</div>';
   return html;
+}
+
+// Delegated click handler: clicking an agent row centers the canvas on that agent.
+document.addEventListener('click', function (e) {
+  var row = e.target.closest ? e.target.closest('.al-agent[data-agent-name]') : null;
+  if (!row) return;
+  focusAgentOnCanvas(row.dataset.agentName);
+});
+
+// ── Focus-on-canvas (pan camera + pulse) ───────────────────────────────────
+
+var _focusAnimRAF = null;
+var _focusPulse = null; // { nodeId, startedAt, duration }
+
+function focusAgentOnCanvas(agentName) {
+  if (typeof getNodeByAgent !== 'function') return;
+  var node = getNodeByAgent(agentName);
+  if (!node) return;
+  var canvas = document.getElementById('canvas');
+  if (!canvas || typeof camera === 'undefined') return;
+  var _dpr = (typeof dpr === 'number' && dpr > 0) ? dpr : 1;
+
+  var targetX = canvas.width / (2 * _dpr) - node.x;
+  var targetY = canvas.height / (2 * _dpr) - node.y;
+
+  var startX = camera.x, startY = camera.y;
+  var startT = performance.now();
+  var duration = 450;
+
+  if (_focusAnimRAF) cancelAnimationFrame(_focusAnimRAF);
+
+  function step(now) {
+    var t = Math.min(1, (now - startT) / duration);
+    var ease = 1 - Math.pow(1 - t, 3);
+    camera.x = startX + (targetX - startX) * ease;
+    camera.y = startY + (targetY - startY) * ease;
+    if (t < 1) _focusAnimRAF = requestAnimationFrame(step);
+    else _focusAnimRAF = null;
+  }
+  _focusAnimRAF = requestAnimationFrame(step);
+
+  // Three staggered attention rings so the pulse lingers past the pan.
+  if (typeof spawnEffect === 'function') {
+    var pulseColor = (typeof C !== 'undefined' && C.in_progress) ? C.in_progress : '#ffcc66';
+    spawnEffect(node.x, node.y, pulseColor);
+    setTimeout(function () { spawnEffect(node.x, node.y, pulseColor); }, 300);
+    setTimeout(function () { spawnEffect(node.x, node.y, pulseColor); }, 600);
+  }
 }
 
 function _findTaskForAgent(agentName, tasks) {

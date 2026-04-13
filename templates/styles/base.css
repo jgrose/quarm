@@ -1178,10 +1178,15 @@ a:hover { color: var(--holo-bright); }
   padding: 3px 8px 3px 16px;
   border-bottom: 1px solid rgba(100, 200, 255, 0.04);
   transition: background 0.15s;
+  cursor: pointer;
 }
 
 .al-agent:hover {
-  background: rgba(100, 200, 255, 0.04);
+  background: rgba(100, 200, 255, 0.08);
+}
+
+.al-agent:active {
+  background: rgba(100, 200, 255, 0.14);
 }
 
 .al-agent-icon {

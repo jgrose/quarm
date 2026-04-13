@@ -197,31 +197,31 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleAgentList(); return;
       }
     }
-    if (e.key === 'q' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'q' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       toggleQueue();
     }
-    if (e.key === 'r' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       if (typeof toggleRoster === 'function') toggleRoster();
     }
-    if (e.key === 'm' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       config.minimap = !config.minimap;
     }
-    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       if (typeof toggleAgentsPanel === 'function') toggleAgentsPanel();
     }
-    if (e.key === 'c' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'c' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       if (typeof toggleChat === 'function') toggleChat();
     }
-    if (e.key === 'l' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       if (typeof toggleAgentList === 'function') toggleAgentList();
     }
-    if (e.key === 'p' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       if (typeof togglePlansList === 'function') togglePlansList();
     }
-    if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !_isTyping()) {
       config.dependencies = !config.dependencies;
     }
-    if (e.key === '?' && document.activeElement.tagName !== 'INPUT') {
+    if (e.key === '?' && !_isTyping()) {
       if (typeof toggleHelp === 'function') toggleHelp();
     }
   });
