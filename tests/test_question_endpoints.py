@@ -88,3 +88,24 @@ def test_set_human_policy_rejects_unknown_policy():
         json={"policy": "nonsense"},
     )
     assert r.status_code == 400
+
+
+def test_questions_snapshot_endpoint_returns_pending():
+    """GET /api/questions returns the current pending set (used for HTTP fallback)."""
+    from fastapi.testclient import TestClient
+    import serve
+    import tools
+
+    # Seed a pending question.
+    tools._question_details["tc-snap-1"] = {
+        "question": "Live?", "context": "", "agent": "a",
+        "task_id": "T", "plan_id": "P", "received_at": 1,
+    }
+    try:
+        client = TestClient(serve.app)
+        resp = client.get("/api/questions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert any(p["id"] == "tc-snap-1" for p in data["pending"])
+    finally:
+        tools._question_details.pop("tc-snap-1", None)
