@@ -1647,6 +1647,13 @@ function _formatAgo(deltaSec) {
   return Math.floor(deltaSec / 3600) + 'h ago';
 }
 
+setInterval(function () {
+  var panel = document.getElementById('asksPanel');
+  if (panel && !panel.classList.contains('hidden') && _pendingQuestions.size > 0) {
+    renderAsks();
+  }
+}, 30000);
+
 function selectAsk(id) {
   if (!_pendingQuestions.has(id)) return;
   _activeQuestionId = id;
