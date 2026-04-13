@@ -14,6 +14,31 @@ function _isTyping() {
 // ── Per-plan human-input policy cache (client-side mirror) ─────────────────
 var _planPolicyCache = {};
 
+// ── Ask-human queue state ────────────────────────────────────────────────────
+// Single source of truth for banner, badge, queue panel, and agent glow.
+var _pendingQuestions = new Map();         // tool_call_id → question record
+var _activeQuestionId = null;              // id currently shown in the banner
+
+function _rerenderQuestionUI() {
+  if (typeof renderAsksBadge === 'function') renderAsksBadge();
+  if (typeof renderAsks === 'function') renderAsks();
+  if (typeof refreshActiveBanner === 'function') refreshActiveBanner();
+}
+
+function applyQuestionsSnapshot(pending) {
+  var next = new Map();
+  for (var i = 0; i < pending.length; i++) {
+    var q = pending[i];
+    if (q && q.id) next.set(q.id, q);
+  }
+  _pendingQuestions = next;
+  // If the active id disappeared, clear it.
+  if (_activeQuestionId && !_pendingQuestions.has(_activeQuestionId)) {
+    _activeQuestionId = null;
+  }
+  _rerenderQuestionUI();
+}
+
 // ── Config System ───────────────────────────────────────────────────────────
 
 // config is declared in nodes.js with all default keys — apply localStorage overrides

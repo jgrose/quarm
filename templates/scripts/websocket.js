@@ -139,11 +139,34 @@ function handleMessage(data) {
     hideApproval();
     return;
   }
+  if (data.type === 'questions_snapshot') {
+    if (typeof applyQuestionsSnapshot === 'function') {
+      applyQuestionsSnapshot(data.pending || []);
+    }
+    return;
+  }
   if (data.type === 'question_request') {
+    if (typeof _pendingQuestions !== 'undefined' && data.id) {
+      _pendingQuestions.set(data.id, {
+        id: data.id,
+        plan_id: data.plan_id || '',
+        agent: data.agent || '',
+        task_id: data.task_id || '',
+        question: data.question || '',
+        context: data.context || '',
+        received_at: Math.floor(Date.now() / 1000),
+      });
+      if (typeof _rerenderQuestionUI === 'function') _rerenderQuestionUI();
+    }
     showQuestion(data);
     return;
   }
   if (data.type === 'question_resolved') {
+    if (typeof _pendingQuestions !== 'undefined' && data.id) {
+      _pendingQuestions.delete(data.id);
+      if (_activeQuestionId === data.id) _activeQuestionId = null;
+      if (typeof _rerenderQuestionUI === 'function') _rerenderQuestionUI();
+    }
     hideQuestion();
     return;
   }
