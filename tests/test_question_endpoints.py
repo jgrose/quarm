@@ -109,3 +109,42 @@ def test_questions_snapshot_endpoint_returns_pending():
         assert any(p["id"] == "tc-snap-1" for p in data["pending"])
     finally:
         tools._question_details.pop("tc-snap-1", None)
+
+
+def test_snapshot_replayed_on_websocket_connect():
+    """New WS clients must receive a questions_snapshot frame on connect."""
+    from fastapi.testclient import TestClient
+    import serve, tools
+
+    with tools._questions_lock:
+        tools._question_details["tc-ws-1"] = {
+            "question": "Live?", "context": "", "agent": "a",
+            "task_id": "T", "plan_id": "P", "received_at": 1,
+        }
+    try:
+        client = TestClient(serve.app)
+        with client.websocket_connect("/ws") as ws:
+            saw_snapshot = {"value": False}
+
+            def _drain():
+                # Drain a bounded number of initial frames looking for the snapshot.
+                for _ in range(25):
+                    try:
+                        msg = ws.receive_json()
+                    except Exception:
+                        return
+                    if msg.get("type") == "questions_snapshot":
+                        ids = [p.get("id") for p in msg.get("pending", [])]
+                        if "tc-ws-1" in ids:
+                            saw_snapshot["value"] = True
+                        return
+
+            # Run drain in a thread with a timeout so a missing snapshot
+            # fails the test instead of hanging on a blocking queue read.
+            t = threading.Thread(target=_drain, daemon=True)
+            t.start()
+            t.join(timeout=3.0)
+            assert saw_snapshot["value"], "WebSocket connect did not replay questions_snapshot"
+    finally:
+        with tools._questions_lock:
+            tools._question_details.pop("tc-ws-1", None)
