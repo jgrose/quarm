@@ -215,6 +215,35 @@ def _append_question_log(plan_id: str, entry: dict) -> None:
         log.debug(f"[ask_human] JSONL log write failed: {exc}")
 
 
+def _broadcast_questions_snapshot() -> None:
+    """POST a questions_snapshot event to serve.py for WS fan-out."""
+    try:
+        import urllib.request
+        pending = [
+            {
+                "id": k,
+                "plan_id": v.get("plan_id", ""),
+                "agent": v.get("agent", ""),
+                "task_id": v.get("task_id", ""),
+                "question": (v.get("question") or "")[:2000],
+                "context": (v.get("context") or "")[:2000],
+                "received_at": v.get("received_at", 0),
+            }
+            for k, v in _question_details.items()
+        ]
+        payload = json.dumps({"type": "questions_snapshot", "pending": pending}).encode()
+        port = os.environ.get("NORT_PORT", os.environ.get("QUARM_PORT", "8000"))
+        req = urllib.request.Request(
+            f"http://localhost:{port}/update",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # fire-and-forget
+
+
 def set_plan_policy(plan_id: str, policy: str = "block", timeout_s: int = 900) -> None:
     """Set the human-input policy for a plan. Called at plan submission and on runtime edits."""
     if policy not in ("block", "timeout"):
@@ -235,6 +264,7 @@ def request_question(tc_id: str, question: str, context: str = "",
     _question_details[tc_id] = {
         "question": question, "context": context,
         "agent": agent, "task_id": task_id, "plan_id": plan_id,
+        "received_at": int(time.time()),
     }
     _append_question_log(plan_id, {
         "ts": int(time.time()),
@@ -267,6 +297,7 @@ def request_question(tc_id: str, question: str, context: str = "",
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass  # fire-and-forget
+    _broadcast_questions_snapshot()
 
     policy = _get_plan_policy(plan_id)
     if policy["policy"] == "timeout":
@@ -284,7 +315,9 @@ def request_question(tc_id: str, question: str, context: str = "",
             "type": "timeout",
             "id": tc_id,
         })
+        _broadcast_questions_snapshot()
         return QUESTION_TIMEOUT_SENTINEL
+    _broadcast_questions_snapshot()
     return answer
 
 
@@ -317,6 +350,7 @@ def resolve_question(tc_id: str, answer: str) -> None:
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass
+    _broadcast_questions_snapshot()
 
 
 def get_pending_questions() -> list[dict]:

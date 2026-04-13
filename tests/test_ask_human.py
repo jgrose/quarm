@@ -119,3 +119,49 @@ def test_ask_human_tool_invokes_request_question(monkeypatch):
     assert captured["plan_id"] == "P1"
     assert captured["task_id"] == "T1"
     assert captured["agent"] == "alice"
+
+
+def test_broadcast_called_on_request_and_resolve(monkeypatch):
+    """request_question and resolve_question should broadcast questions_snapshot."""
+    import tools
+    calls = []
+
+    def fake_post(url, data=None, timeout=None, headers=None):
+        import json as _json
+        # production passes a Request object as the first positional arg
+        if data is None and hasattr(url, "data"):
+            data = url.data
+        try:
+            payload = _json.loads(data.decode() if hasattr(data, "decode") else data)
+        except Exception:
+            payload = {}
+        calls.append(payload)
+
+        class _Stub:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self): return b""
+        return _Stub()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_post)
+
+    def caller():
+        tools.request_question("tc-bc-1", "Q?", plan_id="plan-bc",
+                               agent="a", task_id="T")
+
+    t = threading.Thread(target=caller, daemon=True)
+    t.start()
+    import time; time.sleep(0.05)
+    tools.resolve_question("tc-bc-1", "A")
+    t.join(timeout=1.0)
+
+    types = [c.get("type") for c in calls]
+    # Exact count per-call isn't the contract; what matters is at least one snapshot
+    # on request and one on resolve alongside the existing request/resolved events.
+    assert "questions_snapshot" in types
+    snapshots = [c for c in calls if c.get("type") == "questions_snapshot"]
+    assert any("pending" in s for s in snapshots)
+    # The resolve must produce a snapshot whose pending list no longer contains tc-bc-1.
+    final = snapshots[-1]
+    ids = [p.get("id") for p in final["pending"]]
+    assert "tc-bc-1" not in ids
