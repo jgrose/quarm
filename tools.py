@@ -24,7 +24,7 @@ log = logging.getLogger("nort.tools")
 
 PROJECT_DIR = Path(__file__).parent
 ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
-QUESTIONS_LOG_DIR = Path("plans")
+QUESTIONS_LOG_DIR = PROJECT_DIR / "plans"
 
 SANDBOX_MODE = os.environ.get("NORT_SANDBOX_MODE", "subprocess").lower()
 _SENSITIVE_ENV_PATTERNS = {"API_KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "OPENAI", "ANTHROPIC", "AWS_"}

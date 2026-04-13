@@ -16,6 +16,10 @@ def tmp_plans_dir(tmp_path, monkeypatch):
     plans_dir.mkdir()
     import tools
     monkeypatch.setattr(tools, "QUESTIONS_LOG_DIR", plans_dir, raising=False)
+    monkeypatch.setattr(tools, "_plan_policies", {})
+    monkeypatch.setattr(tools, "_pending_questions", {})
+    monkeypatch.setattr(tools, "_question_answers", {})
+    monkeypatch.setattr(tools, "_question_details", {})
     return plans_dir
 
 
