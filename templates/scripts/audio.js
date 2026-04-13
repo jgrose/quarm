@@ -71,6 +71,12 @@ function playError() {
   _tone(220, 165, 0.25, 0.08, 'triangle');
 }
 
+function playQuestion() {
+  // Two-note attention chime: C5 then G5 (rising), sine, 180ms each
+  _tone(523.25, 523.25, 0.18, 0.08, 'sine');
+  setTimeout(function () { _tone(783.99, 783.99, 0.18, 0.08, 'sine'); }, 130);
+}
+
 // ═══ ENHANCED SOUND DESIGN ═══
 
 // ─── Ambient Tron hum (continuous drone) ───

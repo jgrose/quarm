@@ -109,6 +109,114 @@ def get_pending_approvals() -> list[dict]:
     ]
 
 
+# ── Human-input (ask_human) system ──────────────────────────────────────────
+#
+# Parallel to the approval system: an agent calls `ask_human(question)`, which
+# blocks the agent's thread until a human submits an answer through the dashboard
+# (or a timeout elapses if the plan's policy is "timeout").
+
+QUESTION_TIMEOUT_SENTINEL = "[NO HUMAN RESPONSE — PROCEED WITH BEST JUDGMENT]"
+
+_pending_questions: dict[str, threading.Event] = {}
+_question_answers: dict[str, str] = {}
+_question_details: dict[str, dict] = {}
+
+# plan_id → {"policy": "block"|"timeout", "timeout_s": int}
+_plan_policies: dict[str, dict] = {}
+
+
+def set_plan_policy(plan_id: str, policy: str = "block", timeout_s: int = 900) -> None:
+    """Set the human-input policy for a plan. Called at plan submission and on runtime edits."""
+    if policy not in ("block", "timeout"):
+        raise ValueError(f"Unknown policy {policy!r}; expected 'block' or 'timeout'")
+    _plan_policies[plan_id] = {"policy": policy, "timeout_s": int(timeout_s)}
+
+
+def _get_plan_policy(plan_id: str) -> dict:
+    """Return the stored policy for a plan, defaulting to 'block' if none set."""
+    return _plan_policies.get(plan_id, {"policy": "block", "timeout_s": 900})
+
+
+def request_question(tc_id: str, question: str, context: str = "",
+                      agent: str = "", task_id: str = "", plan_id: str = "") -> str:
+    """Block until a human answers. Returns the answer or the timeout sentinel."""
+    event = threading.Event()
+    _pending_questions[tc_id] = event
+    _question_details[tc_id] = {
+        "question": question, "context": context,
+        "agent": agent, "task_id": task_id, "plan_id": plan_id,
+    }
+    log.info(f"[ASK_HUMAN] Waiting for human answer: {question[:120]}")
+    # Broadcast to UI via serve.py
+    import json as _json
+    import urllib.request
+    try:
+        payload = _json.dumps({
+            "type": "question_request",
+            "id": tc_id,
+            "question": question[:2000],
+            "context": (context or "")[:2000],
+            "agent": agent,
+            "task_id": task_id,
+            "plan_id": plan_id,
+        }).encode()
+        req = urllib.request.Request(
+            f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # fire-and-forget
+
+    policy = _get_plan_policy(plan_id)
+    if policy["policy"] == "timeout":
+        got = event.wait(timeout=policy["timeout_s"])
+    else:
+        event.wait()
+        got = True
+
+    answer = _question_answers.pop(tc_id, None)
+    _pending_questions.pop(tc_id, None)
+    _question_details.pop(tc_id, None)
+    if not got or answer is None:
+        return QUESTION_TIMEOUT_SENTINEL
+    return answer
+
+
+def resolve_question(tc_id: str, answer: str) -> None:
+    """Called from serve.py when the human submits an answer."""
+    _question_answers[tc_id] = answer
+    event = _pending_questions.get(tc_id)
+    if event:
+        event.set()
+    import json as _json
+    import urllib.request
+    try:
+        payload = _json.dumps({
+            "type": "question_resolved",
+            "id": tc_id,
+        }).encode()
+        req = urllib.request.Request(
+            f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass
+
+
+def get_pending_questions() -> list[dict]:
+    """Get all pending question requests for the dashboard."""
+    return [
+        {"id": k, **v}
+        for k, v in _question_details.items()
+    ]
+
+
 # ── Tool context (set per-task) ──────────────────────────────────────────────
 
 _tool_context = threading.local()
@@ -381,6 +489,37 @@ def execute_code(code: str) -> str:
         return f"Error: {e}"
 
 
+# ── ask_human tool ──────────────────────────────────────────────────────────
+
+@tool
+def ask_human(question: str, context: str = "") -> str:
+    """Ask the human operator a clarifying question and wait for their answer.
+
+    Use this only when ambiguity or missing information would materially change
+    your deliverable. Do not use it for minor choices — make those yourself and
+    flag the assumption in your output.
+
+    Args:
+        question: The specific question for the human to answer.
+        context: Optional extra context explaining why the answer matters.
+
+    Returns:
+        The human's typed answer, or a sentinel string if the plan's policy
+        timed out without a response.
+    """
+    ctx = _ctx()
+    import uuid
+    tc_id = f"ask-{uuid.uuid4().hex[:12]}"
+    return request_question(
+        tc_id=tc_id,
+        question=question,
+        context=context,
+        agent=ctx.get("agent", ""),
+        task_id=ctx.get("task_id", ""),
+        plan_id=ctx.get("plan_id", ""),
+    )
+
+
 # ── Tool registry ────────────────────────────────────────────────────────────
 
 TOOL_REGISTRY = {
@@ -392,6 +531,7 @@ TOOL_REGISTRY = {
     "read_file": read_file,
     "write_file": write_file,
     "execute_code": execute_code,
+    "ask_human": ask_human,
     # Aliases for plan.md compatibility
     "search": web_search,
     "browse": browse_url,

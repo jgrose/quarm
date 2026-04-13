@@ -67,6 +67,7 @@ _checkpoint_stub = ModuleType("checkpoint")
 _checkpoint_stub.save_checkpoint = MagicMock()
 _checkpoint_stub.load_checkpoint = MagicMock(return_value=None)
 _checkpoint_stub.clear_checkpoint = MagicMock()
+_checkpoint_stub.has_checkpoint = MagicMock(return_value=False)
 sys.modules.setdefault("checkpoint", _checkpoint_stub)
 
 _agent_registry_stub = ModuleType("agent_registry")

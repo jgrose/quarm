@@ -40,6 +40,8 @@ var config = {
   edgeLabels: true,
   completionFx: true,
   sound: false,
+  browserAlerts: false,
+  questionSound: true,
   weather: true,
   minimap: true,
   roster: true,

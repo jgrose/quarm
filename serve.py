@@ -487,8 +487,24 @@ async def api_reorder(request: Request):
 
 
 @app.post("/api/plans/{plan_id}/run")
-async def api_run_plan(plan_id: str):
+async def api_run_plan(plan_id: str, request: Request):
     """Start the orchestrator for a specific plan."""
+    # Accept optional human-input policy on the run payload.
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if isinstance(data, dict) and "human_input_policy" in data:
+        from tools import set_plan_policy
+        try:
+            set_plan_policy(
+                plan_id,
+                policy=data.get("human_input_policy", "block"),
+                timeout_s=int(data.get("human_input_timeout_s", 900)),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     with _queue_lock:
         queue = _load_queue()
     entry = next((e for e in queue if e["id"] == plan_id), None)
@@ -870,6 +886,36 @@ async def resolve_approval_endpoint(tool_call_id: str, request: Request):
     data = await request.json()
     from tools import resolve_approval
     resolve_approval(tool_call_id, data.get("approved", False))
+    return {"ok": True}
+
+
+# ── Ask-human question endpoints ────────────────────────────────────────────
+
+@app.get("/api/questions")
+async def get_questions():
+    from tools import get_pending_questions
+    return {"pending": get_pending_questions()}
+
+
+@app.post("/api/questions/{tool_call_id}")
+async def resolve_question_endpoint(tool_call_id: str, request: Request):
+    data = await request.json()
+    from tools import resolve_question
+    resolve_question(tool_call_id, str(data.get("answer", "")))
+    return {"ok": True}
+
+
+@app.post("/api/plans/{plan_id}/human_policy")
+async def set_plan_human_policy(plan_id: str, request: Request):
+    _validate_plan_id(plan_id)
+    data = await request.json()
+    policy = data.get("policy", "block")
+    timeout_s = int(data.get("timeout_s", 900))
+    from tools import set_plan_policy
+    try:
+        set_plan_policy(plan_id, policy=policy, timeout_s=timeout_s)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True}
 
 

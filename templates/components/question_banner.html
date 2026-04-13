@@ -1,0 +1,17 @@
+<div id="questionBanner" class="hidden">
+  <div class="question-body">
+    <div class="question-label">AGENT NEEDS INPUT</div>
+    <div id="questionAgent" class="question-agent"></div>
+    <div id="questionText" class="question-text"></div>
+    <div id="questionContext" class="question-context"></div>
+    <div class="question-input-row">
+      <textarea id="questionAnswerInput"
+                placeholder="Type your answer and press Ctrl+Enter to submit..."
+                rows="2"></textarea>
+      <button class="btn-submit-answer"
+              onclick="submitQuestionAnswer(document.getElementById('questionBanner').dataset.toolCallId, document.getElementById('questionAnswerInput').value)">
+        SUBMIT
+      </button>
+    </div>
+  </div>
+</div>

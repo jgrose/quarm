@@ -139,6 +139,14 @@ function handleMessage(data) {
     hideApproval();
     return;
   }
+  if (data.type === 'question_request') {
+    showQuestion(data);
+    return;
+  }
+  if (data.type === 'question_resolved') {
+    hideQuestion();
+    return;
+  }
   // Default: orchestrator status update
   applyStatus(data);
 }

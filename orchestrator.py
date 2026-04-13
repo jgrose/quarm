@@ -679,7 +679,13 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
         "IMPORTANT: When your task requires creating code, HTML, CSS, configuration files, "
         "or any other file-based deliverables, you MUST use the write_file tool to save each "
         "file. Do not just include code in your response text — actually write it to files. "
-        "Use clear filenames and organize files logically (e.g., index.html, styles.css, app.js)."
+        "Use clear filenames and organize files logically (e.g., index.html, styles.css, app.js).\n"
+        "If you encounter ambiguity or missing information that would materially change the "
+        "deliverable, call the ask_human(question, context) tool and wait for the answer "
+        "rather than guessing. Only ask when the answer actually changes your approach — "
+        "do not ask for permission on minor details. If you receive the sentinel "
+        f"'[NO HUMAN RESPONSE — PROCEED WITH BEST JUDGMENT]', proceed with your best guess "
+        "and flag the assumption in your final output."
     )
 
     ctx = [f"Output from {d}:\n{results[d]}"
@@ -724,8 +730,12 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
     # write_file is always available — the system prompt tells every agent to use it
     # for file-based deliverables, and it only writes into the task's own artifacts dir.
     requested = list(agent.get("tools", []))
-    if requested != ["none"] and "write_file" not in [t.strip().lower() for t in requested]:
-        requested.append("write_file")
+    if requested != ["none"]:
+        _lower = [t.strip().lower() for t in requested]
+        if "write_file" not in _lower:
+            requested.append("write_file")
+        if "ask_human" not in _lower:
+            requested.append("ask_human")
     agent_tools = get_tools(requested)
     messages = [
         SystemMessage(content=system),

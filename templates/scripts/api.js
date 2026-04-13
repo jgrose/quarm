@@ -35,7 +35,7 @@ async function generatePlan() {
 }
 
 async function refreshQueue() { var plans = await _apiGet('/api/plans', 'refreshQueue'); if (plans) renderQueue(plans); }
-async function runPlan(id) { await _apiPost('/api/plans/' + id + '/run', undefined, 'runPlan'); refreshQueue(); }
+async function runPlan(id, body) { await _apiPost('/api/plans/' + id + '/run', body, 'runPlan'); refreshQueue(); }
 async function deletePlan(id) { await _apiDelete('/api/plans/' + id, 'deletePlan'); refreshQueue(); }
 async function stopPlan(id) { await _apiPost('/api/plans/' + id + '/stop', undefined, 'stopPlan'); refreshQueue(); }
 async function reorderQueue(orderedIds) { await _apiPost('/api/plans/reorder', { order: orderedIds }, 'reorderQueue'); }
@@ -72,6 +72,24 @@ async function approveToolCall(toolCallId, approved) {
 async function checkPendingApprovals() {
   var data = await _apiGet('/api/approvals', 'checkPendingApprovals');
   if (data && data.pending && data.pending.length > 0) showApproval(data.pending[0]);
+}
+
+async function submitQuestionAnswer(toolCallId, answer) {
+  if (!toolCallId) return;
+  await _apiPost('/api/questions/' + toolCallId, { answer: answer || '' }, 'submitQuestionAnswer');
+  hideQuestion();
+}
+
+async function checkPendingQuestions() {
+  var data = await _apiGet('/api/questions', 'checkPendingQuestions');
+  if (data && data.pending && data.pending.length > 0) showQuestion(data.pending[0]);
+}
+
+async function setPlanHumanPolicy(planId, policy, timeoutS) {
+  if (!planId) return;
+  var body = { policy: policy };
+  if (timeoutS !== undefined && timeoutS !== null) body.timeout_s = parseInt(timeoutS, 10);
+  await _apiPost('/api/plans/' + planId + '/human_policy', body, 'setPlanHumanPolicy');
 }
 
 async function pollHeartbeat() {

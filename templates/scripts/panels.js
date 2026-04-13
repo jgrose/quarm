@@ -1,6 +1,9 @@
 // ═══ NORT PANEL LOGIC ═══
 // UI panels: config, agent detail, event log, queue, thinking, overlays
 
+// ── Per-plan human-input policy cache (client-side mirror) ─────────────────
+var _planPolicyCache = {};
+
 // ── Config System ───────────────────────────────────────────────────────────
 
 // config is declared in nodes.js with all default keys — apply localStorage overrides
@@ -18,6 +21,11 @@ function toggleConfig(key) {
   if (key === 'sound' && typeof setAudioMuted === 'function') {
     setAudioMuted(!config.sound);
     if (config.sound && typeof resumeAudio === 'function') resumeAudio();
+  }
+  if (key === 'browserAlerts' && config.browserAlerts && typeof Notification !== 'undefined') {
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
   }
   saveConfig();
   syncConfigUI();
@@ -819,10 +827,37 @@ function renderQueue(plans) {
     var actions = document.createElement('span');
     actions.className = 'queue-actions';
 
+    // Human-input policy selector (per-plan, editable pre-run and during run)
+    var policySel = document.createElement('select');
+    policySel.className = 'queue-policy-select';
+    policySel.title = 'Human input policy: how ask_human behaves';
+    var stored = (typeof _planPolicyCache !== 'undefined' && _planPolicyCache[p.id]) || p.human_input_policy || 'block';
+    var optBlock = document.createElement('option');
+    optBlock.value = 'block'; optBlock.textContent = 'BLOCK';
+    var optTimeout = document.createElement('option');
+    optTimeout.value = 'timeout'; optTimeout.textContent = 'TIMEOUT 15m';
+    policySel.appendChild(optBlock);
+    policySel.appendChild(optTimeout);
+    policySel.value = stored;
+    policySel.onclick = function(e) { e.stopPropagation(); };
+    policySel.onchange = (function(planId, sel) {
+      return function(e) {
+        e.stopPropagation();
+        _planPolicyCache[planId] = sel.value;
+        setPlanHumanPolicy(planId, sel.value, sel.value === 'timeout' ? 900 : undefined);
+      };
+    })(p.id, policySel);
+    actions.appendChild(policySel);
+
     if (p.status === 'queued' || p.status === 'failed' || p.status === 'done') {
       var runBtn = document.createElement('button');
       runBtn.textContent = 'RUN';
-      runBtn.onclick = (function(planId) { return function(e) { e.stopPropagation(); runPlan(planId); }; })(p.id);
+      runBtn.onclick = (function(planId, sel) {
+        return function(e) {
+          e.stopPropagation();
+          runPlan(planId, { human_input_policy: sel.value, human_input_timeout_s: sel.value === 'timeout' ? 900 : 900 });
+        };
+      })(p.id, policySel);
       actions.appendChild(runBtn);
     }
 
@@ -1142,6 +1177,67 @@ function showApproval(data) {
 function hideApproval() {
   var banner = document.getElementById('approvalBanner');
   if (banner) banner.classList.add('hidden');
+}
+
+// ── Question Banner (ask_human) ─────────────────────────────────────────────
+
+function showQuestion(data) {
+  var banner = document.getElementById('questionBanner');
+  if (!banner) return;
+  banner.classList.remove('hidden');
+
+  var agentEl = document.getElementById('questionAgent');
+  if (agentEl) {
+    var agent = data.agent || 'agent';
+    var task = data.task_id ? ' · ' + data.task_id : '';
+    agentEl.textContent = agent + task;
+  }
+
+  var textEl = document.getElementById('questionText');
+  if (textEl) textEl.textContent = data.question || '';
+
+  var ctxEl = document.getElementById('questionContext');
+  if (ctxEl) ctxEl.textContent = data.context || '';
+
+  var input = document.getElementById('questionAnswerInput');
+  if (input) {
+    input.value = '';
+    setTimeout(function () { input.focus(); }, 50);
+    input.onkeydown = function (e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        submitQuestionAnswer(banner.dataset.toolCallId, input.value);
+      }
+    };
+  }
+
+  banner.dataset.toolCallId = data.id || data.tool_call_id || '';
+
+  // Notification + sound (both gated by user-toggled config).
+  try {
+    if (typeof config !== 'undefined' && config.browserAlerts && typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        new Notification('Agent needs input', { body: (data.question || '').slice(0, 200) });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    if (typeof config !== 'undefined' && config.sound && config.questionSound && typeof playQuestion === 'function') {
+      playQuestion();
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function hideQuestion() {
+  var banner = document.getElementById('questionBanner');
+  if (banner) {
+    banner.classList.add('hidden');
+    banner.dataset.toolCallId = '';
+  }
+  var input = document.getElementById('questionAnswerInput');
+  if (input) input.value = '';
 }
 
 // ── Plan Viewer ─────────────────────────────────────────────────────────────

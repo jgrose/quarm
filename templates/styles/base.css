@@ -1310,6 +1310,26 @@ a:hover { color: var(--holo-bright); }
   border-color: rgba(100, 200, 255, 0.3);
 }
 
+.queue-policy-select {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--glass-border);
+  color: var(--holo-base);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+}
+
+.queue-policy-select:hover {
+  border-color: rgba(100, 200, 255, 0.35);
+}
+
+.queue-policy-select:focus {
+  outline: none;
+  border-color: rgba(100, 200, 255, 0.55);
+}
+
 /* ── 10. Thinking Panel ─────────────────────────────────────────────────── */
 
 #thinkingPanel {
@@ -1944,6 +1964,109 @@ a:hover { color: var(--holo-bright); }
 
 #approvalBanner .btn-reject:hover {
   background: rgba(255, 85, 102, 0.15);
+}
+
+/* ── 14b. Question Banner (ask_human) ──────────────────────────────────── */
+
+#questionBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 201;
+  background: rgba(102, 204, 255, 0.1);
+  border-bottom: 1px solid rgba(102, 204, 255, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 14px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+#questionBanner.hidden {
+  display: none !important;
+}
+
+#questionBanner .question-body {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#questionBanner .question-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(102, 204, 255, 0.9);
+  font-weight: bold;
+}
+
+#questionBanner .question-agent {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+#questionBanner .question-text {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+#questionBanner .question-context {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+#questionBanner .question-context:empty {
+  display: none;
+}
+
+#questionBanner .question-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+#questionBanner textarea {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(102, 204, 255, 0.3);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 36px;
+}
+
+#questionBanner textarea:focus {
+  outline: none;
+  border-color: rgba(102, 204, 255, 0.7);
+  box-shadow: 0 0 8px rgba(102, 204, 255, 0.2);
+}
+
+#questionBanner .btn-submit-answer {
+  background: transparent;
+  border: 1px solid rgba(102, 204, 255, 0.6);
+  color: rgba(102, 204, 255, 0.9);
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#questionBanner .btn-submit-answer:hover {
+  background: rgba(102, 204, 255, 0.15);
+  border-color: rgba(102, 204, 255, 0.9);
 }
 
 /* ── 15. Transcript Panel ───────────────────────────────────────────────── */
