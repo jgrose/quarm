@@ -1553,6 +1553,34 @@ function showAskToast(q) {
   setTimeout(function () { if (el.parentNode) el.remove(); }, 4000);
 }
 
+function renderAsksBadge() {
+  var btn = document.getElementById('asksBtn');
+  var count = document.getElementById('asksCount');
+  if (!btn || !count) return;
+  var n = _pendingQuestions.size;
+  count.textContent = n;
+  if (n > 0) btn.classList.add('has-pending');
+  else btn.classList.remove('has-pending');
+}
+
+function toggleAsksPanel() {
+  var p = document.getElementById('asksPanel');
+  if (!p) return;
+  p.classList.toggle('hidden');
+  if (!p.classList.contains('hidden') && typeof renderAsks === 'function') {
+    renderAsks();
+  }
+}
+
+// Keyboard shortcut: K toggles ASKS (unless user is typing).
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'k' && e.key !== 'K') return;
+  if (_isTyping()) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  toggleAsksPanel();
+});
+
 function dismissQuestion() {
   // User closed the banner without answering — question stays in the queue.
   var banner = document.getElementById('questionBanner');

@@ -9,6 +9,9 @@
   <div class="top-bar-actions">
     <button id="viewToggleBtn" onclick="window.location.href='/flow'" title="Switch to flow view">FLOW</button>
     <button onclick="toggleQueue()" title="Toggle queue (Q)">QUEUE</button>
+    <button id="asksBtn" onclick="toggleAsksPanel()" title="Pending agent questions (K)">
+      ASKS (<span id="asksCount">0</span>)
+    </button>
     <button onclick="toggleLedger()" title="Toggle ledger">LEDGER</button>
     <button onclick="toggleCostPanel()" title="Toggle costs ($)">COSTS</button>
     <button onclick="loadModels()" title="Configure models">MODELS</button>
