@@ -1579,9 +1579,10 @@ function toggleAsksPanel() {
   var p = document.getElementById('asksPanel');
   if (!p) return;
   p.classList.toggle('hidden');
-  if (!p.classList.contains('hidden') && typeof renderAsks === 'function') {
-    renderAsks();
-  }
+  var open = !p.classList.contains('hidden');
+  var btn = document.getElementById('asksBtn');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open && typeof renderAsks === 'function') renderAsks();
 }
 
 var _asksCollapsedPlans = new Set();   // plan_ids the user has collapsed
@@ -1627,7 +1628,7 @@ function renderAsks() {
     var collapsed = _asksCollapsedPlans.has(pid);
     var caret = collapsed ? '&#9656;' : '&#9662;';
     html += '<div class="asks-group">';
-    html += '<div class="asks-group-header" onclick="toggleAsksPlanGroup(' +
+    html += '<div class="asks-group-header" role="button" tabindex="0" onclick="toggleAsksPlanGroup(' +
             escapeHtml(JSON.stringify(pid)) + ')">' +
             '<span class="caret">' + caret + '</span> PLAN ' +
             escapeHtml(pid) + ' (' + items.length + ')</div>';
@@ -1636,7 +1637,7 @@ function renderAsks() {
         var q = items[j];
         var ago = _formatAgo(nowSec - (q.received_at || nowSec));
         var activeCls = (q.id === _activeQuestionId) ? ' active' : '';
-        html += '<div class="asks-item' + activeCls + '" onclick="selectAsk(' +
+        html += '<div class="asks-item' + activeCls + '" role="button" tabindex="0" onclick="selectAsk(' +
                 escapeHtml(JSON.stringify(q.id)) + ')">';
         html += '<div class="asks-item-head">';
         html += '<span>' + escapeHtml(q.agent || 'agent') +
@@ -1659,12 +1660,22 @@ function _formatAgo(deltaSec) {
   return Math.floor(deltaSec / 3600) + 'h ago';
 }
 
-setInterval(function () {
-  var panel = document.getElementById('asksPanel');
-  if (panel && !panel.classList.contains('hidden') && _pendingQuestions.size > 0) {
+// Re-render ASKS time-ago labels at most once per minute while panel is open.
+// Cheap approximation: if any pending item's age-bucket would change, re-render.
+if (!window._asksTickInstalled) {
+  window._asksTickInstalled = true;
+  var _lastAgeTick = 0;
+  setInterval(function () {
+    var panel = document.getElementById('asksPanel');
+    if (!panel || panel.classList.contains('hidden')) return;
+    if (_pendingQuestions.size === 0) return;
+    var now = Math.floor(Date.now() / 1000);
+    // Re-render at most once every 30s.
+    if (now - _lastAgeTick < 30) return;
+    _lastAgeTick = now;
     renderAsks();
-  }
-}, 30000);
+  }, 5000);
+}
 
 function selectAsk(id) {
   if (!_pendingQuestions.has(id)) return;
@@ -1672,6 +1683,17 @@ function selectAsk(id) {
   refreshActiveBanner();
   renderAsks();  // refresh the .active highlight
 }
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var t = e.target;
+  if (!t) return;
+  if (t.classList.contains('asks-group-header') ||
+      t.classList.contains('asks-item')) {
+    e.preventDefault();
+    t.click();
+  }
+});
 
 // Keyboard shortcut: K toggles ASKS (unless user is typing).
 document.addEventListener('keydown', function (e) {

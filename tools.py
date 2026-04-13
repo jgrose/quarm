@@ -290,6 +290,7 @@ def request_question(tc_id: str, question: str, context: str = "",
             "agent": agent,
             "task_id": task_id,
             "plan_id": plan_id,
+            "received_at": _question_details[tc_id].get("received_at", int(time.time())),
         }).encode()
         req = urllib.request.Request(
             f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",

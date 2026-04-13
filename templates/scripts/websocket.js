@@ -154,7 +154,7 @@ function handleMessage(data) {
         task_id: data.task_id || '',
         question: data.question || '',
         context: data.context || '',
-        received_at: Math.floor(Date.now() / 1000),
+        received_at: data.received_at || Math.floor(Date.now() / 1000),
       });
       if (typeof _rerenderQuestionUI === 'function') _rerenderQuestionUI();
     }
