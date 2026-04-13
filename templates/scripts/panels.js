@@ -39,6 +39,50 @@ function applyQuestionsSnapshot(pending) {
   _rerenderQuestionUI();
 }
 
+// ── Draft answers ───────────────────────────────────────────────────────────
+// Keyed by plan+question-hash+agent so the same question across runs matches.
+
+function _hashStr(s) {
+  // Tiny non-crypto hash; collisions are fine for draft matching.
+  var h = 5381;
+  for (var i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return (h >>> 0).toString(16).slice(0, 12);
+}
+
+function _draftKey(q) {
+  if (!q) return null;
+  return 'nort_ask_draft::' + (q.plan_id || '') + '::' +
+         _hashStr(q.question || '') + '::' + (q.agent || '');
+}
+
+function loadDraft(q) {
+  try {
+    var k = _draftKey(q);
+    return k ? (localStorage.getItem(k) || '') : '';
+  } catch (e) { return ''; }
+}
+
+function saveDraft(q, value) {
+  try {
+    var k = _draftKey(q);
+    if (!k) return;
+    if (value) localStorage.setItem(k, value);
+    else localStorage.removeItem(k);
+  } catch (e) { /* quota or disabled — silently ignore */ }
+}
+
+function clearDraft(q) { saveDraft(q, ''); }
+
+// Debounced wrapper for typing-driven saves.
+var _draftSaveTimer = null;
+function scheduleSaveDraft(q, value) {
+  if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
+  _draftSaveTimer = setTimeout(function () { saveDraft(q, value); }, 400);
+}
+
 // ── Config System ───────────────────────────────────────────────────────────
 
 // config is declared in nodes.js with all default keys — apply localStorage overrides
