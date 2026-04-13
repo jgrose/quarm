@@ -1446,53 +1446,48 @@ function hideApproval() {
 // ── Question Banner (ask_human) ─────────────────────────────────────────────
 
 function showQuestion(data) {
-  if (data && data.id) _activeQuestionId = data.id;
+  if (!data || !data.id) return;
   var banner = document.getElementById('questionBanner');
-  if (!banner) return;
-  banner.classList.remove('hidden');
+  var wasHidden = !banner || banner.classList.contains('hidden');
 
-  var agentEl = document.getElementById('questionAgent');
-  if (agentEl) {
-    var agent = data.agent || 'agent';
-    var task = data.task_id ? ' · ' + data.task_id : '';
-    agentEl.textContent = agent + task;
+  // Always mirror into the Map — receiver may predate a snapshot.
+  if (typeof _pendingQuestions !== 'undefined') {
+    _pendingQuestions.set(data.id, {
+      id: data.id,
+      plan_id: data.plan_id || '',
+      agent: data.agent || '',
+      task_id: data.task_id || '',
+      question: data.question || '',
+      context: data.context || '',
+      received_at: data.received_at || Math.floor(Date.now() / 1000),
+    });
   }
 
-  var textEl = document.getElementById('questionText');
-  if (textEl) textEl.textContent = data.question || '';
-
-  var ctxEl = document.getElementById('questionContext');
-  if (ctxEl) ctxEl.textContent = data.context || '';
-
-  var input = document.getElementById('questionAnswerInput');
-  if (input) {
-    input.value = '';
-    setTimeout(function () { input.focus(); }, 50);
-    input.onkeydown = function (e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        submitQuestionAnswer(banner.dataset.toolCallId, input.value);
+  if (wasHidden) {
+    // Banner was idle — raise it for this question with full fanfare.
+    _activeQuestionId = data.id;
+    refreshActiveBanner();
+    try {
+      if (typeof config !== 'undefined' && config.browserAlerts &&
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted') {
+        new Notification('Agent needs input', {
+          body: (data.question || '').slice(0, 200),
+        });
       }
-    };
+    } catch (e) { /* ignore */ }
+    try {
+      if (typeof config !== 'undefined' && config.sound && config.questionSound &&
+          typeof playQuestion === 'function') {
+        playQuestion();
+      }
+    } catch (e) { /* ignore */ }
+  } else if (data.id !== _activeQuestionId) {
+    // Banner already busy with a different question — toast only.
+    showAskToast(_pendingQuestions.get(data.id));
   }
 
-  banner.dataset.toolCallId = data.id || data.tool_call_id || '';
-
-  // Notification + sound (both gated by user-toggled config).
-  try {
-    if (typeof config !== 'undefined' && config.browserAlerts && typeof Notification !== 'undefined') {
-      if (Notification.permission === 'granted') {
-        new Notification('Agent needs input', { body: (data.question || '').slice(0, 200) });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
-      }
-    }
-  } catch (e) { /* ignore */ }
-  try {
-    if (typeof config !== 'undefined' && config.sound && config.questionSound && typeof playQuestion === 'function') {
-      playQuestion();
-    }
-  } catch (e) { /* ignore */ }
+  _rerenderQuestionUI();
 }
 
 function hideQuestion() {
@@ -1539,6 +1534,23 @@ function _updateCarouselUI() {
   if (idx < 0) idx = 0;
   el.classList.remove('hidden');
   txt.textContent = (idx + 1) + ' of ' + ids.length;
+}
+
+function showAskToast(q) {
+  var stack = document.getElementById('questionToastStack');
+  if (!stack) return;
+  var el = document.createElement('div');
+  el.className = 'ask-toast';
+  var total = _pendingQuestions.size;
+  el.innerHTML = '<strong>' + escapeHtml(q.agent || 'agent') +
+                 '</strong> also needs help — ' + total + ' in queue';
+  el.onclick = function () {
+    _activeQuestionId = q.id;
+    refreshActiveBanner();
+    el.remove();
+  };
+  stack.appendChild(el);
+  setTimeout(function () { if (el.parentNode) el.remove(); }, 4000);
 }
 
 function dismissQuestion() {

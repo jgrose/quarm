@@ -2118,6 +2118,37 @@ a:hover { color: var(--holo-bright); }
   background: rgba(255,255,255,0.1);
 }
 
+#questionToastStack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9000;
+  pointer-events: none;
+}
+.ask-toast {
+  pointer-events: auto;
+  background: rgba(20, 20, 30, 0.92);
+  border-left: 3px solid #ff5f8c;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 12px;
+  max-width: 320px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+  animation: askToastIn 200ms ease-out, askToastOut 300ms ease-in 3.7s both;
+  cursor: pointer;
+}
+.ask-toast:hover { border-left-color: #ffc83c; }
+@keyframes askToastIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes askToastOut {
+  to { transform: translateX(20px); opacity: 0; }
+}
+
 /* ── 15. Transcript Panel ───────────────────────────────────────────────── */
 
 #transcriptPanel {
