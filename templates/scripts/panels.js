@@ -1505,9 +1505,41 @@ function hideQuestion() {
   if (input) input.value = '';
 }
 
-// Stubs — real implementations land in Task 7.
-function carouselPrev() { /* Task 7 */ }
-function carouselNext() { /* Task 7 */ }
+function _orderedPendingIds() {
+  var arr = [];
+  _pendingQuestions.forEach(function (v, k) { arr.push({id: k, at: v.received_at || 0}); });
+  arr.sort(function (a, b) { return a.at - b.at; });
+  return arr.map(function (x) { return x.id; });
+}
+
+function carouselPrev() { _carouselStep(-1); }
+function carouselNext() { _carouselStep(+1); }
+
+function _carouselStep(delta) {
+  var ids = _orderedPendingIds();
+  if (ids.length <= 1) return;
+  var idx = ids.indexOf(_activeQuestionId);
+  if (idx < 0) idx = 0;
+  var next = (idx + delta + ids.length) % ids.length;
+  _activeQuestionId = ids[next];
+  refreshActiveBanner();
+  _updateCarouselUI();
+}
+
+function _updateCarouselUI() {
+  var el = document.getElementById('questionCarousel');
+  var txt = document.getElementById('questionCarouselText');
+  if (!el || !txt) return;
+  var ids = _orderedPendingIds();
+  if (ids.length <= 1) {
+    el.classList.add('hidden');
+    return;
+  }
+  var idx = ids.indexOf(_activeQuestionId);
+  if (idx < 0) idx = 0;
+  el.classList.remove('hidden');
+  txt.textContent = (idx + 1) + ' of ' + ids.length;
+}
 
 function dismissQuestion() {
   // User closed the banner without answering — question stays in the queue.
@@ -1542,6 +1574,7 @@ function refreshActiveBanner() {
     input.value = loadDraft(q);
     input.oninput = function () { scheduleSaveDraft(q, input.value); };
   }
+  _updateCarouselUI();
 }
 
 // ── Plan Viewer ─────────────────────────────────────────────────────────────
