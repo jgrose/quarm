@@ -1,6 +1,14 @@
 <div id="questionBanner" class="hidden">
+  <button class="question-close" title="Close (Esc)" onclick="dismissQuestion()">&times;</button>
   <div class="question-body">
-    <div class="question-label">AGENT NEEDS INPUT</div>
+    <div class="question-header">
+      <span class="question-label">AGENT NEEDS INPUT</span>
+      <span id="questionCarousel" class="question-carousel hidden">
+        <button class="carousel-btn" onclick="carouselPrev()" title="Previous">&lsaquo;</button>
+        <span id="questionCarouselText">1 of 1</span>
+        <button class="carousel-btn" onclick="carouselNext()" title="Next">&rsaquo;</button>
+      </span>
+    </div>
     <div id="questionAgent" class="question-agent"></div>
     <div id="questionText" class="question-text"></div>
     <div id="questionContext" class="question-context"></div>

@@ -1446,6 +1446,7 @@ function hideApproval() {
 // ── Question Banner (ask_human) ─────────────────────────────────────────────
 
 function showQuestion(data) {
+  if (data && data.id) _activeQuestionId = data.id;
   var banner = document.getElementById('questionBanner');
   if (!banner) return;
   banner.classList.remove('hidden');
@@ -1502,6 +1503,51 @@ function hideQuestion() {
   }
   var input = document.getElementById('questionAnswerInput');
   if (input) input.value = '';
+}
+
+function dismissQuestion() {
+  // User closed the banner without answering — question stays in the queue.
+  var banner = document.getElementById('questionBanner');
+  if (banner) banner.classList.add('hidden');
+  _activeQuestionId = null;
+  _rerenderQuestionUI();
+}
+
+// Escape dismisses the banner if it's visible.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  var banner = document.getElementById('questionBanner');
+  if (banner && !banner.classList.contains('hidden')) {
+    e.preventDefault();
+    dismissQuestion();
+  }
+});
+
+function refreshActiveBanner() {
+  var banner = document.getElementById('questionBanner');
+  if (!banner) return;
+  if (!_activeQuestionId || !_pendingQuestions.has(_activeQuestionId)) {
+    // Nothing to show; hide silently (not a dismiss).
+    banner.classList.add('hidden');
+    return;
+  }
+  var q = _pendingQuestions.get(_activeQuestionId);
+  banner.classList.remove('hidden');
+  banner.dataset.toolCallId = _activeQuestionId;
+  var agentEl = document.getElementById('questionAgent');
+  if (agentEl) {
+    var task = q.task_id ? ' · ' + q.task_id : '';
+    agentEl.textContent = (q.agent || 'agent') + task;
+  }
+  var textEl = document.getElementById('questionText');
+  if (textEl) textEl.textContent = q.question || '';
+  var ctxEl = document.getElementById('questionContext');
+  if (ctxEl) ctxEl.textContent = q.context || '';
+  var input = document.getElementById('questionAnswerInput');
+  if (input && document.activeElement !== input) {
+    input.value = loadDraft(q);
+    input.oninput = function () { scheduleSaveDraft(q, input.value); };
+  }
 }
 
 // ── Plan Viewer ─────────────────────────────────────────────────────────────

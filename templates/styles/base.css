@@ -2074,6 +2074,50 @@ a:hover { color: var(--holo-bright); }
   border-color: rgba(102, 204, 255, 0.9);
 }
 
+#questionBanner .question-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1;
+}
+#questionBanner .question-close:hover {
+  color: #ff5f8c;
+}
+#questionBanner .question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+#questionBanner .question-carousel {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#questionBanner .question-carousel.hidden { display: none; }
+#questionBanner .carousel-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 6px;
+  border-radius: 3px;
+}
+#questionBanner .carousel-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
 /* ── 15. Transcript Panel ───────────────────────────────────────────────── */
 
 #transcriptPanel {
