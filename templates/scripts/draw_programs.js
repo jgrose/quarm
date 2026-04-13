@@ -193,7 +193,7 @@ function _pickTarget(p, W, H) {
 var _PROG_GLOWS = ['#66ccff','#cc88ff','#66ffaa','#ffbb44','#aaeeff','#ff8866',
                    '#ff88cc','#88ffcc','#ccff88','#88ccff','#ffcc88','#cc88ff'];
 
-function _createProgram(glow, tier, agentName, displayName) {
+function _createProgram(glow, tier, agentName, displayName, sessionId) {
   var startPos = isoToScreen(Math.floor(Math.random() * 40) + 5, Math.floor(Math.random() * 40) + 5);
   var baseSpeed = 20 + Math.random() * 15;
   return { x: startPos.x, y: startPos.y, targetX: 0, targetY: 0, speed: baseSpeed,
@@ -202,7 +202,8 @@ function _createProgram(glow, tier, agentName, displayName) {
     locationTarget: null, atLocation: null, landingSlot: -1, assignedTask: null,
     programState: 'idle', emotion: { current: 'idle', target: 'idle', alpha: 1.0, transitionAge: 0 },
     tier: tier || 'drone', agentName: agentName || null,
-    displayName: displayName || null, bunkerState: 'walking', enterProgress: 0,
+    displayName: displayName || null, sessionId: sessionId || null,
+    bunkerState: 'walking', enterProgress: 0,
     exitProgress: 0, visible: true, cycleMode: false, _baseSpeed: baseSpeed };
 }
 
@@ -568,7 +569,7 @@ function drawAmbientPrograms(ctx, time) {
 
 // ─── Work assignment (called from websocket.js) ───
 
-function routeProgramsToTasks(tasks) {
+function routeProgramsToTasks(tasks, sessionId) {
   if (!ambientPrograms.length) return;
 
   // Build agent->task map
@@ -581,6 +582,10 @@ function routeProgramsToTasks(tasks) {
 
   for (var i = 0; i < ambientPrograms.length; i++) {
     var p = ambientPrograms[i];
+    // Only route programs belonging to this session (when sessionId provided).
+    // Programs without a sessionId (idle placeholders) still get positional fallback.
+    if (sessionId && p.sessionId && p.sessionId !== sessionId) continue;
+
     var task = p.agentName ? taskByAgent[p.agentName] : null;
 
     // Also try positional fallback for idle mode (no agentName set)
@@ -623,6 +628,7 @@ function routeProgramsToTasks(tasks) {
 // ─── Roster sync (called from websocket.js when roster data arrives) ───
 
 function syncProgramsToRoster(data) {
+  var sid = data.session_id || 'default';
   var agents = [];
 
   // Build agent list with tiers
@@ -644,37 +650,39 @@ function syncProgramsToRoster(data) {
 
   if (agents.length === 0) return;
 
-  // Check if roster changed (different agent count or names)
-  var changed = agents.length !== ambientPrograms.length;
+  // If there are any programs without a session assignment (e.g. initAmbientPrograms
+  // placeholders from page load), adopt them into the first incoming session so they
+  // get replaced rather than stranded.
+  for (var adopt = 0; adopt < ambientPrograms.length; adopt++) {
+    if (ambientPrograms[adopt].sessionId == null) ambientPrograms[adopt].sessionId = sid;
+  }
+
+  // Scope to programs belonging to this session
+  var sessionPrograms = ambientPrograms.filter(function(p) { return p.sessionId === sid; });
+
+  // Check if roster changed for this session (different agent count or names)
+  var changed = agents.length !== sessionPrograms.length;
   if (!changed) {
     for (var i = 0; i < agents.length; i++) {
-      if (!ambientPrograms[i] || ambientPrograms[i].agentName !== agents[i].name) {
+      if (!sessionPrograms[i] || sessionPrograms[i].agentName !== agents[i].name) {
         changed = true;
         break;
       }
     }
   }
 
-  if (!changed) return; // roster unchanged, skip respawn
+  if (!changed) return; // roster unchanged for this session, skip respawn
 
-  // Respawn programs matching roster
-  // Save existing XP data if roster panel exists
-  var savedXP = {};
-  if (typeof rosterData !== 'undefined') {
-    for (var rx = 0; rx < rosterData.length; rx++) {
-      savedXP[rosterData[rx].name] = { xp: rosterData[rx].xp, level: rosterData[rx].level };
-    }
+  // Release locations for this session's programs, then remove them from ambientPrograms
+  for (var ri = 0; ri < sessionPrograms.length; ri++) {
+    _releaseLocation(sessionPrograms[ri]);
   }
+  ambientPrograms = ambientPrograms.filter(function(p) { return p.sessionId !== sid; });
 
-  // Release all current locations
-  for (var ri = 0; ri < ambientPrograms.length; ri++) {
-    _releaseLocation(ambientPrograms[ri]);
-  }
-
-  ambientPrograms = [];
+  // Append new programs for this session's roster
   for (var ai = 0; ai < agents.length; ai++) {
     var agent = agents[ai];
-    var p = _createProgram(_PROG_GLOWS[ai % _PROG_GLOWS.length], agent.tier, agent.name, agent.title);
+    var p = _createProgram(_PROG_GLOWS[ai % _PROG_GLOWS.length], agent.tier, agent.name, agent.title, sid);
     ambientPrograms.push(p);
     _pickTarget(p, 0, 0);
   }
@@ -692,4 +700,16 @@ function revertToIdlePrograms() {
   ambientPrograms = [];
   PROGRAM_COUNT = 6; // reset for clarity
   // Re-init will happen on next updateAmbientPrograms call
+}
+
+// ─── Remove programs for a single session (e.g. when that plan completes) ───
+
+function removeProgramsForSession(sessionId) {
+  if (!sessionId) return;
+  for (var i = 0; i < ambientPrograms.length; i++) {
+    if (ambientPrograms[i].sessionId === sessionId) {
+      _releaseLocation(ambientPrograms[i]);
+    }
+  }
+  ambientPrograms = ambientPrograms.filter(function(p) { return p.sessionId !== sessionId; });
 }

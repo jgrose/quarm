@@ -207,36 +207,35 @@ function applyStatus(data) {
     if (typeof _renderFilteredChat === 'function') _renderFilteredChat();
   }
 
-  // Only update canvas/effects for the active session
-  if (sid !== _activeSessionId) return;
+  var _isActiveSession = (sid === _activeSessionId);
 
-  // 1. Build node graph from rosters (first time or on roster change)
+  // 1. Programs are multi-session: always sync this session's roster to the map.
+  //    Node graph (flow view) and chat rosters remain session-scoped to the active session.
   if (data.sub_agents || data.managers || data.reviewers) {
-    rebuildNodes(data);
     if (typeof syncProgramsToRoster === 'function') syncProgramsToRoster(data);
-    if (typeof updateChatRosters === 'function') updateChatRosters(data);
+    if (_isActiveSession) {
+      rebuildNodes(data);
+      if (typeof updateChatRosters === 'function') updateChatRosters(data);
+    }
   }
 
   // Track session start
   if (!liveStartedAt && data.updated_at) liveStartedAt = data.updated_at;
 
-  // 2. Update node states from tasks
+  // 2. Update node states from tasks (program routing is multi-session; node/effect
+  //    updates are scoped to the active session since the flow view only shows one).
   var tasks = data.tasks || [];
   for (var i = 0; i < tasks.length; i++) {
     var task = tasks[i];
-    var node = getNodeByAgent(task.agent);
-    if (!node) continue;
 
-    var prevState = node.state;
-    _syncTaskToNode(node, task);
-
-    // Spawn effects, audio, and bubbles on state transitions
-    if (prevState !== task.status && !_isReplay) {
-      // Find program matching this agent and force re-route
-      if (typeof ambientPrograms !== 'undefined') {
-        for (var pi = 0; pi < ambientPrograms.length; pi++) {
-          var prog = ambientPrograms[pi];
-          if (prog.agentName === task.agent) {
+    // Multi-session: always update the program assigned to this task (match by
+    // agentName + sessionId to avoid collisions across sessions).
+    if (typeof ambientPrograms !== 'undefined') {
+      for (var pi = 0; pi < ambientPrograms.length; pi++) {
+        var prog = ambientPrograms[pi];
+        if (prog.sessionId !== sid) continue;
+        if (prog.agentName === task.agent) {
+          if (!prog.assignedTask || prog.assignedTask.id !== task.id || prog.assignedTask.status !== task.status) {
             prog.assignedTask = { id: task.id, status: task.status, title: task.title,
               lastScore: task.last_score || 0, revisionCount: task.revision_count || 0,
               managerNotes: task.manager_notes || '', reviewerNotes: task.reviewer_notes || '' };
@@ -248,10 +247,22 @@ function applyStatus(data) {
               _releaseLocation(prog);
               _pickTarget(prog, 0, 0);
             }
-            break;
           }
+          break;
         }
       }
+    }
+
+    if (!_isActiveSession) continue;  // flow-view effects only for active session
+
+    var node = getNodeByAgent(task.agent);
+    if (!node) continue;
+
+    var prevState = node.state;
+    _syncTaskToNode(node, task);
+
+    // Spawn effects, audio, and bubbles on state transitions
+    if (prevState !== task.status && !_isReplay) {
       if (task.status === 'in_progress' && prevState === 'pending') {
         spawnEffect(node.x, node.y, getStateColor('in_progress'));
         if (nodes.has('nexus')) spawnParticle('nexus', node.id, C.dispatch, task.title);
@@ -292,62 +303,67 @@ function applyStatus(data) {
     }
   }
 
-  // 2b. Route ambient programs to work locations
-  if (typeof routeProgramsToTasks === 'function') routeProgramsToTasks(tasks);
+  // 2b. Route ambient programs to work locations (multi-session — scope by sid)
+  if (typeof routeProgramsToTasks === 'function') routeProgramsToTasks(tasks, sid);
 
-  // Rebuild dependency visualization
-  if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
-  if (typeof updateDagPanel === 'function') updateDagPanel();
-
-  // 3. Update edges based on active task flow
-  rebuildEdges(data);
-
-  // 4. Update active reviewer
-  if (data.active_reviewer) {
-    var probeNode = getNodeByAgent(data.active_reviewer);
-    if (probeNode) {
-      probeNode.state = 'in_specialist_review';
-    }
-  }
-  // Dim non-active reviewers
-  for (var rName in agentNodeMap) {
-    var nId = agentNodeMap[rName];
-    var n = nodes.get(nId);
-    if (n && n.tier === 'probe' && rName !== data.active_reviewer) {
-      if (n.state === 'in_specialist_review') n.state = 'pending';
-    }
-  }
-
-  // 5. Update session stats
-  updateSessionStats(data.tokens_used || 0, data.results_count || 0, data.total_tasks || 0);
-
-  // 6. Event log rendering is now handled above (chat tab filter)
-
-  // 7. Handle verdict popup + bubble
-  if (data.last_verdict && config.completionFx && !_isReplay) {
-    showVerdict(data.last_verdict);
-    var vNode = getNodeByAgent(data.last_verdict.agent || data.last_verdict.reviewer);
-    if (vNode && typeof addBubble === 'function') {
-      var vRole = vNode.tier === 'probe' ? 'probe' : 'sentinel';
-      addBubble(vNode.id, vRole, data.last_verdict.verdict + ' (' + data.last_verdict.score + '/10)');
-    }
-  }
-
-  // Store plan ID for output browser
-  if (data.session_id && typeof _outputPlanId !== 'undefined') {
-    _outputPlanId = data.session_id;
-  }
-
-  // 8. Handle synthesis/completion
+  // 8. Handle synthesis/completion — session-scoped cleanup so other plans keep running
   if (data.synthesis_report && data.phase === 'done' && !_isReplay) {
-    showCompletion(data);
-    if (typeof revertToIdlePrograms === 'function') {
-      revertToIdlePrograms();
+    if (typeof removeProgramsForSession === 'function') {
+      removeProgramsForSession(sid);
     }
   }
 
-  // 9. Update heartbeat
-  updateHeartbeat(data.phase || 'idle');
+  // Flow-view + session-stats updates only for the active session
+  if (_isActiveSession) {
+    // Rebuild dependency visualization
+    if (typeof rebuildDependencyState === 'function') rebuildDependencyState(tasks);
+    if (typeof updateDagPanel === 'function') updateDagPanel();
+
+    // 3. Update edges based on active task flow
+    rebuildEdges(data);
+
+    // 4. Update active reviewer
+    if (data.active_reviewer) {
+      var probeNode = getNodeByAgent(data.active_reviewer);
+      if (probeNode) {
+        probeNode.state = 'in_specialist_review';
+      }
+    }
+    // Dim non-active reviewers
+    for (var rName in agentNodeMap) {
+      var nId = agentNodeMap[rName];
+      var n = nodes.get(nId);
+      if (n && n.tier === 'probe' && rName !== data.active_reviewer) {
+        if (n.state === 'in_specialist_review') n.state = 'pending';
+      }
+    }
+
+    // 5. Update session stats
+    updateSessionStats(data.tokens_used || 0, data.results_count || 0, data.total_tasks || 0);
+
+    // 7. Handle verdict popup + bubble
+    if (data.last_verdict && config.completionFx && !_isReplay) {
+      showVerdict(data.last_verdict);
+      var vNode = getNodeByAgent(data.last_verdict.agent || data.last_verdict.reviewer);
+      if (vNode && typeof addBubble === 'function') {
+        var vRole = vNode.tier === 'probe' ? 'probe' : 'sentinel';
+        addBubble(vNode.id, vRole, data.last_verdict.verdict + ' (' + data.last_verdict.score + '/10)');
+      }
+    }
+
+    // Store plan ID for output browser
+    if (data.session_id && typeof _outputPlanId !== 'undefined') {
+      _outputPlanId = data.session_id;
+    }
+
+    // 8b. Completion popup for the focused session
+    if (data.synthesis_report && data.phase === 'done' && !_isReplay) {
+      showCompletion(data);
+    }
+
+    // 9. Update heartbeat
+    updateHeartbeat(data.phase || 'idle');
+  }
 }
 
 // ── Session Switching ───────────────────────────────────────────────────────
@@ -360,20 +376,20 @@ function switchSession(sessionId) {
   if (!sess || !sess.data) return;
   var d = sess.data;
 
-  // Clear and rebuild canvas for this session
+  // Flow view is session-scoped — rebuild nodes/edges for the newly focused session.
+  // Do NOT touch ambientPrograms: the city map is multi-session and already has
+  // programs for every running plan from live POST updates.
   nodes.clear();
   edges.length = 0;
   agentNodeMap = {};
-  if (typeof ambientPrograms !== 'undefined') ambientPrograms.length = 0;
 
   // Suppress effects during switch
   var wasReplay = _isReplay;
   _isReplay = true;
 
-  // Rebuild from session data
+  // Rebuild from session data (programs are already present; only nodes/chat need rebuild)
   if (d.sub_agents || d.managers || d.reviewers) {
     rebuildNodes(d);
-    if (typeof syncProgramsToRoster === 'function') syncProgramsToRoster(d);
     if (typeof updateChatRosters === 'function') updateChatRosters(d);
   }
 
@@ -383,6 +399,11 @@ function switchSession(sessionId) {
   if (typeof updateDagPanel === 'function') updateDagPanel();
 
   rebuildEdges(d);
+
+  // Re-route programs for the newly focused session so their assignments reflect
+  // the latest task snapshot (other sessions' programs continue their own routing
+  // via their own status updates).
+  if (typeof routeProgramsToTasks === 'function') routeProgramsToTasks(tasks, sessionId);
 
   // Update chat + stats (chat follows its own filter, not canvas session)
   if (typeof _renderFilteredChat === 'function') _renderFilteredChat();
