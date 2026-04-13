@@ -74,7 +74,10 @@ function saveDraft(q, value) {
   } catch (e) { /* quota or disabled — silently ignore */ }
 }
 
-function clearDraft(q) { saveDraft(q, ''); }
+function clearDraft(q) {
+  if (_draftSaveTimer) { clearTimeout(_draftSaveTimer); _draftSaveTimer = null; }
+  saveDraft(q, '');
+}
 
 // Debounced wrapper for typing-driven saves.
 var _draftSaveTimer = null;
