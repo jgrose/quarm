@@ -1572,6 +1572,88 @@ function toggleAsksPanel() {
   }
 }
 
+var _asksCollapsedPlans = new Set();   // plan_ids the user has collapsed
+
+function toggleAsksPlanGroup(planId) {
+  if (_asksCollapsedPlans.has(planId)) _asksCollapsedPlans.delete(planId);
+  else _asksCollapsedPlans.add(planId);
+  renderAsks();
+}
+
+function renderAsks() {
+  var body = document.getElementById('asksBody');
+  var countEl = document.getElementById('asksPanelCount');
+  if (!body) return;
+  if (countEl) countEl.textContent = _pendingQuestions.size;
+
+  if (_pendingQuestions.size === 0) {
+    body.innerHTML = '<div class="asks-empty">No pending questions.</div>';
+    return;
+  }
+
+  // Group by plan_id. Keep a stable order: plans sorted by oldest question first.
+  var groups = {};
+  _pendingQuestions.forEach(function (q) {
+    var pid = q.plan_id || '(no plan)';
+    if (!groups[pid]) groups[pid] = [];
+    groups[pid].push(q);
+  });
+  Object.keys(groups).forEach(function (pid) {
+    groups[pid].sort(function (a, b) {
+      return (a.received_at || 0) - (b.received_at || 0);
+    });
+  });
+  var planIds = Object.keys(groups).sort(function (a, b) {
+    return (groups[a][0].received_at || 0) - (groups[b][0].received_at || 0);
+  });
+
+  var nowSec = Math.floor(Date.now() / 1000);
+  var html = '';
+  for (var i = 0; i < planIds.length; i++) {
+    var pid = planIds[i];
+    var items = groups[pid];
+    var collapsed = _asksCollapsedPlans.has(pid);
+    var caret = collapsed ? '&#9656;' : '&#9662;';
+    html += '<div class="asks-group">';
+    html += '<div class="asks-group-header" onclick="toggleAsksPlanGroup(' +
+            JSON.stringify(pid) + ')">' +
+            '<span class="caret">' + caret + '</span> PLAN ' +
+            escapeHtml(pid) + ' (' + items.length + ')</div>';
+    if (!collapsed) {
+      for (var j = 0; j < items.length; j++) {
+        var q = items[j];
+        var ago = _formatAgo(nowSec - (q.received_at || nowSec));
+        var activeCls = (q.id === _activeQuestionId) ? ' active' : '';
+        html += '<div class="asks-item' + activeCls + '" onclick="selectAsk(' +
+                JSON.stringify(q.id) + ')">';
+        html += '<div class="asks-item-head">';
+        html += '<span>' + escapeHtml(q.agent || 'agent') +
+                (q.task_id ? ' &middot; ' + escapeHtml(q.task_id) : '') + '</span>';
+        html += '<span class="asks-item-time">' + ago + '</span>';
+        html += '</div>';
+        html += '<div class="asks-item-preview">' +
+                escapeHtml((q.question || '').slice(0, 160)) + '</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+}
+
+function _formatAgo(deltaSec) {
+  if (deltaSec < 60) return deltaSec + 's ago';
+  if (deltaSec < 3600) return Math.floor(deltaSec / 60) + 'm ago';
+  return Math.floor(deltaSec / 3600) + 'h ago';
+}
+
+function selectAsk(id) {
+  if (!_pendingQuestions.has(id)) return;
+  _activeQuestionId = id;
+  refreshActiveBanner();
+  renderAsks();  // refresh the .active highlight
+}
+
 // Keyboard shortcut: K toggles ASKS (unless user is typing).
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'k' && e.key !== 'K') return;
