@@ -197,6 +197,7 @@ QUESTION_TIMEOUT_SENTINEL = "[NO HUMAN RESPONSE — PROCEED WITH BEST JUDGMENT]"
 _pending_questions: dict[str, threading.Event] = {}
 _question_answers: dict[str, str] = {}
 _question_details: dict[str, dict] = {}
+_questions_lock = threading.Lock()
 
 # plan_id → {"policy": "block"|"timeout", "timeout_s": int}
 _plan_policies: dict[str, dict] = {}
@@ -219,18 +220,19 @@ def _broadcast_questions_snapshot() -> None:
     """POST a questions_snapshot event to serve.py for WS fan-out."""
     try:
         import urllib.request
-        pending = [
-            {
-                "id": k,
-                "plan_id": v.get("plan_id", ""),
-                "agent": v.get("agent", ""),
-                "task_id": v.get("task_id", ""),
-                "question": (v.get("question") or "")[:2000],
-                "context": (v.get("context") or "")[:2000],
-                "received_at": v.get("received_at", 0),
-            }
-            for k, v in _question_details.items()
-        ]
+        with _questions_lock:
+            pending = [
+                {
+                    "id": k,
+                    "plan_id": v.get("plan_id", ""),
+                    "agent": v.get("agent", ""),
+                    "task_id": v.get("task_id", ""),
+                    "question": (v.get("question") or "")[:2000],
+                    "context": (v.get("context") or "")[:2000],
+                    "received_at": v.get("received_at", 0),
+                }
+                for k, v in _question_details.items()
+            ]
         payload = json.dumps({"type": "questions_snapshot", "pending": pending}).encode()
         port = os.environ.get("NORT_PORT", os.environ.get("QUARM_PORT", "8000"))
         req = urllib.request.Request(
@@ -260,12 +262,13 @@ def request_question(tc_id: str, question: str, context: str = "",
                       agent: str = "", task_id: str = "", plan_id: str = "") -> str:
     """Block until a human answers. Returns the answer or the timeout sentinel."""
     event = threading.Event()
-    _pending_questions[tc_id] = event
-    _question_details[tc_id] = {
-        "question": question, "context": context,
-        "agent": agent, "task_id": task_id, "plan_id": plan_id,
-        "received_at": int(time.time()),
-    }
+    with _questions_lock:
+        _pending_questions[tc_id] = event
+        _question_details[tc_id] = {
+            "question": question, "context": context,
+            "agent": agent, "task_id": task_id, "plan_id": plan_id,
+            "received_at": int(time.time()),
+        }
     _append_question_log(plan_id, {
         "ts": int(time.time()),
         "type": "request",
@@ -306,9 +309,10 @@ def request_question(tc_id: str, question: str, context: str = "",
         event.wait()
         got = True
 
-    answer = _question_answers.pop(tc_id, None)
-    _pending_questions.pop(tc_id, None)
-    _question_details.pop(tc_id, None)
+    with _questions_lock:
+        answer = _question_answers.pop(tc_id, None)
+        _pending_questions.pop(tc_id, None)
+        _question_details.pop(tc_id, None)
     if not got or answer is None:
         _append_question_log(plan_id, {
             "ts": int(time.time()),
@@ -323,15 +327,16 @@ def request_question(tc_id: str, question: str, context: str = "",
 
 def resolve_question(tc_id: str, answer: str) -> None:
     """Called from serve.py when the human submits an answer."""
-    _question_answers[tc_id] = answer
-    details = _question_details.get(tc_id, {})
+    with _questions_lock:
+        _question_answers[tc_id] = answer
+        details = dict(_question_details.get(tc_id, {}))
+        event = _pending_questions.get(tc_id)
     _append_question_log(details.get("plan_id", ""), {
         "ts": int(time.time()),
         "type": "resolve",
         "id": tc_id,
         "answer": answer,
     })
-    event = _pending_questions.get(tc_id)
     if event:
         event.set()
     import json as _json
@@ -355,10 +360,11 @@ def resolve_question(tc_id: str, answer: str) -> None:
 
 def get_pending_questions() -> list[dict]:
     """Get all pending question requests for the dashboard."""
-    return [
-        {"id": k, **v}
-        for k, v in _question_details.items()
-    ]
+    with _questions_lock:
+        return [
+            {"id": k, **v}
+            for k, v in _question_details.items()
+        ]
 
 
 # ── Tool context (set per-task) ──────────────────────────────────────────────
