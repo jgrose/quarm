@@ -1335,6 +1335,68 @@ a:hover { color: var(--holo-bright); }
   border-color: rgba(100, 200, 255, 0.55);
 }
 
+#asksPanel {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  width: 360px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  z-index: 800;
+  padding: 12px;
+}
+#asksPanel.hidden { display: none; }
+#asksBody { font-size: 12px; }
+.asks-group {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.asks-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.asks-group-header {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 6px;
+}
+.asks-group-header .caret { display: inline-block; width: 10px; }
+.asks-item {
+  padding: 8px;
+  margin-bottom: 4px;
+  background: rgba(255,95,140,0.06);
+  border-left: 2px solid #ff5f8c;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.asks-item:hover { background: rgba(255,95,140,0.14); }
+.asks-item.active { background: rgba(255,200,60,0.15); border-left-color: #ffc83c; }
+.asks-item-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.asks-item-time { font-size: 10px; color: rgba(255,255,255,0.5); }
+.asks-item-preview {
+  color: rgba(255,255,255,0.8);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.asks-empty {
+  color: rgba(255,255,255,0.5);
+  font-style: italic;
+  text-align: center;
+  padding: 24px 0;
+}
+
 /* ── 10. Thinking Panel ─────────────────────────────────────────────────── */
 
 #thinkingPanel {
@@ -2072,6 +2134,94 @@ a:hover { color: var(--holo-bright); }
 #questionBanner .btn-submit-answer:hover {
   background: rgba(102, 204, 255, 0.15);
   border-color: rgba(102, 204, 255, 0.9);
+}
+
+#questionBanner .question-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1;
+}
+#questionBanner .question-close:hover {
+  color: #ff5f8c;
+}
+#questionBanner .question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+#questionBanner .question-carousel {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#questionBanner .question-carousel.hidden { display: none; }
+#questionBanner .carousel-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 6px;
+  border-radius: 3px;
+}
+#questionBanner .carousel-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+#questionToastStack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9000;
+  pointer-events: none;
+}
+.ask-toast {
+  pointer-events: auto;
+  background: rgba(20, 20, 30, 0.92);
+  border-left: 3px solid #ff5f8c;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 12px;
+  max-width: 320px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+  animation: askToastIn 200ms ease-out, askToastOut 300ms ease-in 3.7s both;
+  cursor: pointer;
+}
+.ask-toast:hover { border-left-color: #ffc83c; }
+@keyframes askToastIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes askToastOut {
+  to { transform: translateX(20px); opacity: 0; }
+}
+
+#asksBtn { position: relative; }
+#asksBtn.has-pending #asksCount {
+  color: #ff5f8c;
+  font-weight: 900;
+}
+#asksBtn.has-pending {
+  animation: asksPulse 1.8s ease-in-out infinite;
+}
+@keyframes asksPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,95,140,0.0); }
+  50%     { box-shadow: 0 0 12px 2px rgba(255,95,140,0.6); }
 }
 
 /* ── 15. Transcript Panel ───────────────────────────────────────────────── */

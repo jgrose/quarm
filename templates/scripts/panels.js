@@ -14,6 +14,78 @@ function _isTyping() {
 // ── Per-plan human-input policy cache (client-side mirror) ─────────────────
 var _planPolicyCache = {};
 
+// ── Ask-human queue state ────────────────────────────────────────────────────
+// Single source of truth for banner, badge, queue panel, and agent glow.
+var _pendingQuestions = new Map();         // tool_call_id → question record
+var _activeQuestionId = null;              // id currently shown in the banner
+
+function _rerenderQuestionUI() {
+  if (typeof renderAsksBadge === 'function') renderAsksBadge();
+  if (typeof renderAsks === 'function') renderAsks();
+  if (typeof refreshActiveBanner === 'function') refreshActiveBanner();
+}
+
+function applyQuestionsSnapshot(pending) {
+  var next = new Map();
+  for (var i = 0; i < pending.length; i++) {
+    var q = pending[i];
+    if (q && q.id) next.set(q.id, q);
+  }
+  _pendingQuestions = next;
+  // If the active id disappeared, clear it.
+  if (_activeQuestionId && !_pendingQuestions.has(_activeQuestionId)) {
+    _activeQuestionId = null;
+  }
+  _rerenderQuestionUI();
+}
+
+// ── Draft answers ───────────────────────────────────────────────────────────
+// Keyed by plan+question-hash+agent so the same question across runs matches.
+
+function _hashStr(s) {
+  // Tiny non-crypto hash; collisions are fine for draft matching.
+  var h = 5381;
+  for (var i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return (h >>> 0).toString(16).slice(0, 12);
+}
+
+function _draftKey(q) {
+  if (!q) return null;
+  return 'nort_ask_draft::' + (q.plan_id || '') + '::' +
+         _hashStr(q.question || '') + '::' + (q.agent || '');
+}
+
+function loadDraft(q) {
+  try {
+    var k = _draftKey(q);
+    return k ? (localStorage.getItem(k) || '') : '';
+  } catch (e) { return ''; }
+}
+
+function saveDraft(q, value) {
+  try {
+    var k = _draftKey(q);
+    if (!k) return;
+    if (value) localStorage.setItem(k, value);
+    else localStorage.removeItem(k);
+  } catch (e) { /* quota or disabled — silently ignore */ }
+}
+
+function clearDraft(q) {
+  if (_draftSaveTimer) { clearTimeout(_draftSaveTimer); _draftSaveTimer = null; }
+  saveDraft(q, '');
+}
+
+// Debounced wrapper for typing-driven saves.
+var _draftSaveTimer = null;
+function scheduleSaveDraft(q, value) {
+  if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
+  _draftSaveTimer = setTimeout(function () { saveDraft(q, value); }, 400);
+}
+
 // ── Config System ───────────────────────────────────────────────────────────
 
 // config is declared in nodes.js with all default keys — apply localStorage overrides
@@ -84,6 +156,18 @@ var selectedNode = null;
 function showAgentDetail(node) {
   hideBuildingDetail(); // Mutual exclusion with building card
   selectedNode = node;
+  // If this agent has a pending ask_human question, also open its banner entry.
+  if (typeof _pendingQuestions !== 'undefined' && _pendingQuestions.size > 0) {
+    var target = null;
+    var name = (node.agent || node.label || '').toLowerCase();
+    _pendingQuestions.forEach(function (q) {
+      if (!target && q.agent && q.agent.toLowerCase() === name) target = q.id;
+    });
+    if (target) {
+      _activeQuestionId = target;
+      refreshActiveBanner();
+    }
+  }
   var card = document.getElementById('agentDetailCard');
   card.classList.remove('hidden');
   var tierInfo = TIERS[node.tier] || TIERS.drone;
@@ -1374,52 +1458,48 @@ function hideApproval() {
 // ── Question Banner (ask_human) ─────────────────────────────────────────────
 
 function showQuestion(data) {
+  if (!data || !data.id) return;
   var banner = document.getElementById('questionBanner');
-  if (!banner) return;
-  banner.classList.remove('hidden');
+  var wasHidden = !banner || banner.classList.contains('hidden');
 
-  var agentEl = document.getElementById('questionAgent');
-  if (agentEl) {
-    var agent = data.agent || 'agent';
-    var task = data.task_id ? ' · ' + data.task_id : '';
-    agentEl.textContent = agent + task;
+  // Always mirror into the Map — receiver may predate a snapshot.
+  if (typeof _pendingQuestions !== 'undefined') {
+    _pendingQuestions.set(data.id, {
+      id: data.id,
+      plan_id: data.plan_id || '',
+      agent: data.agent || '',
+      task_id: data.task_id || '',
+      question: data.question || '',
+      context: data.context || '',
+      received_at: data.received_at || Math.floor(Date.now() / 1000),
+    });
   }
 
-  var textEl = document.getElementById('questionText');
-  if (textEl) textEl.textContent = data.question || '';
-
-  var ctxEl = document.getElementById('questionContext');
-  if (ctxEl) ctxEl.textContent = data.context || '';
-
-  var input = document.getElementById('questionAnswerInput');
-  if (input) {
-    input.value = '';
-    setTimeout(function () { input.focus(); }, 50);
-    input.onkeydown = function (e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        submitQuestionAnswer(banner.dataset.toolCallId, input.value);
+  if (wasHidden) {
+    // Banner was idle — raise it for this question with full fanfare.
+    _activeQuestionId = data.id;
+    refreshActiveBanner();
+    try {
+      if (typeof config !== 'undefined' && config.browserAlerts &&
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted') {
+        new Notification('Agent needs input', {
+          body: (data.question || '').slice(0, 200),
+        });
       }
-    };
+    } catch (e) { /* ignore */ }
+    try {
+      if (typeof config !== 'undefined' && config.sound && config.questionSound &&
+          typeof playQuestion === 'function') {
+        playQuestion();
+      }
+    } catch (e) { /* ignore */ }
+  } else if (data.id !== _activeQuestionId) {
+    // Banner already busy with a different question — toast only.
+    showAskToast(_pendingQuestions.get(data.id));
   }
 
-  banner.dataset.toolCallId = data.id || data.tool_call_id || '';
-
-  // Notification + sound (both gated by user-toggled config).
-  try {
-    if (typeof config !== 'undefined' && config.browserAlerts && typeof Notification !== 'undefined') {
-      if (Notification.permission === 'granted') {
-        new Notification('Agent needs input', { body: (data.question || '').slice(0, 200) });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
-      }
-    }
-  } catch (e) { /* ignore */ }
-  try {
-    if (typeof config !== 'undefined' && config.sound && config.questionSound && typeof playQuestion === 'function') {
-      playQuestion();
-    }
-  } catch (e) { /* ignore */ }
+  _rerenderQuestionUI();
 }
 
 function hideQuestion() {
@@ -1430,6 +1510,234 @@ function hideQuestion() {
   }
   var input = document.getElementById('questionAnswerInput');
   if (input) input.value = '';
+}
+
+function _orderedPendingIds() {
+  var arr = [];
+  _pendingQuestions.forEach(function (v, k) { arr.push({id: k, at: v.received_at || 0}); });
+  arr.sort(function (a, b) { return a.at - b.at; });
+  return arr.map(function (x) { return x.id; });
+}
+
+function carouselPrev() { _carouselStep(-1); }
+function carouselNext() { _carouselStep(+1); }
+
+function _carouselStep(delta) {
+  var ids = _orderedPendingIds();
+  if (ids.length <= 1) return;
+  var idx = ids.indexOf(_activeQuestionId);
+  if (idx < 0) idx = 0;
+  var next = (idx + delta + ids.length) % ids.length;
+  _activeQuestionId = ids[next];
+  refreshActiveBanner();
+  _updateCarouselUI();
+}
+
+function _updateCarouselUI() {
+  var el = document.getElementById('questionCarousel');
+  var txt = document.getElementById('questionCarouselText');
+  if (!el || !txt) return;
+  var ids = _orderedPendingIds();
+  if (ids.length <= 1) {
+    el.classList.add('hidden');
+    return;
+  }
+  var idx = ids.indexOf(_activeQuestionId);
+  if (idx < 0) idx = 0;
+  el.classList.remove('hidden');
+  txt.textContent = (idx + 1) + ' of ' + ids.length;
+}
+
+function showAskToast(q) {
+  var stack = document.getElementById('questionToastStack');
+  if (!stack) return;
+  var el = document.createElement('div');
+  el.className = 'ask-toast';
+  var total = _pendingQuestions.size;
+  el.innerHTML = '<strong>' + escapeHtml(q.agent || 'agent') +
+                 '</strong> also needs help — ' + total + ' in queue';
+  el.onclick = function () {
+    _activeQuestionId = q.id;
+    refreshActiveBanner();
+    el.remove();
+  };
+  stack.appendChild(el);
+  setTimeout(function () { if (el.parentNode) el.remove(); }, 4000);
+}
+
+function renderAsksBadge() {
+  var btn = document.getElementById('asksBtn');
+  var count = document.getElementById('asksCount');
+  if (!btn || !count) return;
+  var n = _pendingQuestions.size;
+  count.textContent = n;
+  if (n > 0) btn.classList.add('has-pending');
+  else btn.classList.remove('has-pending');
+}
+
+function toggleAsksPanel() {
+  var p = document.getElementById('asksPanel');
+  if (!p) return;
+  p.classList.toggle('hidden');
+  var open = !p.classList.contains('hidden');
+  var btn = document.getElementById('asksBtn');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open && typeof renderAsks === 'function') renderAsks();
+}
+
+var _asksCollapsedPlans = new Set();   // plan_ids the user has collapsed
+
+function toggleAsksPlanGroup(planId) {
+  if (_asksCollapsedPlans.has(planId)) _asksCollapsedPlans.delete(planId);
+  else _asksCollapsedPlans.add(planId);
+  renderAsks();
+}
+
+function renderAsks() {
+  var body = document.getElementById('asksBody');
+  var countEl = document.getElementById('asksPanelCount');
+  if (!body) return;
+  if (countEl) countEl.textContent = _pendingQuestions.size;
+
+  if (_pendingQuestions.size === 0) {
+    body.innerHTML = '<div class="asks-empty">No pending questions.</div>';
+    return;
+  }
+
+  // Group by plan_id. Keep a stable order: plans sorted by oldest question first.
+  var groups = {};
+  _pendingQuestions.forEach(function (q) {
+    var pid = q.plan_id || '(no plan)';
+    if (!groups[pid]) groups[pid] = [];
+    groups[pid].push(q);
+  });
+  Object.keys(groups).forEach(function (pid) {
+    groups[pid].sort(function (a, b) {
+      return (a.received_at || 0) - (b.received_at || 0);
+    });
+  });
+  var planIds = Object.keys(groups).sort(function (a, b) {
+    return (groups[a][0].received_at || 0) - (groups[b][0].received_at || 0);
+  });
+
+  var nowSec = Math.floor(Date.now() / 1000);
+  var html = '';
+  for (var i = 0; i < planIds.length; i++) {
+    var pid = planIds[i];
+    var items = groups[pid];
+    var collapsed = _asksCollapsedPlans.has(pid);
+    var caret = collapsed ? '&#9656;' : '&#9662;';
+    html += '<div class="asks-group">';
+    html += '<div class="asks-group-header" role="button" tabindex="0" onclick="toggleAsksPlanGroup(' +
+            escapeHtml(JSON.stringify(pid)) + ')">' +
+            '<span class="caret">' + caret + '</span> PLAN ' +
+            escapeHtml(pid) + ' (' + items.length + ')</div>';
+    if (!collapsed) {
+      for (var j = 0; j < items.length; j++) {
+        var q = items[j];
+        var ago = _formatAgo(nowSec - (q.received_at || nowSec));
+        var activeCls = (q.id === _activeQuestionId) ? ' active' : '';
+        html += '<div class="asks-item' + activeCls + '" role="button" tabindex="0" onclick="selectAsk(' +
+                escapeHtml(JSON.stringify(q.id)) + ')">';
+        html += '<div class="asks-item-head">';
+        html += '<span>' + escapeHtml(q.agent || 'agent') +
+                (q.task_id ? ' &middot; ' + escapeHtml(q.task_id) : '') + '</span>';
+        html += '<span class="asks-item-time">' + ago + '</span>';
+        html += '</div>';
+        html += '<div class="asks-item-preview">' +
+                escapeHtml((q.question || '').slice(0, 160)) + '</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+}
+
+function _formatAgo(deltaSec) {
+  if (deltaSec < 60) return deltaSec + 's ago';
+  if (deltaSec < 3600) return Math.floor(deltaSec / 60) + 'm ago';
+  return Math.floor(deltaSec / 3600) + 'h ago';
+}
+
+// Re-render ASKS time-ago labels at most once per minute while panel is open.
+// Cheap approximation: if any pending item's age-bucket would change, re-render.
+if (!window._asksTickInstalled) {
+  window._asksTickInstalled = true;
+  var _lastAgeTick = 0;
+  setInterval(function () {
+    var panel = document.getElementById('asksPanel');
+    if (!panel || panel.classList.contains('hidden')) return;
+    if (_pendingQuestions.size === 0) return;
+    var now = Math.floor(Date.now() / 1000);
+    // Re-render at most once every 30s.
+    if (now - _lastAgeTick < 30) return;
+    _lastAgeTick = now;
+    renderAsks();
+  }, 5000);
+}
+
+function selectAsk(id) {
+  if (!_pendingQuestions.has(id)) return;
+  _activeQuestionId = id;
+  refreshActiveBanner();
+  renderAsks();  // refresh the .active highlight
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var t = e.target;
+  if (!t) return;
+  if (t.classList.contains('asks-group-header') ||
+      t.classList.contains('asks-item')) {
+    e.preventDefault();
+    t.click();
+  }
+});
+
+// Keyboard shortcut: K toggles ASKS (unless user is typing).
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'k' && e.key !== 'K') return;
+  if (_isTyping()) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  toggleAsksPanel();
+});
+
+function dismissQuestion() {
+  // User closed the banner without answering — question stays in the queue.
+  var banner = document.getElementById('questionBanner');
+  if (banner) banner.classList.add('hidden');
+  _activeQuestionId = null;
+  _rerenderQuestionUI();
+}
+
+function refreshActiveBanner() {
+  var banner = document.getElementById('questionBanner');
+  if (!banner) return;
+  if (!_activeQuestionId || !_pendingQuestions.has(_activeQuestionId)) {
+    // Nothing to show; hide silently (not a dismiss).
+    banner.classList.add('hidden');
+    return;
+  }
+  var q = _pendingQuestions.get(_activeQuestionId);
+  banner.classList.remove('hidden');
+  banner.dataset.toolCallId = _activeQuestionId;
+  var agentEl = document.getElementById('questionAgent');
+  if (agentEl) {
+    var task = q.task_id ? ' · ' + q.task_id : '';
+    agentEl.textContent = (q.agent || 'agent') + task;
+  }
+  var textEl = document.getElementById('questionText');
+  if (textEl) textEl.textContent = q.question || '';
+  var ctxEl = document.getElementById('questionContext');
+  if (ctxEl) ctxEl.textContent = q.context || '';
+  var input = document.getElementById('questionAnswerInput');
+  if (input && document.activeElement !== input) {
+    input.value = loadDraft(q);
+    input.oninput = function () { scheduleSaveDraft(q, input.value); };
+  }
+  _updateCarouselUI();
 }
 
 // ── Plan Viewer ─────────────────────────────────────────────────────────────

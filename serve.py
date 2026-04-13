@@ -46,6 +46,8 @@ from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
+from tools import get_pending_questions
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("nort")
 
@@ -185,6 +187,14 @@ class ConnectionManager:
                 await ws.send_json(status)
             except Exception as e:
                 log.debug(f"Failed to send session {session_id} state to new WS client: {e}")
+        # Send current pending-questions snapshot so mid-run connections see outstanding asks.
+        try:
+            await ws.send_json({
+                "type": "questions_snapshot",
+                "pending": get_pending_questions(),
+            })
+        except Exception as e:
+            log.debug(f"Failed to send questions snapshot to new WS client: {e}")
 
     async def disconnect(self, ws: WebSocket):
         async with self._lock:

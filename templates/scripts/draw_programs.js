@@ -217,6 +217,53 @@ function initAmbientPrograms(W, H) {
   }
 }
 
+// ─── Pending-question "needs help" indicator ───
+
+function _programHasPendingQuestion(p) {
+  if (typeof _pendingQuestions === 'undefined' || !_pendingQuestions.size) return false;
+  var name = (p && p.agentName) ? p.agentName : '';
+  if (!name) return false;
+  var hit = false;
+  _pendingQuestions.forEach(function (q) {
+    if (!hit && q.agent && q.agent.toLowerCase() === name.toLowerCase()) hit = true;
+  });
+  return hit;
+}
+
+function _drawHelpIndicator(ctx, x, y, time) {
+  // Amber pulse ring around the sprite.
+  var pulse = 0.5 + 0.5 * Math.sin(time / 0.9);
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.45 * pulse;
+  ctx.beginPath();
+  ctx.arc(x, y, 18 + 4 * pulse, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,200,60,' + (0.6 + 0.3 * pulse) + ')';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // Beacon beam.
+  ctx.save();
+  var grad = ctx.createLinearGradient(x, y - 12, x, y - 72);
+  grad.addColorStop(0, 'rgba(95,220,255,0.55)');
+  grad.addColorStop(1, 'rgba(95,220,255,0.0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x - 5, y - 72, 10, 60);
+  ctx.restore();
+
+  // "?!" chip.
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#ff5f8c';
+  ctx.fillRect(x - 10, y - 34, 20, 14);
+  ctx.fillStyle = '#fff';
+  ctx.font = '900 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?!', x, y - 27);
+  ctx.restore();
+}
+
 // ─── Pixel light trail ───
 
 function _drawPixelTrail(ctx, trail, color, scale, cycleMode) {
@@ -562,6 +609,10 @@ function drawAmbientPrograms(ctx, time) {
 
     // Thought bubble emotion indicator
     if (typeof drawThoughtBubble === 'function') drawThoughtBubble(ctx, p, drawY, time, bunkerAlpha);
+
+    if (_programHasPendingQuestion(p)) {
+      _drawHelpIndicator(ctx, p.x, p.y, time);
+    }
   }
 
   ctx.restore();

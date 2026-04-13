@@ -266,3 +266,38 @@ class TestDashboardSmoke:
         assert body["status"] in ("idle", "running", "stuck"), (
             f"Unexpected status value: {body['status']}"
         )
+
+    def test_asks_badge_updates_with_snapshot(self, page):
+        """Pending-question snapshot should bump the ASKS badge count."""
+        page.goto(BASE_URL + "/", timeout=PAGE_LOAD_TIMEOUT)
+        page.wait_for_selector("#asksBtn")
+
+        page.evaluate("""
+            applyQuestionsSnapshot([
+              {id:'s1', plan_id:'p', agent:'a1', question:'one?', received_at:1},
+              {id:'s2', plan_id:'p', agent:'a2', question:'two?', received_at:2},
+            ]);
+        """)
+
+        count = page.text_content("#asksCount")
+        assert (count or "").strip() == "2"
+
+        btn = page.locator("#asksBtn")
+        assert "has-pending" in (btn.get_attribute("class") or "")
+
+    def test_asks_panel_open_and_click_selects(self, page):
+        """Opening the panel and clicking a row should set the banner's active id."""
+        page.goto(BASE_URL + "/", timeout=PAGE_LOAD_TIMEOUT)
+        page.wait_for_selector("#asksBtn")
+
+        page.evaluate("""
+            applyQuestionsSnapshot([
+              {id:'qa', plan_id:'p1', agent:'R', question:'First?', received_at:1},
+              {id:'qb', plan_id:'p1', agent:'D', question:'Second?', received_at:2},
+            ]);
+        """)
+        page.click("#asksBtn")
+        page.wait_for_selector("#asksPanel:not(.hidden)")
+        page.click(".asks-item >> nth=0")
+        active = page.evaluate("_activeQuestionId")
+        assert active in ("qa", "qb")

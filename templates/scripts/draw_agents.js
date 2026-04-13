@@ -358,6 +358,17 @@ function _drawSingleAgent(ctx, node, time, lod) {
 
 // ─── Draw all agents (public API) ───
 
+function _agentHasPendingQuestion(node) {
+  if (typeof _pendingQuestions === 'undefined' || !_pendingQuestions.size) return false;
+  var agent = node && (node.agent || node.label || '');
+  if (!agent) return false;
+  var hit = false;
+  _pendingQuestions.forEach(function (q) {
+    if (!hit && q.agent && q.agent.toLowerCase() === String(agent).toLowerCase()) hit = true;
+  });
+  return hit;
+}
+
 function drawAllAgents(ctx, time, W, H) {
   var lod = _getLodLevel();
   var view = null;
@@ -374,5 +385,8 @@ function drawAllAgents(ctx, time, W, H) {
           node.y < view.y - margin || node.y > view.y + view.h + margin) continue;
     }
     _drawSingleAgent(ctx, node, time, lod);
+    if (_agentHasPendingQuestion(node) && typeof _drawHelpIndicator === 'function') {
+      _drawHelpIndicator(ctx, node.x, node.y, time);
+    }
   }
 }

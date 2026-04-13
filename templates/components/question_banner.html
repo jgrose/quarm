@@ -1,6 +1,14 @@
 <div id="questionBanner" class="hidden">
+  <button type="button" class="question-close" title="Close (Esc)" aria-label="Close question banner" onclick="dismissQuestion()">&times;</button>
   <div class="question-body">
-    <div class="question-label">AGENT NEEDS INPUT</div>
+    <div class="question-header">
+      <span class="question-label">AGENT NEEDS INPUT</span>
+      <span id="questionCarousel" class="question-carousel hidden">
+        <button type="button" class="carousel-btn" onclick="carouselPrev()" title="Previous" aria-label="Previous question">&lsaquo;</button>
+        <span id="questionCarouselText">1 of 1</span>
+        <button type="button" class="carousel-btn" onclick="carouselNext()" title="Next" aria-label="Next question">&rsaquo;</button>
+      </span>
+    </div>
     <div id="questionAgent" class="question-agent"></div>
     <div id="questionText" class="question-text"></div>
     <div id="questionContext" class="question-context"></div>
@@ -8,10 +16,11 @@
       <textarea id="questionAnswerInput"
                 placeholder="Type your answer and press Ctrl+Enter to submit..."
                 rows="2"></textarea>
-      <button class="btn-submit-answer"
+      <button type="button" class="btn-submit-answer"
               onclick="submitQuestionAnswer(document.getElementById('questionBanner').dataset.toolCallId, document.getElementById('questionAnswerInput').value)">
         SUBMIT
       </button>
     </div>
   </div>
 </div>
+<div id="questionToastStack"></div>

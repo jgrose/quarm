@@ -5,6 +5,8 @@ Supports hybrid approval: read-only tools auto-execute, write tools require huma
 """
 
 import os
+import json
+import time
 import subprocess
 import logging
 import threading
@@ -22,6 +24,7 @@ log = logging.getLogger("nort.tools")
 
 PROJECT_DIR = Path(__file__).parent
 ARTIFACTS_DIR = PROJECT_DIR / "artifacts"
+QUESTIONS_LOG_DIR = PROJECT_DIR / "plans"
 
 SANDBOX_MODE = os.environ.get("NORT_SANDBOX_MODE", "subprocess").lower()
 _SENSITIVE_ENV_PATTERNS = {"API_KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "OPENAI", "ANTHROPIC", "AWS_"}
@@ -194,9 +197,53 @@ QUESTION_TIMEOUT_SENTINEL = "[NO HUMAN RESPONSE — PROCEED WITH BEST JUDGMENT]"
 _pending_questions: dict[str, threading.Event] = {}
 _question_answers: dict[str, str] = {}
 _question_details: dict[str, dict] = {}
+_questions_lock = threading.Lock()
 
 # plan_id → {"policy": "block"|"timeout", "timeout_s": int}
 _plan_policies: dict[str, dict] = {}
+
+
+def _append_question_log(plan_id: str, entry: dict) -> None:
+    """Atomic-append one JSON line to plans/{plan_id}_questions.jsonl."""
+    if not plan_id:
+        return
+    try:
+        QUESTIONS_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        path = QUESTIONS_LOG_DIR / f"{plan_id}_questions.jsonl"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        log.debug(f"[ask_human] JSONL log write failed: {exc}")
+
+
+def _broadcast_questions_snapshot() -> None:
+    """POST a questions_snapshot event to serve.py for WS fan-out."""
+    try:
+        import urllib.request
+        with _questions_lock:
+            pending = [
+                {
+                    "id": k,
+                    "plan_id": v.get("plan_id", ""),
+                    "agent": v.get("agent", ""),
+                    "task_id": v.get("task_id", ""),
+                    "question": (v.get("question") or "")[:2000],
+                    "context": (v.get("context") or "")[:2000],
+                    "received_at": v.get("received_at", 0),
+                }
+                for k, v in _question_details.items()
+            ]
+        payload = json.dumps({"type": "questions_snapshot", "pending": pending}).encode()
+        port = os.environ.get("NORT_PORT", os.environ.get("QUARM_PORT", "8000"))
+        req = urllib.request.Request(
+            f"http://localhost:{port}/update",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # fire-and-forget
 
 
 def set_plan_policy(plan_id: str, policy: str = "block", timeout_s: int = 900) -> None:
@@ -215,11 +262,21 @@ def request_question(tc_id: str, question: str, context: str = "",
                       agent: str = "", task_id: str = "", plan_id: str = "") -> str:
     """Block until a human answers. Returns the answer or the timeout sentinel."""
     event = threading.Event()
-    _pending_questions[tc_id] = event
-    _question_details[tc_id] = {
-        "question": question, "context": context,
-        "agent": agent, "task_id": task_id, "plan_id": plan_id,
-    }
+    with _questions_lock:
+        _pending_questions[tc_id] = event
+        _question_details[tc_id] = {
+            "question": question, "context": context,
+            "agent": agent, "task_id": task_id, "plan_id": plan_id,
+            "received_at": int(time.time()),
+        }
+    _append_question_log(plan_id, {
+        "ts": int(time.time()),
+        "type": "request",
+        "id": tc_id,
+        "agent": agent,
+        "task_id": task_id,
+        "question": question,
+    })
     log.info(f"[ASK_HUMAN] Waiting for human answer: {question[:120]}")
     # Broadcast to UI via serve.py
     import json as _json
@@ -233,6 +290,7 @@ def request_question(tc_id: str, question: str, context: str = "",
             "agent": agent,
             "task_id": task_id,
             "plan_id": plan_id,
+            "received_at": _question_details[tc_id].get("received_at", int(time.time())),
         }).encode()
         req = urllib.request.Request(
             f"http://localhost:{os.environ.get('NORT_PORT', os.environ.get('QUARM_PORT', '8000'))}/update",
@@ -243,6 +301,7 @@ def request_question(tc_id: str, question: str, context: str = "",
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass  # fire-and-forget
+    _broadcast_questions_snapshot()
 
     policy = _get_plan_policy(plan_id)
     if policy["policy"] == "timeout":
@@ -251,18 +310,34 @@ def request_question(tc_id: str, question: str, context: str = "",
         event.wait()
         got = True
 
-    answer = _question_answers.pop(tc_id, None)
-    _pending_questions.pop(tc_id, None)
-    _question_details.pop(tc_id, None)
+    with _questions_lock:
+        answer = _question_answers.pop(tc_id, None)
+        _pending_questions.pop(tc_id, None)
+        _question_details.pop(tc_id, None)
     if not got or answer is None:
+        _append_question_log(plan_id, {
+            "ts": int(time.time()),
+            "type": "timeout",
+            "id": tc_id,
+        })
+        _broadcast_questions_snapshot()
         return QUESTION_TIMEOUT_SENTINEL
+    _broadcast_questions_snapshot()
     return answer
 
 
 def resolve_question(tc_id: str, answer: str) -> None:
     """Called from serve.py when the human submits an answer."""
-    _question_answers[tc_id] = answer
-    event = _pending_questions.get(tc_id)
+    with _questions_lock:
+        _question_answers[tc_id] = answer
+        details = dict(_question_details.get(tc_id, {}))
+        event = _pending_questions.get(tc_id)
+    _append_question_log(details.get("plan_id", ""), {
+        "ts": int(time.time()),
+        "type": "resolve",
+        "id": tc_id,
+        "answer": answer,
+    })
     if event:
         event.set()
     import json as _json
@@ -281,14 +356,16 @@ def resolve_question(tc_id: str, answer: str) -> None:
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass
+    _broadcast_questions_snapshot()
 
 
 def get_pending_questions() -> list[dict]:
     """Get all pending question requests for the dashboard."""
-    return [
-        {"id": k, **v}
-        for k, v in _question_details.items()
-    ]
+    with _questions_lock:
+        return [
+            {"id": k, **v}
+            for k, v in _question_details.items()
+        ]
 
 
 # ── Tool context (set per-task) ──────────────────────────────────────────────
