@@ -654,6 +654,12 @@ def _extract_code_blocks_to_files(tid: str, draft: str):
 
         target = artifacts / filename
         try:
+            # Guard against path traversal embedded in LLM-generated filenames
+            target.resolve().relative_to(artifacts.resolve())
+        except ValueError:
+            log_event(f"  [SECURITY] Blocked path traversal in {tid} code block: {filename!r}")
+            continue
+        try:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
             saved += 1
@@ -809,6 +815,21 @@ def _execute_single_task(tid, tasks, results, sub_agents_list):
     wrote_files = any(tc["name"] == "write_file" and _tool_succeeded(tc) for tc in tool_calls_log)
     if not wrote_files and draft and "```" in draft:
         _extract_code_blocks_to_files(tid, draft)
+
+    # ── Content scan: check agent-written artifacts for secrets / injection ──
+    try:
+        from content_scanner import scan_directory, format_scan_report
+        from tools import _artifacts_path
+        artifacts_path = _artifacts_path()
+        if artifacts_path.is_dir():
+            findings = scan_directory(artifacts_path)
+            if findings:
+                scan_report = format_scan_report(findings)
+                log_event(f"  [SCAN] {task['agent'].upper()} artifacts: {scan_report}")
+                # Prepend scan warnings to draft so reviewers see them
+                draft = f"⚠ CONTENT SCAN FINDINGS:\n{scan_report}\n\n---\n{draft}"
+    except Exception as e:
+        log_event(f"  [SCAN] Error scanning artifacts for {tid}: {e}")
 
     done_msg = f"[{task['agent'].upper()}] Draft done ({len(draft)} chars, {total_toks} tokens, {tools_used} tool calls) → manager review"
     print(f"  {done_msg}"); log_event(done_msg)

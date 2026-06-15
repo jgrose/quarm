@@ -11,11 +11,29 @@ SECRET_PATTERNS = [
     (r'(?i)(aws_secret_access_key|aws_secret)\s*[=:]\s*\S+', "AWS Secret Key"),
     (r'ghp_[A-Za-z0-9_]{36}', "GitHub Personal Access Token"),
     (r'gho_[A-Za-z0-9_]{36}', "GitHub OAuth Token"),
-    (r'sk-[A-Za-z0-9]{20,}', "OpenAI/Stripe Secret Key"),
+    # Modern OpenAI formats: sk-proj-*, sk-svcacct-*, classic sk-*
+    (r'sk-proj-[A-Za-z0-9_\-]{20,}', "OpenAI Project Key"),
+    (r'sk-svcacct-[A-Za-z0-9_\-]{20,}', "OpenAI Service Account Key"),
+    (r'sk-[A-Za-z0-9]{48}', "OpenAI/Stripe Secret Key"),
+    # Anthropic keys: sk-ant-api03-*, sk-ant-*
+    (r'sk-ant-[A-Za-z0-9_\-]{20,}', "Anthropic API Key"),
     (r'(?i)(password|passwd|pwd)\s*[=:]\s*["\'][^"\']{4,}["\']', "Hardcoded Password"),
     (r'(?i)(api_key|apikey|api-key)\s*[=:]\s*["\'][^"\']{8,}["\']', "API Key Assignment"),
-    (r'(?i)bearer\s+[A-Za-z0-9\-_.~+/]{20,}', "Bearer Token"),
+    (r'(?i)bearer\s+[A-Za-z0-9\-_.~+/=]{20,}', "Bearer Token"),
     (r'-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----', "Private Key"),
+    # Slack tokens
+    (r'xoxb-[0-9A-Za-z\-]{50,}', "Slack Bot Token"),
+    (r'xoxp-[0-9A-Za-z\-]{50,}', "Slack User Token"),
+]
+
+EXFILTRATION_PATTERNS = [
+    # Cloud metadata endpoints embedded in code/config
+    (r'169\.254\.169\.254', "AWS metadata endpoint reference"),
+    (r'metadata\.google\.internal', "GCP metadata endpoint reference"),
+    # Data URIs that could encode exfiltrated content
+    (r'(?i)data:text/[a-z]+;base64,[A-Za-z0-9+/]{100,}', "Large base64 data URI"),
+    # Suspicious image/script src patterns for DNS exfiltration
+    (r'(?i)src=["\']https?://[^"\']*\$\{', "Potential exfiltration via dynamic URL"),
 ]
 
 INJECTION_PATTERNS = [
@@ -50,6 +68,17 @@ def scan_file(filepath: Path) -> list[dict]:
                 "file": str(filepath),
                 "line": line_num,
                 "match_preview": match.group()[:40] + "..." if len(match.group()) > 40 else match.group(),
+            })
+
+    for pattern, label in EXFILTRATION_PATTERNS:
+        for match in re.finditer(pattern, content):
+            line_num = content[:match.start()].count('\n') + 1
+            findings.append({
+                "type": "exfiltration",
+                "label": label,
+                "file": str(filepath),
+                "line": line_num,
+                "match_preview": match.group()[:60],
             })
 
     code_exts = {'.py', '.js', '.ts', '.jsx', '.tsx', '.sh', '.bash'}

@@ -31,8 +31,11 @@ _SENSITIVE_ENV_PATTERNS = {"API_KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL
 
 # ── Approval system ─────────────────────────────────────────────────────────
 
-# Tools that require human approval before execution
-APPROVAL_REQUIRED = {"execute_code"}
+# Tools that require human approval before execution.
+# NOTE: the orchestrator passes auto_approve_all=True so this gate only fires
+# when execute_tool_call is called directly (e.g., from the dashboard or tests).
+# Include all aliases so the check works regardless of which name the LLM uses.
+APPROVAL_REQUIRED = {"execute_code", "analyze_data"}
 
 # Pending approvals: tool_call_id → threading.Event
 _pending_approvals: dict[str, threading.Event] = {}
@@ -413,17 +416,33 @@ def web_search(query: str) -> str:
     return _ws(query)
 
 
+def _is_ssrf_target(hostname: str) -> bool:
+    """Return True if hostname resolves to a loopback, private, or link-local address."""
+    import ipaddress, socket
+    if not hostname:
+        return True
+    try:
+        addrs = socket.getaddrinfo(hostname, None)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_unspecified:
+                return True
+    except Exception:
+        # Treat resolution failures as blocked to fail safe
+        return True
+    return False
+
+
 @tool
 def browse_url(url: str) -> str:
     """Load a web page using headless Chromium and return its content as markdown. Handles JavaScript-rendered pages."""
     from urllib.parse import urlparse
     parsed = urlparse(url)
-    if parsed.scheme == "file":
-        return "Blocked: file:// URLs are not allowed."
-    _blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]", "169.254.169.254"}
+    if parsed.scheme not in ("http", "https"):
+        return f"Blocked: only http/https URLs are allowed (got {parsed.scheme!r})."
     hostname = (parsed.hostname or "").lower()
-    if hostname in _blocked_hosts or hostname == "::1":
-        return f"Blocked: requests to {hostname} are not allowed."
+    if _is_ssrf_target(hostname):
+        return f"Blocked: requests to {hostname!r} are not allowed (private/reserved address)."
     from tools_web import browse_url as _bu
     return _bu(url)
 

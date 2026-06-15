@@ -31,10 +31,15 @@ def _init_cache():
     return c
 
 
+_cache_lock = __import__("threading").Lock()
+
+
 def _get_cached(url: str) -> str | None:
     try:
-        c = sqlite3.connect(_CACHE_DB)
-        row = c.execute("SELECT content, cached_at FROM url_cache WHERE url=?", (url,)).fetchone()
+        with _cache_lock:
+            c = sqlite3.connect(_CACHE_DB, timeout=5, check_same_thread=False)
+            row = c.execute("SELECT content, cached_at FROM url_cache WHERE url=?", (url,)).fetchone()
+            c.close()
         if row and (time.time() - row[1]) < _CACHE_TTL:
             return row[0]
     except Exception:
@@ -44,12 +49,14 @@ def _get_cached(url: str) -> str | None:
 
 def _set_cached(url: str, content: str):
     try:
-        c = sqlite3.connect(_CACHE_DB)
-        c.execute(
-            "INSERT OR REPLACE INTO url_cache (url, content, cached_at) VALUES (?, ?, ?)",
-            (url, content, time.time()),
-        )
-        c.commit()
+        with _cache_lock:
+            c = sqlite3.connect(_CACHE_DB, timeout=5, check_same_thread=False)
+            c.execute(
+                "INSERT OR REPLACE INTO url_cache (url, content, cached_at) VALUES (?, ?, ?)",
+                (url, content, time.time()),
+            )
+            c.commit()
+            c.close()
     except Exception:
         pass
 

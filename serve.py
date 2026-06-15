@@ -86,6 +86,28 @@ def _save_queue(queue: list[dict]):
 
 CONFIG_FILE = STATIC_DIR / "config.json"
 
+
+def _validate_webhook_url(url: str) -> str | None:
+    """Return an error string if url is not a safe outbound https URL, else None."""
+    import ipaddress, socket
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return "webhook_url must use http or https"
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        return "webhook_url has no hostname"
+    try:
+        addrs = socket.getaddrinfo(hostname, None)
+        for _, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_unspecified:
+                return f"webhook_url resolves to a private/reserved address ({ip})"
+    except Exception as exc:
+        return f"webhook_url hostname could not be resolved: {exc}"
+    return None
+
+
 def _load_config() -> dict:
     if CONFIG_FILE.exists():
         try:
@@ -324,6 +346,12 @@ def _run_orchestrator_worker(plan_id: str):
     finally:
         with _running_lock:
             _running_plan_ids.discard(plan_id)
+        _stop_flags.discard(plan_id)
+        # Release the in-memory WS session state; clients that reconnect after
+        # the run completes get a fresh queue snapshot instead.
+        manager.cleanup_session(plan_id)
+        from status_bridge import cleanup_session as _bridge_cleanup
+        _bridge_cleanup(plan_id)
         _auto_advance()
 
 
@@ -414,10 +442,16 @@ async def flow_view(request: Request):
 
 # ── Orchestrator bridge route (existing) ─────────────────────────────────────
 
+_UPDATE_SECRET = os.environ.get("NORT_SECRET", os.environ.get("QUARM_SECRET", ""))
+
+
 @app.post("/update")
 async def receive_update(request: Request):
     """Called by status_bridge.py on every orchestrator state change."""
     global _last_update_time
+    if _UPDATE_SECRET:
+        if request.headers.get("X-Gauntlet-Secret") != _UPDATE_SECRET:
+            raise HTTPException(status_code=403, detail="Forbidden")
     try:
         payload = await request.json()
     except Exception as e:
@@ -525,6 +559,7 @@ async def api_reorder(request: Request):
 @app.post("/api/plans/{plan_id}/run")
 async def api_run_plan(plan_id: str, request: Request):
     """Start the orchestrator for a specific plan."""
+    _validate_plan_id(plan_id)
     # Accept optional human-input policy on the run payload.
     try:
         data = await request.json()
@@ -569,6 +604,7 @@ async def api_run_plan(plan_id: str, request: Request):
 @app.post("/api/plans/{plan_id}/stop")
 async def api_stop_plan(plan_id: str):
     """Stop a running plan."""
+    _validate_plan_id(plan_id)
     with _running_lock:
         if plan_id not in _running_plan_ids:
             raise HTTPException(status_code=409, detail="Plan is not running")
@@ -583,6 +619,7 @@ async def api_stop_plan(plan_id: str):
 @app.delete("/api/plans/{plan_id}")
 async def api_delete_plan(plan_id: str):
     """Remove a plan from the queue."""
+    _validate_plan_id(plan_id)
     with _running_lock:
         if plan_id in _running_plan_ids:
             raise HTTPException(status_code=409, detail="Cannot delete a running plan")
@@ -759,6 +796,10 @@ async def get_config():
 @app.post("/api/config")
 async def save_config(request: Request):
     data = await request.json()
+    if "webhook_url" in data and data["webhook_url"]:
+        err = _validate_webhook_url(data["webhook_url"])
+        if err:
+            raise HTTPException(status_code=400, detail=err)
     cfg = _load_config()
     cfg.update(data)
     _save_config(cfg)
@@ -848,6 +889,9 @@ async def test_webhook(request: Request):
     url = cfg.get("webhook_url", "")
     if not url:
         raise HTTPException(status_code=400, detail="No webhook URL configured")
+    err = _validate_webhook_url(url)
+    if err:
+        raise HTTPException(status_code=400, detail=f"Unsafe webhook URL: {err}")
     import urllib.request
     payload = json.dumps({
         "project": "NORT Test",
@@ -872,6 +916,7 @@ INCOMING_DIR = PLANS_DIR / "incoming"
 
 def _watch_incoming():
     """Poll plans/incoming/ for new .md files and auto-queue them."""
+    from validate_plan import validate as _validate_plan
     INCOMING_DIR.mkdir(parents=True, exist_ok=True)
     while True:
         try:
@@ -880,6 +925,13 @@ def _watch_incoming():
                 dest = PLANS_DIR / f"{plan_id}.md"
                 content = f.read_text()
                 dest.write_text(content)
+                # Validate before queuing; reject invalid plans
+                errors = _validate_plan(str(dest))
+                if errors:
+                    log.warning(f"Incoming plan {f.name} failed validation, rejected: {errors[:2]}")
+                    dest.unlink(missing_ok=True)
+                    f.unlink()
+                    continue
                 # Extract title from first heading
                 title_match = re.search(r"^#\s+(?:PROJECT PLAN:\s*)?(.+)", content, re.MULTILINE)
                 title = title_match.group(1).strip() if title_match else f.stem
@@ -1428,8 +1480,19 @@ async def api_delete_team(name: str):
 
 # ── Static file fallback (must be last) ──────────────────────────────────────
 
+# Extensions that the static fallback is allowed to serve. Sensitive file types
+# (.py, .json, .env, .md, .db, etc.) are intentionally excluded.
+_STATIC_ALLOWED_EXTS = {
+    ".html", ".js", ".css", ".ico", ".png", ".svg", ".gif",
+    ".jpg", ".jpeg", ".woff", ".woff2", ".ttf", ".eot", ".webp",
+}
+
+
 @app.get("/{filename}")
 async def static_file(filename: str):
+    # Reject dotfiles and any file type not explicitly allowed
+    if filename.startswith(".") or Path(filename).suffix.lower() not in _STATIC_ALLOWED_EXTS:
+        raise HTTPException(status_code=404, detail=f"{filename} not found")
     path = STATIC_DIR / filename
     if path.exists() and path.is_file():
         return FileResponse(path)
